@@ -9,49 +9,16 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <script>
     (function () {
-      try {
-        var saved = localStorage.getItem("vocabtool.theme");
-        if (saved === "dark" || saved === "light") {
-          var dark = saved === "dark";
-          document.documentElement.dataset.theme = saved;
-          document.documentElement.style.backgroundColor =
-            dark ? "#0f1420" : "#f7f9fd";
-          document.documentElement.style.colorScheme = saved;
-          var meta = document.querySelector('meta[name="theme-color"]');
-          if (meta) meta.setAttribute("content", dark ? "#0f1420" : "#007AFF");
-          // body 自带不透明背景，CSS 加载前会盖住 html 背景造成闪色；
-          // 隐藏 body 内容直到样式表加载完成，避免无样式/日间首帧闪现。
-          var guard = document.createElement("style");
-          guard.id = "theme-flash-guard";
-          guard.textContent = "html, body { background: " +
-            (dark ? "#0f1420" : "#f7f9fd") + " !important; }" +
-            " body { visibility: hidden; }";
-          document.head.appendChild(guard);
-          var cssLinks = document.querySelectorAll('link[rel="stylesheet"]');
-          var pending = cssLinks.length;
-          var removed = false;
-          function removeGuard() {
-            if (removed) return;
-            removed = true;
-            var el = document.getElementById("theme-flash-guard");
-            if (el && el.parentNode) el.parentNode.removeChild(el);
-          }
-          if (pending === 0) {
-            removeGuard();
-          } else {
-            cssLinks.forEach(function (link) {
-              link.addEventListener("load", function () {
-                pending -= 1;
-                if (pending <= 0) removeGuard();
-              });
-              link.addEventListener("error", function () {
-                pending -= 1;
-              });
-            });
-            setTimeout(removeGuard, 5000); // 兜底：无论怎样 5 秒后显示
-          }
-        }
-      } catch (e) {}
+      var saved = null;
+      try { saved = localStorage.getItem("vocabtool.theme"); } catch (e) {}
+      var dark = saved === "dark" ||
+        (saved !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+      var theme = dark ? "dark" : "light";
+      document.documentElement.dataset.theme = theme;
+      document.documentElement.style.backgroundColor = dark ? "#0f1420" : "#f7f9fd";
+      document.documentElement.style.colorScheme = theme;
+      var meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) meta.setAttribute("content", dark ? "#0f1420" : "#007AFF");
     })();
   </script>
   <link rel="manifest" href="/manifest.webmanifest">

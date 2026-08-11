@@ -76,6 +76,18 @@ def test_home_page_has_guest_search_demo_and_login_link(client):
     assert "体验 AI 短文" in page.text
 
 
+def test_theme_is_applied_before_stylesheets_on_home_and_login(client):
+    for path in ("/", "/login"):
+        html = client.get(path).text
+        initializer = html.index('localStorage.getItem("vocabtool.theme")')
+        first_stylesheet = html.index('<link rel="stylesheet"')
+        assert initializer < first_stylesheet
+        assert 'window.matchMedia("(prefers-color-scheme: dark)").matches' in html
+        assert "document.documentElement.dataset.theme = theme" in html
+        assert "theme-flash-guard" not in html
+        assert "visibility: hidden" not in html
+
+
 def test_app_page_is_removed(client):
     response = client.get("/app", follow_redirects=False)
     assert response.status_code == 404
