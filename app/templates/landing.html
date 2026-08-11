@@ -20,16 +20,36 @@
           var meta = document.querySelector('meta[name="theme-color"]');
           if (meta) meta.setAttribute("content", dark ? "#0f1420" : "#007AFF");
           // body 自带不透明背景，CSS 加载前会盖住 html 背景造成闪色；
-          // 临时覆盖 body 背景，样式表加载完成后移除以恢复渐变。
+          // 隐藏 body 内容直到样式表加载完成，避免无样式/日间首帧闪现。
           var guard = document.createElement("style");
           guard.id = "theme-flash-guard";
           guard.textContent = "html, body { background: " +
-            (dark ? "#0f1420" : "#f7f9fd") + " !important; }";
+            (dark ? "#0f1420" : "#f7f9fd") + " !important; }" +
+            " body { visibility: hidden; }";
           document.head.appendChild(guard);
-          window.addEventListener("load", function () {
+          var cssLinks = document.querySelectorAll('link[rel="stylesheet"]');
+          var pending = cssLinks.length;
+          var removed = false;
+          function removeGuard() {
+            if (removed) return;
+            removed = true;
             var el = document.getElementById("theme-flash-guard");
             if (el && el.parentNode) el.parentNode.removeChild(el);
-          });
+          }
+          if (pending === 0) {
+            removeGuard();
+          } else {
+            cssLinks.forEach(function (link) {
+              link.addEventListener("load", function () {
+                pending -= 1;
+                if (pending <= 0) removeGuard();
+              });
+              link.addEventListener("error", function () {
+                pending -= 1;
+              });
+            });
+            setTimeout(removeGuard, 5000); // 兜底：无论怎样 5 秒后显示
+          }
         }
       } catch (e) {}
     })();
