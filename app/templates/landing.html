@@ -1,0 +1,567 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#007AFF">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <script>
+    (function () {
+      try {
+        var saved = localStorage.getItem("vocabtool.theme");
+        if (saved === "dark" || saved === "light") {
+          document.documentElement.dataset.theme = saved;
+          document.documentElement.style.backgroundColor =
+            saved === "dark" ? "#0f1420" : "#f7f9fd";
+          document.documentElement.style.colorScheme = saved;
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute("content", saved === "dark" ? "#0f1420" : "#007AFF");
+        }
+      } catch (e) {}
+    })();
+  </script>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <title>vocabtool - 查单词、记词汇，读文章</title>
+  <link rel="icon" type="image/png" sizes="192x192" href="{{ static_url('icons/icon-192.png') }}">
+  <link rel="icon" type="image/png" sizes="192x192" media="(prefers-color-scheme: dark)" href="{{ static_url('icons/icon-dark-192.png') }}">
+  <link rel="icon" type="image/png" sizes="512x512" href="{{ static_url('icons/icon-512.png') }}">
+  <link rel="icon" type="image/png" sizes="512x512" media="(prefers-color-scheme: dark)" href="{{ static_url('icons/icon-dark-512.png') }}">
+  <link rel="apple-touch-icon" href="{{ static_url('icons/icon-192.png') }}">
+  <link rel="stylesheet" href="{{ static_url('style.css') }}">
+  <link rel="stylesheet" href="{{ static_url('style-glass.css') }}" id="skin-glass">
+  <link rel="stylesheet" href="{{ static_url('style-liquid.css') }}" id="skin-liquid">
+  <link rel="stylesheet" href="{{ static_url('style-motion.css') }}">
+</head>
+<body class="landing-body" data-logged-in="{{ 'true' if logged_in else 'false' }}">
+  <header class="topbar">
+    <div class="topbar-left">
+      <a class="topbar-logo" href="/" aria-label="返回首页">V</a>
+      <a class="landing-brand" href="/" aria-label="vocabtool 首页">vocabtool</a>
+    </div>
+    <div class="topbar-right">
+      {% if logged_in %}
+      <div class="account-menu" id="account-menu">
+        <button id="account-menu-toggle" class="account-menu-summary" data-ico="account" type="button"><span class="ic nav-emoji" aria-hidden="true">👤</span>个人</button>
+        <div id="account-menu-panel" class="account-menu-panel" hidden>
+          <p class="account-email">邮箱：<strong id="home-email">…</strong></p>
+          <button id="account-theme-toggle" class="small" type="button"><span id="account-theme-toggle-label">☾ 夜间模式</span></button>
+          <button id="home-logout" class="danger" type="button">退出登录</button>
+        </div>
+      </div>
+      {% else %}
+      <a class="landing-login-btn" href="/login">登录</a>
+      {% endif %}
+    </div>
+  </header>
+
+  <main class="landing-main">
+    <section class="landing-hero" id="landing-hero">
+      <div class="logo">V</div>
+      <h1>查单词、<mark class="oil-highlight">记词汇</mark>，读文章</h1>
+      <form id="landing-search-form" class="landing-search">
+        <div class="search-mode" role="group" aria-label="查询模式">
+          <button type="button" class="search-mode-btn active" data-search-mode="lookup" aria-pressed="true">查词</button>
+          <button type="button" class="search-mode-btn" data-search-mode="etymology" aria-pressed="false">词源</button>
+          <button type="button" class="search-mode-btn" data-search-mode="qa" aria-pressed="false">问答</button>
+        </div>
+        <div class="landing-search-input">
+          <input type="text" name="q" placeholder="输入单词或短语…" aria-label="搜索单词">
+          <button id="landing-search-clear" class="landing-clear-btn" type="button" aria-label="清空搜索" hidden>×</button>
+        </div>
+        <button class="primary" type="submit">DeepSeek</button>
+      </form>
+      <div id="landing-search-result" class="landing-search-result" role="status" aria-live="polite" aria-atomic="true" hidden></div>
+
+      <div class="manga-hero-art" aria-label="漫画风格的眼镜学生与暖黄色边牧">
+        <div class="manga-panel">
+          <svg class="manga-art" viewBox="0 0 560 300" role="img" aria-label="戴眼镜的学生和暖黄色边牧一起学习单词">
+            <defs>
+              <pattern id="manga-ht" width="12" height="12" patternUnits="userSpaceOnUse">
+                <circle cx="3" cy="3" r="1.8" fill="#1d1a16" opacity=".42"/>
+                <circle cx="9" cy="9" r="1.8" fill="#1d1a16" opacity=".42"/>
+              </pattern>
+              <pattern id="manga-ht-soft" width="10" height="10" patternUnits="userSpaceOnUse">
+                <circle cx="2.4" cy="2.4" r="1.1" fill="#1d1a16" opacity=".26"/>
+              </pattern>
+              <clipPath id="manga-dog-clip">
+                <path d="M348 190 Q348 156 402 156 Q456 156 456 190 Q456 232 402 232 Q348 232 348 190 Z"/>
+              </clipPath>
+            </defs>
+
+            <g stroke="#1d1a16" stroke-linecap="round" opacity=".07">
+              <path d="M280 148 L280 -18"/>
+              <path d="M280 148 L540 -8"/>
+              <path d="M280 148 L566 72"/>
+              <path d="M280 148 L574 148"/>
+              <path d="M280 148 L566 226"/>
+              <path d="M280 148 L540 308"/>
+              <path d="M280 148 L280 322"/>
+              <path d="M280 148 L22 308"/>
+              <path d="M280 148 L-6 226"/>
+              <path d="M280 148 L-14 148"/>
+              <path d="M280 148 L-6 72"/>
+              <path d="M280 148 L20 -8"/>
+            </g>
+            <ellipse cx="280" cy="282" rx="212" ry="20" fill="url(#manga-ht-soft)" opacity=".5"/>
+            <circle cx="280" cy="138" r="176" fill="url(#manga-ht-soft)" opacity=".18"/>
+
+            <g stroke="#1d1a16" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M66 230 q5 11 16 16 q-11 5 -16 16 q-5 -11 -16 -16 q11 -5 16 -16 z" fill="#f2b705" stroke-width="2"/>
+              <path d="M512 108 q5 11 16 16 q-11 5 -16 16 q-5 -11 -16 -16 q11 -5 16 -16 z" fill="#f2b705" stroke-width="2.5"/>
+              <path d="M496 236 q4 8 12 12 q-8 4 -12 12 q-4 -8 -12 -12 q8 -4 12 -12 z" fill="#f2b705" stroke-width="2"/>
+              <path d="M252 42 q4 8 12 12 q-8 4 -12 12 q-4 -8 -12 -12 q8 -4 12 -12 z" fill="#f2b705" stroke-width="2"/>
+              <path d="M42 96 q4 8 12 12 q-8 4 -12 12 q-4 -8 -12 -12 q8 -4 12 -12 z" fill="#f2b705" stroke-width="2"/>
+              <path d="M540 260 q4 8 12 12 q-8 4 -12 12 q-4 -8 -12 -12 q8 -4 12 -12 z" fill="#f2b705" stroke-width="2"/>
+
+              <circle cx="130" cy="104" r="36" fill="#fffaf0" stroke-width="5"/>
+              <path d="M96 90 Q110 62 144 64 Q166 70 166 90" fill="none" stroke-width="5"/>
+              <path d="M108 78 Q124 66 144 70" fill="none" stroke-width="3" opacity=".7"/>
+              <circle cx="116" cy="100" r="12" fill="none" stroke-width="3.5"/>
+              <circle cx="150" cy="100" r="12" fill="none" stroke-width="3.5"/>
+              <path d="M128 100 h8" fill="none" stroke-width="3.5"/>
+              <path d="M104 98 L88 90" fill="none" stroke-width="3.5"/>
+              <path d="M162 98 L176 88" fill="none" stroke-width="3.5"/>
+              <circle cx="116" cy="100" r="2.7" fill="#1d1a16" stroke="none"/>
+              <circle cx="150" cy="100" r="2.7" fill="#1d1a16" stroke="none"/>
+              <path d="M123 116 q7 7 14 0" fill="none" stroke-width="3"/>
+              <path d="M101 113 q4 4 9 2" fill="none" stroke-width="2.5" stroke="#d9781f" opacity=".75"/>
+              <path d="M156 113 q-4 4 -9 2" fill="none" stroke-width="2.5" stroke="#d9781f" opacity=".75"/>
+              <path d="M130 140 L130 198" fill="none" stroke-width="5"/>
+              <path d="M130 198 L112 246" fill="none" stroke-width="5"/>
+              <path d="M130 198 L150 246" fill="none" stroke-width="5"/>
+              <path d="M102 246 h18" fill="none" stroke-width="5"/>
+              <path d="M140 246 h18" fill="none" stroke-width="5"/>
+              <path d="M130 158 L98 120" fill="none" stroke-width="5"/>
+              <path d="M130 158 L160 170" fill="none" stroke-width="5"/>
+              <circle cx="94" cy="115" r="5" fill="#fffaf0" stroke-width="3"/>
+              <circle cx="165" cy="172" r="5" fill="#fffaf0" stroke-width="3"/>
+            </g>
+
+            <g transform="rotate(7 200 160)" stroke="#1d1a16" stroke-linecap="round">
+              <rect x="164" y="110" width="92" height="72" rx="9" fill="#e9f1fb" stroke-width="4"/>
+              <rect x="176" y="146" width="68" height="22" rx="5" fill="url(#manga-ht)" stroke-width="0"/>
+              <path d="M210 118 q5 11 16 16 q-11 5 -16 16 q-5 -11 -16 -16 q11 -5 16 -16 z" fill="#f2b705" stroke-width="2.5"/>
+              <path d="M176 178 h68" fill="none" stroke-width="3" opacity=".55"/>
+            </g>
+            <g stroke="#1d1a16" stroke-width="4" stroke-linecap="round" opacity=".65">
+              <path d="M264 128 h16"/>
+              <path d="M264 168 h16"/>
+              <path d="M264 148 h9"/>
+            </g>
+
+            <g stroke="#1d1a16" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M452 210 q32 -2 26 22 q-5 14 -20 9" fill="none" stroke-width="6"/>
+              <path d="M348 190 Q348 156 402 156 Q456 156 456 190 Q456 232 402 232 Q348 232 348 190 Z" fill="#f2b705" stroke-width="5"/>
+              <g clip-path="url(#manga-dog-clip)" opacity=".5">
+                <rect x="340" y="150" width="124" height="92" fill="url(#manga-ht)"/>
+              </g>
+              <ellipse cx="430" cy="224" rx="17" ry="13" fill="#f2b705" stroke-width="4"/>
+              <ellipse cx="362" cy="232" rx="10" ry="16" fill="#f2b705" stroke-width="4"/>
+              <ellipse cx="390" cy="233" rx="10" ry="15" fill="#f2b705" stroke-width="4"/>
+              <ellipse cx="362" cy="247" rx="8" ry="5" fill="#fffaf0" stroke-width="3"/>
+              <ellipse cx="390" cy="248" rx="8" ry="5" fill="#fffaf0" stroke-width="3"/>
+              <circle cx="386" cy="142" r="34" fill="#f2b705" stroke-width="5"/>
+              <path d="M360 120 Q332 122 336 142 Q338 154 358 148 Z" fill="#1d1a16" stroke-width="4"/>
+              <path d="M408 118 Q442 116 436 148 Q431 162 406 154 Z" fill="#1d1a16" stroke-width="4"/>
+              <ellipse cx="362" cy="157" rx="18" ry="13" fill="#fffaf0" stroke-width="3.5"/>
+              <circle cx="353" cy="151" r="4.5" fill="#1d1a16" stroke="none"/>
+              <path d="M358 163 q8 8 16 0" fill="none" stroke-width="3"/>
+              <circle cx="380" cy="137" r="3.4" fill="#1d1a16" stroke="none"/>
+              <path d="M400 133 q6 -1 7 5" fill="none" stroke-width="2.5" opacity=".75"/>
+              <path d="M376 170 Q392 158 408 170 Q406 192 392 196 Q378 192 376 170 Z" fill="#fffaf0" stroke-width="3"/>
+              <path d="M368 186 Q384 198 406 186" fill="none" stroke-width="6" stroke="#3f6fbf"/>
+              <circle cx="386" cy="200" r="6" fill="#f2b705" stroke-width="3"/>
+            </g>
+          </svg>
+          <div class="manga-speech">汪！今天也要学习呀！</div>
+          <div class="manga-chips" aria-hidden="true">
+            <span class="manga-chip c-known">查词</span>
+            <span class="manga-chip c-learning">我的词库</span>
+            <span class="manga-chip c-hard">学习卡片</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="landing-section" id="real-review"{% if not logged_in %} hidden{% endif %}>
+      <div id="real-review-empty" class="home-review-empty">
+        <p>🎉 恭喜你完成今天的学习任务！</p>
+        <button id="real-extra-open" class="ghost small" type="button">继续学习</button>
+      </div>
+      <div id="real-review-empty-none" class="home-review-empty" hidden>
+        <h3>还没有卡片</h3>
+        <p class="hint">先去制作新卡，再回来开始今日学习。</p>
+        <button id="real-review-go-add" class="ghost small" type="button">去制作新卡</button>
+      </div>
+      <div id="real-extra-panel" class="real-extra-panel" hidden>
+        <label>类型
+          <select id="real-extra-type">
+            <option value="all" selected>全部类型</option>
+            <option value="general">通用卡</option>
+            <option value="reading">阅读卡</option>
+            <option value="cloze">Cloze 卡</option>
+            <option value="speaking">口语卡</option>
+            <option value="anki">Anki 导入</option>
+          </select>
+        </label>
+        <label>数量 <input id="real-extra-count" type="number" min="1" max="100" value="5"></label>
+        <button id="real-extra-start" class="primary small" type="button">开始学习</button>
+        <p id="real-extra-status" class="hint" role="status" aria-live="polite"></p>
+      </div>
+      <div id="real-review-cards" class="demo-cards home-review-cards"></div>
+      <div class="real-review-manage-row">
+        <div class="review-manage">
+          <button id="real-review-manage-toggle" type="button" aria-haspopup="menu" aria-expanded="false">卡片管理 ▾</button>
+          <div id="real-review-manage-menu" class="review-manage-menu" role="menu" hidden>
+            <button id="real-review-undo" type="button" role="menuitem" disabled>撤回</button>
+            <button id="real-review-delete-first" type="button" role="menuitem">删除当前卡</button>
+            <button id="real-manage-library" type="button" role="menuitem">我的词库</button>
+            <button id="real-manage-add-card" type="button" role="menuitem">制作新卡</button>
+            <button id="real-manage-browser" type="button" role="menuitem">我的卡片</button>
+            <div class="review-manage-daily">
+              <label for="real-review-daily-new-limit">每天新学习</label>
+              <div class="review-manage-daily-row">
+                <input id="real-review-daily-new-limit" type="number" min="0" max="200" value="10">
+                <span>张</span>
+                <button id="real-review-save-daily-new" class="small" type="button">保存</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="review-remaining" aria-label="剩余卡片统计">
+          <span class="review-remaining-total">剩余 <b id="real-review-remaining-total">0</b> 张</span>
+          <span class="rr rr-new">新学 <b id="real-review-remaining-new">0</b></span>
+          <span class="rr rr-learning">学习中 <b id="real-review-remaining-learning">0</b></span>
+          <span class="rr rr-due">待复习 <b id="real-review-remaining-due">0</b></span>
+        </div>
+      </div>
+      <div class="real-review-toolbar">
+        <span id="real-undo-status" class="hint" role="status" aria-live="polite"></span>
+      </div>
+    </section>
+
+    <section class="landing-section" id="guest-demo-cards"{% if logged_in %} hidden{% endif %}>
+      <div class="landing-section-head">
+        <h2>体验学习卡片</h2>
+        <p>通用、阅读、Cloze 与口语卡，点击翻面体验</p>
+      </div>
+      {% set demo_cards = [
+        {"type": "通用卡", "front": "<mark class='oil-highlight'>pond</mark>", "answer": "pond /pɒnd/", "meaning": "n. 池塘", "sentence": "The children fed the ducks by the pond after school.", "audio": "pond", "audio_back": "The children fed the ducks by the pond after school.", "front_audio": true},
+        {"type": "阅读卡", "front": "The old <mark class='oil-highlight'>fisherman</mark> checked his net before sunrise.", "answer": "fisherman", "meaning": "n. 渔夫；钓鱼的人", "sentence": "", "audio": "The old fisherman checked his net before sunrise.", "front_audio": true},
+        {"type": "Cloze 卡", "front": "She spoke in a <mark class='oil-highlight'>______</mark> voice so the baby would not wake.", "answer": "gentle /ˈdʒentl/", "meaning": "adj. 轻柔的；温和的", "sentence": "", "audio": "She spoke in a gentle voice so the baby would not wake.", "front_audio": false},
+        {"type": "口语卡", "front": "如何称赞对方说话很有感染力？", "answer": "Your words are truly eloquent.", "meaning": "称赞对方表达生动、有感染力", "sentence": "", "audio": "Your words are truly eloquent.", "front_audio": false}
+      ] %}
+      <div class="demo-cards">
+        {% for card in demo_cards %}
+        <div class="demo-card">
+          <div class="demo-card-inner">
+            <div class="demo-card-face front"><span class="demo-type">{{ card.type }}</span><p class="demo-front-text">{{ card.front|safe }}</p>{% if card.front_audio %}<button class="demo-audio" type="button" data-audio="{{ card.audio }}">▶ 发音</button>{% endif %}</div>
+            <div class="demo-card-face back"><p class="demo-back-word">{{ card.answer }}</p><p>{{ card.meaning }}</p>{% if card.sentence %}<p>{{ card.sentence }}</p>{% endif %}<button class="demo-audio" type="button" data-audio="{{ card.audio_back or card.audio }}">▶ 例句</button><div class="demo-rating"><button class="rating again" data-demo-rating="again" type="button"><b>重来</b><small>现在</small></button><button class="rating hard" data-demo-rating="hard" type="button"><b>困难</b><small>现在</small></button><button class="rating good" data-demo-rating="good" type="button"><b>良好</b><small>学完</small></button><button class="rating easy" data-demo-rating="easy" type="button"><b>简单</b><small>学完</small></button></div></div>
+          </div>
+          <button class="demo-flip" type="button" data-demo-flip>翻转</button>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="landing-section oil-today oil-only" id="oil-today"{% if not logged_in %} hidden{% endif %}>
+      <div class="oil-today-card">
+        <div class="oil-today-main">
+          <div class="oil-today-ring" aria-hidden="true">
+            <svg viewBox="0 0 110 110">
+              <circle class="oil-today-ring-track" cx="55" cy="55" r="44"></circle>
+              <circle class="oil-today-ring-fill" id="oil-today-ring-fill" cx="55" cy="55" r="44"></circle>
+            </svg>
+            <div class="oil-today-ring-label"><b id="oil-today-ring-text">0%</b><span>今日进度</span></div>
+          </div>
+          <div class="oil-today-copy">
+            <p class="oil-today-kicker">今日学习</p>
+            <h2 id="oil-today-title">今天也要见面 5 分钟</h2>
+            <p class="oil-today-sub" id="oil-today-sub">先解决到期卡片，再学一点新词</p>
+          </div>
+        </div>
+        <div class="oil-today-stats">
+          <div class="oil-today-stat"><b id="oil-today-due">–</b><span>复习</span></div>
+          <div class="oil-today-stat"><b id="oil-today-new">–</b><span>新学</span></div>
+          <div class="oil-today-stat"><b id="oil-today-studied">–</b><span>今日已学</span></div>
+          <div class="oil-today-stat stat-days"><b id="oil-today-days">–</b><span>连续学习</span></div>
+        </div>
+        <div class="oil-today-actions">
+          <button id="oil-today-start" class="primary" type="button">开始今日学习</button>
+          <button id="oil-today-add" type="button">制作新卡</button>
+          <button id="oil-today-article" type="button">读一篇 AI 短文</button>
+          <button id="oil-today-extra" type="button" hidden>继续学习</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="landing-section" id="guest-demo-article"{% if logged_in %} hidden{% endif %}>
+      <div class="landing-section-head">
+        <h2>体验 AI 短文</h2>
+        <p class="hint">示例：4 个目标词，一篇可朗读的短文</p>
+      </div>
+      <div id="guest-article-body">
+        <div class="demo-words">
+          <span>gentle</span><span>pond</span><span>fisherman</span><span>eloquent</span>
+        </div>
+        <article class="demo-article">
+          <h3>The Old Fisherman</h3>
+          <div id="guest-article-paragraphs">
+            <p>Every morning, the old <mark>fisherman</mark> walked to the <mark>pond</mark> with quiet, <mark>gentle</mark> steps. He never hurried, because the water had taught him to wait.</p>
+            <p>A girl asked why he returned each day. The old man gave an <mark>eloquent</mark> answer: &quot;The pond has no secrets for me, only lessons. Every ripple is a new sentence.&quot;</p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="landing-section" id="real-article-panel"{% if not logged_in %} hidden{% endif %}>
+      <div class="landing-section-head">
+        <h2>AI 短文</h2>
+        <p class="hint">deepseek-v4-flash 用今天新学的词汇生成</p>
+      </div>
+      <div id="real-article-body-wrap">
+        <div class="real-article-generate-row">
+          <button id="real-article-generate" class="primary" type="button">生成文章</button>
+          <span id="real-article-status" class="hint" role="status" aria-live="polite" hidden></span>
+        </div>
+        <div id="real-article-placeholder" class="real-article-placeholder">
+          <p>还没有生成文章</p>
+          <p class="hint">点击上方“生成文章”后会显示在这里</p>
+        </div>
+        <article id="real-article-result" class="demo-article" hidden>
+          <div id="real-article-body" class="ai-article-body"></div>
+        </article>
+      </div>
+    </section>
+
+    <section class="landing-section manage-area" id="manage-area"{% if not logged_in %} hidden{% endif %}>
+      <div class="manage-tabs" role="tablist" aria-label="管理功能">
+        <button type="button" class="manage-button" data-manage-panel="real-library" role="tab" aria-selected="false">我的词库</button>
+        <button type="button" class="manage-button" data-manage-panel="real-card-browser" role="tab" aria-selected="false">我的卡片</button>
+        <button type="button" class="manage-button" data-manage-panel="real-add-card" role="tab" aria-selected="false">制作新卡</button>
+      </div>
+      <div class="manage-panels">
+        <div id="real-library" class="manage-panel" hidden>
+          <div class="library-body">
+            <div class="word-status-filters" role="group" aria-label="词库状态筛选">
+              <button type="button" class="word-status-filter active" data-word-status-filter="all">全部</button>
+              <button type="button" class="word-status-filter" data-word-status-filter="easy">Easy</button>
+              <button type="button" class="word-status-filter" data-word-status-filter="mid">Mid（已制卡）</button>
+              <button type="button" class="word-status-filter" data-word-status-filter="hard">Hard（生词库）</button>
+            </div>
+            <div class="library-profile-row">
+              <label>阅读基础词范围：NGSL 前 <input id="real-profile-known-rank" type="number" min="0" max="31000" value="3000"> 词</label>
+              <button id="real-profile-save" class="small primary" type="button">保存</button>
+              <span id="real-profile-status" class="hint" role="status" aria-live="polite"></span>
+            </div>
+            <input id="real-library-search" class="landing-library-search" placeholder="搜索我的词库…">
+            <p id="real-word-total" class="hint card-browser-total">共 0 个词</p>
+            <div id="real-word-batch" class="library-batch" hidden>
+              <div class="card-batch-left">
+                <label class="check-row"><input id="real-word-batch-all" type="checkbox"> 全选本页</label>
+                <button id="real-word-batch-easy" class="small" type="button">标记为 Easy</button>
+                <button id="real-word-batch-hard" class="small" type="button">标记为 Hard</button>
+                <button id="real-word-batch-delete" class="small danger" type="button">移出词库</button>
+                <button id="real-word-batch-clear" class="small" type="button">取消选择</button>
+              </div>
+              <span id="real-word-batch-count" class="hint">已选 0 个</span>
+            </div>
+            <div id="real-word-mark-easy" class="word-mark-easy" hidden>
+              <div class="word-mark-easy-head">
+                <strong>批量标记 Easy</strong>
+                <button type="button" class="small" id="real-word-mark-easy-close">收起</button>
+              </div>
+              <p class="hint">把内置词表、NGSL 排名范围或粘贴的单词标记为 Easy（已掌握），标记后这些词从 Hard 中筛出。</p>
+              <div class="word-mark-easy-sources">
+                <label class="check-row"><input id="real-word-mark-easy-list-toggle" type="checkbox"> 用内置词表</label>
+                <div id="real-word-mark-easy-list-fields" class="ngsl-fields-row" hidden>
+                  <label>词表 <select id="real-word-mark-easy-list-id"></select></label>
+                </div>
+                <label class="check-row"><input id="real-word-mark-easy-ngsl-toggle" type="checkbox"> 用 NGSL 词库</label>
+                <div id="real-word-mark-easy-ngsl-fields" class="ngsl-fields-row" hidden>
+                  <label>范围 <input id="real-word-mark-easy-ngsl-from" type="number" min="1" max="31000" value="1"> - <input id="real-word-mark-easy-ngsl-to" type="number" min="1" max="31000" value="3000"></label>
+                </div>
+                <label class="check-row"><input id="real-word-mark-easy-paste-toggle" type="checkbox"> 粘贴单词</label>
+                <div id="real-word-mark-easy-paste-fields" class="ngsl-fields-row" hidden>
+                  <textarea id="real-word-mark-easy-paste" rows="3" placeholder="每行一个单词或短语"></textarea>
+                </div>
+              </div>
+              <button id="real-word-mark-easy-run" class="small primary" type="button">标记为 Easy</button>
+              <span id="real-word-mark-easy-status" class="hint" role="status" aria-live="polite"></span>
+            </div>
+            <button id="real-word-batch-easy-open" class="small" type="button">批量标记 Easy…</button>
+            <p id="real-word-status" class="hint" role="status" aria-live="polite" hidden></p>
+            <div id="real-word-results" class="word-results"></div>
+          </div>
+        </div>
+        <div id="real-card-browser" class="manage-panel" hidden>
+          <div class="library-body">
+            <div class="card-browser-filters">
+              <input id="real-browser-query" type="search" maxlength="100" placeholder="搜索单词、正面或背面…">
+              <select id="real-browser-state">
+                <option value="all">全部进度</option>
+                <option value="new">新卡</option>
+                <option value="scheduled">已有待复习日期</option>
+                <option value="buried">不想学</option>
+              </select>
+              <select id="real-browser-type">
+                <option value="all">全部类型</option>
+                <option value="general">通用卡</option>
+                <option value="reading">阅读卡</option>
+                <option value="cloze">Cloze 卡</option>
+                <option value="speaking">口语卡</option>
+                <option value="anki">Anki 导入卡</option>
+              </select>
+              <div class="browser-sort-wrap">
+                <label for="real-browser-sort">排序方式</label>
+                <select id="real-browser-sort">
+                  <option value="time">按添加时间（新→旧）</option>
+                  <option value="alpha">按字母排序（A→Z）</option>
+                  <option value="ngsl">按 NGSL 排名（常用在前）</option>
+                </select>
+              </div>
+              <button id="real-browser-search" class="small primary" type="button">查询</button>
+            </div>
+            <p id="real-browser-total" class="hint card-browser-total">共 0 张卡片</p>
+            <div id="real-browser-batch" class="card-browser-batch" hidden>
+              <label class="check-row"><input id="real-browser-batch-all" type="checkbox"> 全选本页</label>
+              <span id="real-browser-batch-count" class="hint">已选 0 张</span>
+              <button id="real-browser-select-all" class="small" type="button">全选所有卡片</button>
+              <button id="real-browser-batch-delete" class="small danger" type="button">批量删除</button>
+              <button id="real-browser-batch-clear" class="small" type="button">取消选择</button>
+            </div>
+            <div id="real-browser-results" class="card-browser-results"></div>
+            <div class="browser-pager">
+              <button id="real-browser-prev" class="small" type="button">上一页</button>
+              <span id="real-browser-page" class="hint"></span>
+              <button id="real-browser-next" class="small" type="button">下一页</button>
+            </div>
+          </div>
+        </div>
+        <div id="real-add-card" class="manage-panel" hidden>
+          <div class="add-card-body">
+            <div class="card-wizard-steps">
+              <span class="card-wizard-step active">1 选择卡片类型</span>
+              <span class="card-wizard-step" id="card-wizard-step-2">2 提取目标词</span>
+              <span class="card-wizard-step" id="card-wizard-step-3">3 生成卡片</span>
+            </div>
+
+            <div class="card-step" id="card-step-1">
+              <div class="card-type-boxes four" id="real-card-types">
+                <button type="button" class="card-type-option" data-card-type="general"><strong>通用卡</strong><span>单词 → 核心释义</span></button>
+                <button type="button" class="card-type-option" data-card-type="reading"><strong>阅读卡</strong><span>在语境中识别</span></button>
+                <button type="button" class="card-type-option" data-card-type="cloze"><strong>Cloze 卡</strong><span>从语境主动提取</span></button>
+                <button type="button" class="card-type-option" data-card-type="speaking"><strong>口语卡</strong><span>交际意图 → 英文表达</span></button>
+              </div>
+              <p class="hint" id="real-card-step1-hint">请先点击选择卡片类型</p>
+            </div>
+
+            <div class="card-step" id="card-step-2" hidden>
+              <div class="add-card-source-row">
+                <label>目标词来自
+                  <select id="real-card-source">
+                    <optgroup label="自己提供内容">
+                      <option value="corpus">从文章或文本提取</option>
+                      <option value="wordlist">粘贴单词或短语</option>
+                      <option value="file">从文件提取</option>
+                    </optgroup>
+                    <optgroup label="系统词库">
+                      <option value="builtin">选择内置词表</option>
+                      <option value="ngsl">按 NGSL 排名选词</option>
+                      <option value="saved">从生词库选择</option>
+                    </optgroup>
+                    <optgroup label="AI 与口语">
+                      <option value="topic">AI 按主题生成词表</option>
+                      <option value="needs">选择口语表达素材</option>
+                    </optgroup>
+                  </select>
+                </label>
+                <button id="real-card-extract" class="small" type="button">提取目标词</button>
+                <button type="button" class="small" id="real-card-step2-back">← 上一步</button>
+              </div>
+              <div id="real-card-source-fields">
+                <textarea id="real-card-source-text" rows="4" placeholder="每行一个单词或短语"></textarea>
+                <p id="real-card-corpus-hint" class="hint" hidden>支持粘贴整篇文章或文本，自动提取目标单词；只提取，不保存正文</p>
+                <div id="real-card-file-fields" hidden>
+                  <input id="real-card-file" type="file" accept=".txt,.md,.pdf,.docx,.epub,.csv,.xlsx,.xls,.db,.sqlite">
+                  <p class="hint">支持 TXT/MD/PDF/DOCX/EPUB/CSV/XLSX/DB/SQLite，最大 10MB；只提取目标词，不保存正文</p>
+                </div>
+                <div id="real-card-ngsl-source-fields" class="ngsl-fields-row" hidden>
+                  <label>个数 <input id="real-card-count" type="number" min="1" max="5000" value="100"></label>
+                  <label class="check-row"><input id="real-card-random" type="checkbox"> 随机抽取</label>
+                </div>
+                <div id="real-card-list-fields" class="ngsl-fields-row" hidden>
+                  <label>词表 <select id="real-card-list-id"></select></label>
+                  <label>个数 <input id="real-card-list-count" type="number" min="1" max="5000" value="20"></label>
+                  <label class="check-row"><input id="real-card-list-random" type="checkbox"> 随机抽取</label>
+                </div>
+                <div id="real-card-topic-fields" hidden>
+                  <label>主题 <input id="real-card-topic" type="text" placeholder="如：旅游"></label>
+                  <label>个数 <input id="real-card-topic-count" type="number" value="20"></label>
+                </div>
+                <div id="real-needs-fields" hidden>
+                  <div class="speaking-needs-toolbar">
+                    <input id="real-needs-search" type="search" maxlength="50" placeholder="搜索口语素材…">
+                    <button id="real-needs-select-all" class="small" type="button">全选</button>
+                    <button id="real-needs-clear" class="small" type="button">清空</button>
+                    <label class="speaking-needs-random">随机选<input id="real-needs-random-count" type="number" min="1" max="50" value="10">个<button id="real-needs-random" class="small" type="button">随机</button></label>
+                    <span id="real-needs-count" class="hint">已选 0 个</span>
+                  </div>
+                  <div id="real-needs-list" class="speaking-needs-list"></div>
+                </div>
+                <div id="real-card-ngsl-filter-row" class="ngsl-fields-row">
+                  <label class="check-row"><input id="real-card-ngsl-filter" type="checkbox"> 按 NGSL 排名范围筛选</label>
+                  <div id="real-card-ngsl-filter-fields" hidden>
+                    <label>NGSL 排名 <input id="real-card-rank-from" type="number" min="1" max="31000" value="1"> - <input id="real-card-rank-to" type="number" min="1" max="31000" value="31000"></label>
+                  </div>
+                  <span id="real-card-ngsl-filter-hint" class="hint">开启后只保留 NGSL 中位于该排名范围的词</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="card-step" id="card-step-3" hidden>
+              <textarea id="real-card-words" rows="4" placeholder="目标词（可编辑，每行一个）"></textarea>
+              <p class="hint card-deepseek-note">卡片正面与释义由 DeepSeek 生成，单词越多耗时越长</p>
+              <div id="real-card-progress-wrap" class="card-generate-progress" hidden>
+                <div id="real-card-progress-bar" class="card-generate-progress-bar">
+                  <div id="real-card-progress-fill" class="card-generate-progress-fill"></div>
+                </div>
+                <span id="real-card-progress-text" class="hint">0 / 0</span>
+              </div>
+              <div class="real-add-card-row">
+                <button id="real-card-generate" class="primary" type="button">生成卡片</button>
+                <button type="button" class="small" id="real-card-step3-back">← 上一步</button>
+                <span id="real-card-status" class="hint" role="status" aria-live="polite"></span>
+              </div>
+              <div id="real-card-result"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+  <nav class="mobile-nav" id="mobile-nav" aria-label="主导航">
+    <button type="button" class="mobile-nav-btn" data-mobile-view="search">
+      <span class="mobile-nav-ic" aria-hidden="true">🔍</span><span>查词</span>
+    </button>
+    <button type="button" class="mobile-nav-btn" data-mobile-view="study">
+      <span class="mobile-nav-ic" aria-hidden="true">📚</span><span>学习</span>
+    </button>
+    <button type="button" class="mobile-nav-btn" data-mobile-view="article">
+      <span class="mobile-nav-ic" aria-hidden="true">📖</span><span>文章</span>
+    </button>
+    {% if logged_in %}
+    <button type="button" class="mobile-nav-btn" data-mobile-view="cards">
+      <span class="mobile-nav-ic" aria-hidden="true">🗂</span><span>卡片</span>
+    </button>
+    {% endif %}
+  </nav>
+  <div id="floating-lookup" class="floating-lookup" role="dialog" aria-label="查词结果" aria-live="polite" hidden>
+    <div id="floating-lookup-body"></div>
+  </div>
+  <script src="{{ static_url('ui-polish.js') }}"></script>
+  <script src="{{ static_url('landing-v51.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,50 @@
+/* ============================================================
+   精移动效层（所有皮肤共用，最后加载）
+   卡片 hover 抬升辉光 / 搜索聚焦呼吸 / 词条微浮动。
+   只加动效不改布局；prefers-reduced-motion 时全部关闭。
+   ============================================================ */
+
+@media (prefers-reduced-motion: no-preference) {
+  .demo-card {
+    transition: transform .35s var(--ease), box-shadow .35s var(--ease);
+  }
+  .demo-card:hover {
+    transform: translateY(-6px);
+  }
+  .demo-card:hover .demo-card-face {
+    box-shadow: var(--shadow-lg);
+  }
+
+  .word-result {
+    transition: transform .25s var(--ease), box-shadow .25s var(--ease);
+  }
+  .word-result:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .landing-search:focus-within {
+    animation: motion-search-glow 2.6s ease-in-out infinite;
+  }
+  @keyframes motion-search-glow {
+    0%, 100% {
+      box-shadow: 0 0 0 3px rgba(0, 122, 255, .12), var(--shadow);
+    }
+    50% {
+      box-shadow: 0 0 0 5px rgba(0, 122, 255, .20), var(--shadow);
+    }
+  }
+
+  .demo-flip {
+    transition: transform .25s var(--ease), box-shadow .25s var(--ease);
+  }
+  .demo-flip:hover {
+    transform: translateY(-2px);
+  }
+
+  /* 文章内标记词：轻微呼吸高亮 */
+  .demo-article mark,
+  .ai-article-body mark {
+    transition: background-color .3s ease;
+  }
+}

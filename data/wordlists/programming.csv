@@ -1,0 +1,603 @@
+abstraction
+accent
+accessibility
+accessibility tree
+accessible description
+accessible name
+adobe flash
+advance measure
+ajax
+algorithm
+alignment container
+alignment subject
+alpha
+alpn
+api
+apple safari
+application context
+argument
+aria
+arpa
+arpanet
+array
+ascii
+aspect ratio
+asynchronous
+atag
+attribute
+authentication
+authenticator
+bandwidth
+base64
+baseline
+bcp 47 language tag
+beacon
+bezier curve
+bfcache
+bidi
+bigint
+binding
+bitwise flags
+blink
+blink element
+block-level content
+block
+block cipher mode of operation
+boolean
+bounding box
+breadcrumb
+brotli compression
+browser
+browsing context
+buffer
+bun
+cache
+cacheable
+caldav
+call stack
+callback function
+camel case
+canonical order
+canvas
+card sorting
+carddav
+caret
+cdn
+certificate authority
+certified
+challenge
+character
+character encoding
+character reference
+character set
+chrome
+cia
+cipher
+cipher suite
+ciphertext
+class
+closure
+cloud
+cloud computing
+cls
+cms
+code point
+code splitting
+code unit
+codec
+color space
+color wheel
+compile
+compile time
+composite operation
+compression dictionary transport
+computer programming
+conditional
+constant
+constructor
+content header
+continuous integration
+continuous media
+control flow
+cookie
+copyleft
+cors-safelisted request header
+cors-safelisted response header
+cors
+crawler
+credential
+crlf
+cross-site scripting
+cross axis
+crud
+cryptanalysis
+cryptography
+csp
+csr
+csrf
+css
+css descriptor
+css pixel
+css preprocessor
+css selector
+cssom
+data structure
+database
+debounce
+decryption
+deep copy
+delta
+denial of service
+deno
+deserialization
+developer tools
+device pixel
+digital certificate
+digital signature
+distributed denial of service
+dmz
+dns
+doctype
+document directive
+document environment
+dom
+domain
+domain name
+domain sharding
+dominator
+dsl
+dtls
+dtmf
+dynamic typing
+ecma
+ecmascript
+effective connection type
+element
+encapsulation
+encryption
+endianness
+engine
+entity
+entity header
+enumerated
+escape character
+event
+exception
+exif
+expando
+extrinsic size
+fallback alignment
+falsy
+favicon
+federated identity
+fetch directive
+fetch metadata request header
+fingerprinting
+firefox os
+firewall
+first-class function
+first contentful paint
+first cpu idle
+first input delay
+first meaningful paint
+first paint
+flex
+flex container
+flex item
+flexbox
+flow relative values
+forbidden request header
+forbidden response header name
+fork
+fps
+fragmentainer
+ftp
+ftu
+function
+fuzzing
+gamut
+garbage collection
+gecko
+general header
+gif
+git
+global object
+global scope
+global variable
+glyph
+google chrome
+gpl
+gpu
+graceful degradation
+grid
+grid areas
+grid axis
+grid cell
+grid column
+grid container
+grid lines
+grid row
+grid tracks
+guaranteed invalid value
+gutters
+gzip compression
+hash function
+hash routing
+head
+head of line blocking
+high-level programming language
+hmac
+hoisting
+host
+hotlink
+houdini
+hpkp
+hsts
+html
+html5
+html color codes
+http
+http 2
+http 3
+http content
+http header
+https
+https rr
+hyperlink
+hypertext
+iana
+icann
+ice
+ide
+idempotent
+identifier
+identity provider
+idl
+ietf
+iife
+imap
+immutable
+indexeddb
+information architecture
+inheritance
+ink overflow
+inline-level content
+input method editor
+inset properties
+instance
+interaction to next paint
+internationalization
+internet
+interpolation
+intrinsic size
+invariant
+ip address
+ipv4
+ipv6
+irc
+iso
+isp
+itu
+jank
+java
+javascript
+jitter
+jpeg
+json
+json type representation
+just in time compilation
+kebab case
+key
+keyword
+khronos
+largest contentful paint
+latency
+layout mode
+layout viewport
+lazy load
+leading
+lgpl
+ligature
+literal
+local scope
+local variable
+locale
+localization
+logical properties
+long task
+loop
+lossless compression
+lossy compression
+ltr
+main axis
+main thread
+markup
+mathml
+media
+media query
+metadata
+method
+microsoft edge
+microsoft internet explorer
+middleware
+mime
+mime type
+minification
+mitm
+mixin
+mobile first
+modem
+modularity
+mozilla firefox
+multi-factor authentication
+mutable
+mvc
+namespace
+nan
+nat
+native
+navigation directive
+netscape navigator
+network throttling
+nntp
+node.js
+node
+non-normative
+nonce
+normative
+null
+nullish
+number
+object
+object reference
+oop
+opengl
+openssl
+opera browser
+operand
+operator
+origin
+ota
+owasp
+p2p
+pac
+packet
+page load time
+page prediction
+parameter
+parent object
+parse
+parser
+payload body
+payload header
+pdf
+perceived performance
+percent-encoding
+php
+physical properties
+pixel
+placeholder names
+plaintext
+plugin
+png
+polyfill
+polymorphism
+pop
+port
+prefetch
+preflight request
+prerender
+presto
+primitive
+principle of least privilege
+privileged
+privileged code
+progressive enhancement
+progressive web apps
+promise
+property
+protocol
+prototype-based programming
+prototype
+proxy server
+pseudo-class
+pseudo-element
+pseudocode
+public-key cryptography
+python
+quality values
+quaternion
+quic
+rail
+raster image
+rate limit
+rdf
+reading order
+real user monitoring
+recursion
+reflow
+registrable domain
+regular expression
+relying party
+render blocking
+repaint
+replaced elements
+replay attack
+repo
+reporting directive
+representation header
+request header
+resource timing
+response header
+responsive web design
+rest
+rgb
+ril
+rng
+robots.txt
+round trip time
+router
+rss
+rsync
+rtcp
+rtf
+rtl
+rtp
+rtsp
+ruby
+safe
+salt
+same-origin policy
+scm
+scope
+screen reader
+script-supporting element
+scroll boundary
+scroll chaining
+scroll container
+scroll snap
+sctp
+sdk
+sdp
+search engine
+secure context
+semantics
+seo
+serializable object
+serialization
+server
+server timing
+session hijacking
+sgml
+shadow tree
+shallow copy
+shim
+signature
+simd
+sisd
+site
+site map
+sld
+sloppy mode
+slug
+smoke test
+smpte
+smtp
+snake case
+snap positions
+soap
+social engineering
+source map
+spa
+specification
+speculative parsing
+speed index
+sql
+sql injection
+sri
+ssg
+ssl
+ssr
+stacking context
+state machine
+statement
+static method
+static typing
+sticky activation
+strict mode
+string
+stringifier
+stun
+style origin
+style sheet
+submit button
+svg
+svn
+symbol
+symmetric-key cryptography
+synchronous
+syntax
+syntax error
+synthetic monitoring
+table grid box
+table wrapper box
+tag
+tcp
+tcp handshake
+tcp slow start
+telnet
+texel
+thread
+three js
+throttle
+time to first byte
+time to interactive
+tld
+tls
+tofu
+top layer
+transient activation
+tree shaking
+trident
+truthy
+ttl
+turn
+type
+type coercion
+type conversion
+typescript
+uaag
+udp
+ui
+undefined
+unicode
+unix time
+uri
+url
+urn
+usenet
+user agent
+utf-16
+utf-8
+uuid
+ux
+validator
+value
+variable
+vendor prefix
+viewport
+visual viewport
+void element
+voip
+w3c
+wai
+wcag
+web performance
+web server
+web standards
+webassembly
+webdav
+webextensions
+webgl
+webidl
+webkit
+webm
+webp
+webrtc
+websockets
+webvtt
+whatwg
+whitespace
+windowproxy
+world wide web
+wrapper
+xforms
+xhtml
+xinclude
+xlink
+xml
+xmlhttprequest
+xpath
+xquery
+xslt
+zstandard compression

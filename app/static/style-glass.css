@@ -1,0 +1,317 @@
+/* ============================================================
+   玻璃拟态 Glassmorphism —— 当前功能布局适配层
+   视觉沿用 style.css 的 Modern UI Refresh，不覆盖原有风格
+   ============================================================ */
+
+/* ---------- 记忆/文章/管理区桌面网格 ---------- */
+.landing-section {
+  margin-top: 36px;
+}
+
+.manage-panels {
+  border-top: 0;
+  padding-top: 0;
+}
+.manage-panels.is-open {
+  border-top: 1px solid var(--line);
+  padding-top: 20px;
+}
+.manage-panel[hidden] { display: none; }
+.manage-panel .library-body,
+.manage-panel .add-card-body {
+  max-width: none;
+}
+
+/* ---------- 记忆区：4 个卡位常驻 ---------- */
+.real-review-toolbar {
+  justify-content: flex-start;
+  margin-bottom: 12px;
+}
+#real-review .home-review-cards .demo-card,
+#guest-demo-cards .demo-cards .demo-card {
+  height: 420px;
+}
+.review-placeholder .demo-card-face {
+  border-style: dashed;
+  border-color: var(--line);
+  background: transparent;
+  box-shadow: none;
+}
+
+/* ---------- 文章区：完整展示，页面随正文自然滚动 ---------- */
+#real-article-panel {
+  display: flex;
+  flex-direction: column;
+}
+#real-article-body-wrap {
+  display: flex;
+  flex-direction: column;
+}
+.real-article-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 20px;
+  color: var(--muted);
+  text-align: center;
+}
+.real-article-placeholder p {
+  margin: 0;
+}
+.real-article-placeholder p:first-child {
+  color: var(--text);
+  font-weight: 700;
+}
+.real-article-placeholder[hidden] { display: none; }
+#real-article-result {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------- 游客文章区：完整展示 ---------- */
+#guest-demo-article {
+  display: flex;
+  flex-direction: column;
+}
+#guest-article-body {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------- 桌面版式：上下单栏，卡片一行 4 个 ---------- */
+@media (min-width: 900px) {
+  .landing-main {
+    display: block;
+    max-width: 1080px;
+  }
+  .landing-section {
+    margin-top: 48px;
+  }
+  .landing-hero {
+    margin-bottom: 0;
+  }
+  #guest-demo-cards,
+  #real-review {
+    grid-area: auto;
+    padding-right: 0;
+    border-right: 0;
+  }
+  #guest-demo-article,
+  #real-article-panel {
+    grid-area: auto;
+    padding-left: 0;
+  }
+  .manage-area {
+    grid-area: auto;
+  }
+  #real-review .home-review-cards,
+  #guest-demo-cards .demo-cards {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    max-width: none;
+  }
+  #real-card-browser .card-browser-filters {
+    grid-template-columns: minmax(180px, 1fr) auto auto;
+  }
+}
+
+/* ============================================================
+   卡片外观：默认与 oil 统一（参考 oil 白纸大卡）
+   ============================================================ */
+#real-review .home-review-cards {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  gap: 20px;
+  max-width: 100%;
+  margin: 26px 0 0;
+}
+#real-review .home-review-cards .demo-card {
+  width: 100%;
+  max-width: 100%;
+  height: 440px;
+}
+#real-review .home-review-cards .demo-card-face.front,
+#real-review .home-review-cards .demo-card-face.back {
+  background: var(--panel);
+}
+#real-review .home-review-cards .demo-front-text {
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+#real-review .home-review-cards .card-answer,
+#real-review .home-review-cards .card-answer p,
+#real-review .home-review-cards .card-answer li,
+#real-review .home-review-cards .card-answer strong,
+#real-review .home-review-cards .card-answer em,
+#real-review .home-review-cards .card-answer code {
+  font-size: 22px;
+  line-height: 1.7;
+  color: var(--text);
+}
+#real-review .home-review-cards .speaking-en {
+  font-size: 22px;
+  line-height: 1.5;
+}
+#real-review .home-review-cards .speaking-note {
+  font-size: 16px;
+  line-height: 1.55;
+}
+#real-review .home-review-cards .demo-rating .rating {
+  padding: 10px 16px;
+}
+#real-review .home-review-cards .demo-rating .rating b {
+  font-size: 16px;
+}
+#real-review .home-review-cards .demo-rating .rating small {
+  font-size: 12px;
+}
+#real-review .home-review-cards .demo-audio-row .demo-audio,
+#real-review .home-review-cards .demo-flip {
+  font-size: 16px;
+  min-height: 48px;
+  padding: 12px 26px;
+}
+/* 正面目标词：强调色高亮 */
+#real-review .home-review-cards .demo-card-face.front .target-word,
+#real-review .home-review-cards .demo-card-face.front mark,
+#guest-demo-cards .demo-card-face.front mark,
+#guest-demo-cards .demo-card-face mark {
+  background: linear-gradient(transparent 58%, var(--card-hl) 58%, var(--card-hl) 94%, transparent 94%);
+  color: var(--accent);
+  padding: 0 2px;
+  border-radius: 0;
+  font-weight: 600;
+}
+/* 演示区：四张示例卡 */
+#guest-demo-cards .demo-cards {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  max-width: 1080px;
+  margin: 0 auto;
+}
+#guest-demo-cards .demo-cards .demo-card {
+  height: 420px;
+}
+/* 演示卡：白纸面 + 更清晰的字号 */
+#guest-demo-cards .demo-card-face.front,
+#guest-demo-cards .demo-card-face.back {
+  background: var(--panel);
+}
+#guest-demo-cards .demo-front-text {
+  font-size: 20px;
+  font-weight: 600;
+}
+#guest-demo-cards .demo-back-word {
+  font-size: 18px;
+}
+#guest-demo-cards .demo-card-face.back p {
+  font-size: 15px;
+  color: var(--text);
+  line-height: 1.6;
+}
+
+@media (max-width: 820px) {
+  #guest-demo-cards .demo-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+}
+
+@media (max-width: 600px) {
+  #guest-demo-cards .demo-cards .demo-card {
+    height: min(300px, 52vh);
+  }
+  #guest-demo-cards .demo-front-text {
+    font-size: 16px;
+  }
+  #guest-demo-cards .demo-rating {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
+  }
+  #guest-demo-cards .demo-rating .rating {
+    min-height: 34px;
+    padding: 4px 2px;
+  }
+  #guest-demo-cards .demo-rating .rating b {
+    font-size: 12px;
+  }
+  #guest-demo-cards .demo-rating .rating small {
+    font-size: 9px;
+  }
+}
+/* 卡片静止：关闭 3D 跟随鼠标抖动 */
+html.js-ui-polish .demo-card.ui-tilt {
+  transform: none !important;
+  will-change: auto;
+}
+
+/* ============================================================
+   查词结果：默认与 oil 同一结构，主题色不同
+   ============================================================ */
+body .landing-search-result {
+  background: var(--panel);
+  border: 2px solid var(--lookup-border);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  color: var(--text);
+}
+body .landing-search-result .lookup-head {
+  text-align: center;
+  margin-bottom: 12px;
+}
+body .landing-search-result .lookup-word {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.4;
+  margin-bottom: 8px;
+  color: var(--accent);
+}
+body .landing-search-result .lookup-word mark.oil-highlight,
+body .floating-lookup .lookup-word mark.oil-highlight {
+  font-size: 24px;
+  font-weight: 700;
+  padding: 0 4px;
+  background: linear-gradient(transparent 58%, var(--card-hl) 58%, var(--card-hl) 94%, transparent 94%);
+}
+body .landing-search-result .search-rank,
+body .floating-lookup .search-rank {
+  display: inline-flex;
+}
+body .landing-search-result .lookup-explanation,
+body .landing-search-result .qa-rich,
+body .floating-lookup .lookup-explanation,
+body .floating-lookup .qa-rich {
+  text-align: left;
+}
+body .floating-lookup .qa-answer-box,
+body .floating-lookup .lookup-answer.card,
+body .floating-lookup .reader-lookup-loading {
+  background: var(--panel);
+  border: 2px solid var(--lookup-border);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  color: var(--text);
+}
+body .floating-lookup .lookup-answer.card {
+  text-align: left;
+  max-height: 76vh;
+  overflow-y: auto;
+}
+body .floating-lookup .lookup-head {
+  text-align: center;
+  margin-bottom: 12px;
+}
+body .floating-lookup .lookup-word {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.4;
+  margin-bottom: 8px;
+  color: var(--accent);
+}
+body .floating-lookup .lookup-actions {
+  display: flex;
+  justify-content: center;
+}

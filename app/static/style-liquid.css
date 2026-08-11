@@ -1,0 +1,180 @@
+/* ============================================================
+   默认风格：现代简约（苹果交互 + Notion 排版）
+   只改视觉，不改变任何功能逻辑
+   ============================================================ */
+
+/* ---------- 背景：纯净浅底，去掉光斑与极光 ---------- */
+.landing-main::before,
+.landing-main::after,
+body::before,
+body::after {
+  display: none !important;
+}
+:root:not([data-theme="dark"]) body {
+  background: var(--bg);
+}
+[data-theme="dark"] body {
+  background: var(--bg);
+}
+
+/* ---------- 文本：Notion 风格排版 ---------- */
+body {
+  font-family: ui-sans-serif, -apple-system, "PingFang SC", "Helvetica Neue",
+    "Noto Sans SC", system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.65;
+  letter-spacing: -.01em;
+}
+h1, h2, h3 {
+  letter-spacing: -.02em;
+}
+h2 { font-size: 22px; font-weight: 750; }
+h3 { font-size: 17px; font-weight: 700; }
+.landing-hero h1 {
+  font-size: 40px;
+  font-weight: 800;
+  letter-spacing: -.03em;
+}
+/* 正文阅读体验：更宽行距 + 阅读宽度 */
+.lookup-answer p,
+.demo-article,
+.ai-article-body {
+  line-height: 1.75;
+}
+.demo-article,
+.ai-article-body {
+  max-width: 66ch;
+}
+
+/* ---------- 面板：白底 + 细边框；阴影只表达真实层级 ---------- */
+/* 普通正文面板：只用边框表达边界，不加多余阴影 */
+.card-browser,
+.manage-panel,
+.real-extra-panel,
+.auth-card,
+.demo-card-face,
+.demo-article,
+.speaking-needs-list,
+.home-review-empty {
+  background: #ffffff;
+  border-color: #e7eaf0;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+/* 悬浮内容（下拉结果、浮层、菜单、提示）：阴影表达真实浮起 */
+.landing-search-result,
+.lookup-answer,
+.account-menu-panel,
+.review-manage-menu,
+.toast {
+  background: #ffffff;
+  border-color: #e7eaf0;
+  box-shadow:
+    0 2px 6px rgba(16, 24, 40, .06),
+    0 12px 32px rgba(16, 24, 40, .12);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* ---------- 间距：以 8px 为基的常用尺度 ---------- */
+.landing-main {
+  padding: 48px 24px 80px;
+}
+.landing-section {
+  margin-top: 48px;
+}
+.landing-search {
+  gap: 8px;
+}
+.card-browser-results {
+  gap: 8px;
+}
+
+/* ---------- 输入控件：白底 + 苹果式焦点环 ---------- */
+input,
+textarea,
+select {
+  background: #ffffff;
+  border-color: #d9dfe8;
+}
+input:focus,
+textarea:focus,
+select:focus,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+  border-color: rgba(10, 112, 238, .5);
+  box-shadow: 0 0 0 4px rgba(10, 112, 238, .16);
+}
+
+/* ---------- 按钮：纯色主按钮 + 苹果弹簧反馈 ---------- */
+@media (prefers-reduced-motion: no-preference) {
+  button {
+    transition:
+      transform .18s cubic-bezier(.34, 1.56, .64, 1),
+      background-color .2s ease,
+      border-color .2s ease,
+      box-shadow .2s ease,
+      color .2s ease;
+  }
+  button:active:not(:disabled) {
+    transform: scale(.97);
+  }
+}
+
+/* 卡片音频播放与翻转按钮：不用蓝色，保持中性文字色 */
+.demo-audio,
+.demo-flip {
+  color: var(--text);
+}
+
+/* logo：与全局同色（iOS 蓝渐变），弱化白色高光 */
+:root:not([data-theme="dark"]) .logo::after,
+:root:not([data-theme="dark"]) .topbar-logo::after {
+  background: linear-gradient(180deg, rgba(255, 255, 255, .14), rgba(255, 255, 255, 0) 52%);
+}
+
+/* ---------- 夜间模式：深色实底 ---------- */
+[data-theme="dark"] .topbar,
+[data-theme="dark"] .landing-search-input,
+[data-theme="dark"] .landing-search-result,
+[data-theme="dark"] .lookup-answer,
+[data-theme="dark"] .demo-card-face,
+[data-theme="dark"] .demo-article,
+[data-theme="dark"] .card-browser,
+[data-theme="dark"] .manage-panel,
+[data-theme="dark"] .account-menu-panel,
+[data-theme="dark"] .real-extra-panel,
+[data-theme="dark"] .review-manage-menu,
+[data-theme="dark"] .home-review-empty,
+[data-theme="dark"] .auth-card,
+[data-theme="dark"] .toast,
+[data-theme="dark"] .speaking-needs-list {
+  background: #1a2130;
+  border-color: #2c3850;
+  box-shadow: none;
+}
+[data-theme="dark"] .landing-search-result,
+[data-theme="dark"] .lookup-answer,
+[data-theme="dark"] .account-menu-panel,
+[data-theme="dark"] .review-manage-menu,
+[data-theme="dark"] .toast {
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, .3),
+    0 12px 32px rgba(0, 0, 0, .45);
+}
+[data-theme="dark"] input,
+[data-theme="dark"] textarea,
+[data-theme="dark"] select {
+  background: #1a2130;
+  border-color: #2c3850;
+}
+[data-theme="dark"] input:focus,
+[data-theme="dark"] textarea:focus,
+[data-theme="dark"] select:focus {
+  border-color: rgba(64, 156, 255, .6);
+  box-shadow: 0 0 0 4px rgba(64, 156, 255, .2);
+}

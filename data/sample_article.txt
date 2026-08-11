@@ -1,0 +1,5 @@
+Reading is one of the most powerful ways to learn new words. When you read a story, you meet words in their natural environment, surrounded by other words that make the meaning clear. This is why teachers often ask students to read books that are slightly above their current level.
+
+However, reading alone is not enough. If you never review a word again, you will probably forget it within a few days. The secret is to combine reading with spaced repetition: mark the words you do not know, turn them into cards, and let the system show them to you again at the right time. After a few weeks, the words move from your short-term memory to your long-term memory.
+
+This website gives you a simple workflow. Paste any English article into your corpus, read it with colored highlights, click a word to say whether you know it, generate cards for the words you are still learning, and review a small number of cards every day. The review curve on the statistics page shows you how many cards are due tomorrow, next week, and beyond.

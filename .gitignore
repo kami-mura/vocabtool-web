@@ -1,0 +1,35 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+data/*
+!data/ngsl_sfi_31k.csv
+!data/sample_article.txt
+!data/wordlists/
+backups/
+.deploy-stage/
+.rclone.conf
+.pytest_cache/
+.ruff_cache/
+.DS_Store
+
+# 内部实施计划与过程文档，不随仓库公开
+docs/superpowers/
+
+# 本地工具记忆文件
+.workbuddy/
+AGENTS.md
+English-Vocabulary-Word-List/
+
+# 隐私/密钥文件一律不进入仓库
+*.key
+*.pem
+*.p12
+*.pfx
+*.cer
+*.secret
+
+# 个人发布脚本仅存在于开发仓库，不随公开仓库发布
+release.sh
+deploy.sh

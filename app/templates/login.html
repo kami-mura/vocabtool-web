@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#007AFF">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="manifest" href="/static/manifest.webmanifest">
+  <title>vocabtool - 登录</title>
+  <link rel="icon" type="image/png" sizes="192x192" href="{{ static_url('icons/icon-192.png') }}">
+  <link rel="icon" type="image/png" sizes="192x192" media="(prefers-color-scheme: dark)" href="{{ static_url('icons/icon-dark-192.png') }}">
+  <link rel="icon" type="image/png" sizes="512x512" href="{{ static_url('icons/icon-512.png') }}">
+  <link rel="icon" type="image/png" sizes="512x512" media="(prefers-color-scheme: dark)" href="{{ static_url('icons/icon-dark-512.png') }}">
+  <link rel="apple-touch-icon" href="{{ static_url('icons/icon-192.png') }}">
+  <link rel="stylesheet" href="{{ static_url('style.css') }}">
+  <link rel="stylesheet" href="{{ static_url('style-glass.css') }}" id="skin-glass">
+  <link rel="stylesheet" href="{{ static_url('style-liquid.css') }}" id="skin-liquid">
+  <link rel="stylesheet" href="{{ static_url('style-motion.css') }}">
+</head>
+<body class="auth-body">
+  <header class="topbar auth-topbar">
+    <div class="topbar-left">
+      <a class="topbar-logo" href="/" aria-label="返回首页">V</a>
+      <span class="auth-brand-name">vocabtool</span>
+    </div>
+    <div class="topbar-right">
+      <button id="auth-theme-toggle" class="auth-theme-toggle" type="button" aria-label="切换夜间模式">☾</button>
+    </div>
+  </header>
+  <div class="auth-main-wrap">
+    <main class="auth-card">
+      <div class="logo">V</div>
+      <h1>vocabtool</h1>
+      <p class="subtitle">查单词 · 读文章 · 记词汇</p>
+      <div class="mini-tabs">
+        <button id="tab-login" class="active" type="button">登录</button>
+        <button id="tab-register" type="button">注册</button>
+      </div>
+
+      <form id="form-login" autocomplete="on">
+        <label>邮箱<input id="login-email" type="email" required placeholder="you@example.com"></label>
+        <label>密码<input id="login-password" type="password" required autocomplete="current-password" placeholder="输入密码"></label>
+        <button id="login-submit" class="primary" type="submit">登录</button>
+        <button id="show-reset" class="auth-link" type="button">忘记密码？</button>
+      </form>
+
+      <form id="form-register" hidden autocomplete="on">
+        <label>邮箱<input id="reg-email" type="email" required placeholder="you@example.com"></label>
+        {% if email_verification_required %}
+        <div class="verification-row">
+          <label>邮箱验证码<input id="reg-code" inputmode="numeric" autocomplete="one-time-code" required minlength="6" maxlength="6" placeholder="6 位验证码"></label>
+          <button id="send-code" class="small" type="button">发送验证码</button>
+        </div>
+        {% endif %}
+        <label>密码<input id="reg-password" type="password" required minlength="10" autocomplete="new-password" placeholder="至少 10 位"></label>
+        <button class="primary" type="submit">注册并开始</button>
+      </form>
+
+      <form id="form-reset" hidden autocomplete="on">
+        <h2>重置密码</h2>
+        <label>注册邮箱<input id="reset-email" type="email" required placeholder="you@example.com"></label>
+        <div class="verification-row">
+          <label>邮箱验证码<input id="reset-code" inputmode="numeric" autocomplete="one-time-code" required minlength="6" maxlength="6" placeholder="6 位验证码"></label>
+          <button id="send-reset-code" class="small" type="button">发送验证码</button>
+        </div>
+        <label>新密码<input id="reset-password" type="password" required minlength="10" autocomplete="new-password" placeholder="至少 10 位"></label>
+        <button id="reset-submit" class="primary" type="submit">重置密码</button>
+        <button id="reset-back" class="auth-link" type="button">返回登录</button>
+      </form>
+
+      <p id="msg" class="msg"></p>
+    </main>
+  </div>
+  <script src="{{ static_url('ui-polish.js') }}"></script>
+  <script src="{{ static_url('auth.js') }}"></script>
+</body>
+</html>
