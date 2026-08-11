@@ -379,13 +379,15 @@
           (data.spelling_note && data.spelling_note.corrected) || lookup.query || text;
         html =
           '<div class="lookup-head">' +
-          '<div class="lookup-word"><mark class="oil-highlight">' + escapeHtml(displayWord) + "</mark></div>" +
+          '<div class="lookup-word"><mark class="oil-highlight">' + escapeHtml(displayWord) + "</mark>" +
+          ' <button class="demo-audio lookup-audio" data-real-audio="' + escapeHtml(displayWord) +
+          '" type="button" aria-label="朗读发音">▶ 发音</button></div>' +
           (lookup.ngsl_rank
             ? '<div class="search-rank">NGSL 排名 #' + Number(lookup.ngsl_rank) + "</div>"
             : "") +
           "</div>" +
           '<div class="lookup-explanation">' +
-          escapeHtml(lookup.explanation || data.ai_error || "暂无解释") +
+          renderLookupExplanation(lookup.explanation || data.ai_error || "暂无解释") +
           "</div>" + lookupCardActionHtml(lookup);
       } else {
         const res = await fetch("/api/lookups/question", {
@@ -411,6 +413,17 @@
   }
 
   document.addEventListener("dblclick", (e) => {
+    const target = e.target;
+    if (target === searchInput && target.selectionStart != null) {
+      const selected = target.value
+        .substring(target.selectionStart, target.selectionEnd)
+        .replace(/\s+/g, " ")
+        .trim();
+      if (selected && selected.length <= 200) {
+        lookupFloating(selected, e.clientX, e.clientY);
+        return;
+      }
+    }
     if (e.target.closest("input, textarea, select, button, a")) return;
     const selection = window.getSelection();
     if (!selection || selection.rangeCount === 0) return;
@@ -3420,6 +3433,27 @@
     }
   }
 
+  /* 释义中的英文例句（"• " 开头行）逐句加朗读按钮 */
+  function sentenceAudioHtml(sentence) {
+    return ' <button class="demo-audio lookup-audio" data-real-audio="' +
+      escapeHtml(sentence) +
+      '" type="button" aria-label="朗读例句">▶</button>';
+  }
+
+  function renderLookupExplanation(text) {
+    if (!text) return escapeHtml("暂无解释");
+    return String(text)
+      .split(/\r?\n/)
+      .map(function (line) {
+        const m = line.trim().match(/^[•*]\s+(.+)$/);
+        if (!m) return escapeHtml(line);
+        const sentence = m[1].replace(/\s+/g, " ").trim();
+        if (!sentence) return escapeHtml(line);
+        return escapeHtml(line) + sentenceAudioHtml(sentence);
+      })
+      .join("\n");
+  }
+
   function lookupCardActionHtml(lookup) {
     if (!isLoggedIn || !lookup || !lookup.id || !["word", "phrase"].includes(lookup.query_type)) return "";
     if (lookup.has_card || lookup.card_id) {
@@ -3545,13 +3579,15 @@
         const quickLookup = data.lookup || {};
         box.innerHTML =
           '<div class="lookup-head">' +
-          '<div class="lookup-word"><mark class="oil-highlight">' + escapeHtml(text) + "</mark></div>" +
+          '<div class="lookup-word"><mark class="oil-highlight">' + escapeHtml(text) + "</mark>" +
+          ' <button class="demo-audio lookup-audio" data-real-audio="' + escapeHtml(text) +
+          '" type="button" aria-label="朗读发音">▶ 发音</button></div>' +
           (quickLookup.ngsl_rank
             ? '<div class="search-rank">NGSL 排名 #' + Number(quickLookup.ngsl_rank) + "</div>"
             : "") +
           "</div>" +
           '<div class="lookup-explanation">' +
-          escapeHtml(quickLookup.explanation || "暂无解释") +
+          renderLookupExplanation(quickLookup.explanation || "暂无解释") +
           "</div>";
         box.className = "landing-search-result ok";
         addSearchClose();
@@ -3575,13 +3611,15 @@
         (data.spelling_note && data.spelling_note.corrected) || lookup.query || text;
       box.innerHTML =
         '<div class="lookup-head">' +
-        '<div class="lookup-word"><mark class="oil-highlight">' + escapeHtml(displayWord) + "</mark></div>" +
+        '<div class="lookup-word"><mark class="oil-highlight">' + escapeHtml(displayWord) + "</mark>" +
+        ' <button class="demo-audio lookup-audio" data-real-audio="' + escapeHtml(displayWord) +
+        '" type="button" aria-label="朗读发音">▶ 发音</button></div>' +
         (lookup.ngsl_rank
           ? '<div class="search-rank">NGSL 排名 #' + Number(lookup.ngsl_rank) + "</div>"
           : "") +
         "</div>" +
         '<div class="lookup-explanation">' +
-        escapeHtml(lookup.explanation || "暂无解释") +
+        renderLookupExplanation(lookup.explanation || "暂无解释") +
         "</div>" + lookupCardActionHtml(lookup) +
         (isVocabtool
           ? '<div class="vocabtool-actions">' +

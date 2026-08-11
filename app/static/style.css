@@ -685,6 +685,12 @@ button.landing-login-btn { border: none; cursor: pointer; }
   cursor: pointer;
 }
 .demo-audio:hover { filter: brightness(1.05); }
+.lookup-audio {
+  margin: 0 0 0 8px;
+  padding: 2px 10px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
 .demo-audio-row {
   display: flex;
   gap: 8px;
