@@ -3443,7 +3443,7 @@
   /* ---------- 三种查询模式：查词 / 词源 / 问答 ---------- */
   let searchMode = "lookup";
   const SEARCH_PLACEHOLDERS = {
-    lookup: "本网站双击都可以查词",
+    lookup: "输入单词，短语或者简短中文（双击可查词）",
     etymology: "输入英文单词，查词源，如 arena",
     qa: "输入英语问题，如 lie 和 lay 的区别",
   };

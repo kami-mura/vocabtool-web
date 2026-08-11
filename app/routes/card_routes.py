@@ -299,9 +299,10 @@ def card_studio_targets(
         ]
         candidates.sort(key=lambda item: item[1] or 999_999)
     elif body.source == "saved":
+        # 只提取生词库中的 hard 词：mid=已制卡、easy=已掌握，都不应重复提取
         rows = (
             db.query(SavedWord)
-            .filter(SavedWord.user_id == user.id)
+            .filter(SavedWord.user_id == user.id, SavedWord.status == "hard")
             .order_by(SavedWord.updated_at.desc())
             .all()
         )

@@ -348,6 +348,36 @@ def test_card_studio_pasted_text_and_saved_words_imports_all(client):
     assert len(saved.json()["words"]) == 3
 
 
+def test_card_studio_saved_source_excludes_easy_and_mid_words(client):
+    register(client, "studio-saved-no-easy@example.com")
+    for word in ("run", "set"):
+        lookup = client.post("/api/lookups", json={"text": word}).json()["lookup"]
+        assert client.post(f"/api/lookups/{lookup['id']}/save").status_code == 200
+    # point 通过批量标记面板标为 easy（词不在词库时直接创建 easy 行），
+    # set 制卡后为 mid（已制卡）：两者都不应被提取
+    marked = client.post(
+        "/api/words/batch-status", json={"words": ["point"], "status": "easy"}
+    )
+    assert marked.status_code == 200
+    assert marked.json()["updated"] == 1
+    made = client.post(
+        "/api/card-studio/cards",
+        json={"words": ["set"], "card_type": "general"},
+    )
+    assert made.status_code == 200
+    assert made.json()["created"] == 1
+
+    saved = client.post(
+        "/api/card-studio/targets",
+        json={"source": "saved", "count": 1, "card_type": "general"},
+    )
+    assert saved.status_code == 200
+    words = [item["word"] for item in saved.json()["words"]]
+    assert "point" not in words
+    assert "set" not in words
+    assert words == ["run"]
+
+
 def test_card_studio_wordlist_and_saved_sources_support_ngsl_filter(client):
     register(client, "studio-ngsl-filter@example.com")
     pasted = client.post(
