@@ -3,7 +3,8 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from .. import tts
-from ..api_support import _require_user, check_request_rate
+from ..api_support import _anonymous_request_identity, _require_user, check_request_rate
+from ..auth import current_user
 from ..db import get_db
 
 router = APIRouter(prefix="/tts", tags=["tts"])
@@ -23,9 +24,19 @@ async def generate_tts(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    """按文本生成/复用缓存音频，返回可播放 URL；仅限登录用户，按用户限流。"""
-    user = _require_user(db, request)
-    if not check_request_rate(
+    """按文本生成/复用缓存音频，返回可播放 URL；登录用户按用户限流，
+    游客（查词结果发音等）按来源身份限流。"""
+    user = current_user(request, db)
+    if user is None:
+        if not check_request_rate(
+            db,
+            action="tts-generate",
+            identity=_anonymous_request_identity(request),
+            limit=200,
+            window_minutes=60,
+        ):
+            raise HTTPException(status_code=429, detail="语音生成请求过多，请稍后再试或登录")
+    elif not check_request_rate(
         db,
         action="tts-generate",
         identity=f"u{user.id}",

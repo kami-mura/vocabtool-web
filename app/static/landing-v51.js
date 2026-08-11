@@ -1692,17 +1692,22 @@
     });
   }
 
+  /* 任意位置的发音按钮（data-real-audio）：复习卡、查词结果、浮动面板等。
+     事件冒泡到 document 统一处理，避免每个容器重复绑定。 */
+  document.addEventListener("click", (e) => {
+    const audioButton = e.target.closest("[data-real-audio]");
+    if (audioButton) {
+      playRealAudio(audioButton.dataset.realAudio, audioButton);
+      return;
+    }
+  });
+
   const realReviewCards = document.getElementById("real-review-cards");
   if (realReviewCards) {
     realReviewCards.addEventListener("click", (e) => {
       const buryButton = e.target.closest("[data-real-bury]");
       if (buryButton) {
         buryRealCard(buryButton);
-        return;
-      }
-      const audioButton = e.target.closest("[data-real-audio]");
-      if (audioButton) {
-        playRealAudio(audioButton.dataset.realAudio, audioButton);
         return;
       }
       const ratingButton = e.target.closest("[data-real-rating]");

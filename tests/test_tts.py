@@ -106,15 +106,27 @@ def test_tts_prefetch_schedules_background_generation(client, monkeypatch, tmp_p
     assert len(list(tmp_path.glob("*.mp3"))) == 2
 
 
-def test_tts_endpoints_require_auth(client):
-    assert client.post("/api/tts", json={"text": "apple"}).status_code == 401
+def test_tts_guest_generates_and_serves_audio(client, monkeypatch, tmp_path):
+    """游客（查词结果发音）可生成并播放音频；预生成仍仅限登录用户。"""
+    def fake_generate(text, voice, path):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"x" * 200)
+        return True
+
+    monkeypatch.setattr(tts, "TTS_DIR", tmp_path)
+    monkeypatch.setattr(tts, "_generate_audio_blocking", fake_generate)
+
+    res = client.post("/api/tts", json={"text": "apple"})
+    assert res.status_code == 200
+    url = res.json()["url"]
+    assert url.startswith("/tts-audio/")
+    assert client.get(url).status_code == 200
+
     assert (
         client.post("/api/tts/prefetch", json={"texts": ["apple"]}).status_code
         == 401
     )
-    assert (
-        client.get("/tts-audio/aaaaaaaaaaaaaaaaaaaaaaaa.mp3").status_code == 401
-    )
+    assert client.get("/tts-audio/aaaaaaaaaaaaaaaaaaaaaaaa.mp3").status_code == 404
 
 
 def test_tts_cache_prunes_oldest_when_over_quota(monkeypatch, tmp_path):

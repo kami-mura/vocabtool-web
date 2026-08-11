@@ -165,8 +165,6 @@ def tts_audio_file(filename: str, request: Request):
     """提供 TTS 生成的 mp3；文件名即内容哈希，可永久缓存。"""
     from . import tts
 
-    if not _logged_in(request):
-        raise HTTPException(status_code=401, detail="未登录")
     if not tts.is_audio_filename(filename):
         raise HTTPException(status_code=404, detail="音频不存在")
     path = tts.TTS_DIR / filename
