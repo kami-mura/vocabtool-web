@@ -978,9 +978,24 @@
         }
       }
     }
-    const frontHtml =
-      '<p class="demo-front-text">' + frontInner + "</p>" +
-      (!isSpeaking && frontButtons ? '<div class="demo-audio-row">' + frontButtons + "</div>" : "");
+    let frontHtml;
+    if (card.card_type === "reading") {
+      // 阅读卡正面：目标词一行（带播放按钮）+ 例句 + 例句下方播放按钮
+      frontHtml =
+        '<div class="reading-word-row">' +
+        '<mark class="oil-highlight">' + escapeHtml(target) + "</mark>" +
+        ' <button class="demo-audio" data-real-audio="' + escapeHtml(target) +
+        '" type="button">▶</button></div>' +
+        '<p class="demo-front-text">' + frontInner + "</p>" +
+        (sentence && sentence !== target
+          ? '<div class="demo-audio-row"><button class="demo-audio" data-real-audio="' +
+            escapeHtml(sentence) + '" type="button">▶</button></div>'
+          : "");
+    } else {
+      frontHtml =
+        '<p class="demo-front-text">' + frontInner + "</p>" +
+        (!isSpeaking && frontButtons ? '<div class="demo-audio-row">' + frontButtons + "</div>" : "");
+    }
     let backInner;
     if (isSpeaking) {
       backInner = '<div class="card-answer">' + speakingRows(card.back).map((row) =>
@@ -3428,7 +3443,7 @@
   /* ---------- 三种查询模式：查词 / 词源 / 问答 ---------- */
   let searchMode = "lookup";
   const SEARCH_PLACEHOLDERS = {
-    lookup: "输入英文单词、短语或中文释义…",
+    lookup: "本网站双击都可以查词",
     etymology: "输入英文单词，查词源，如 arena",
     qa: "输入英语问题，如 lie 和 lay 的区别",
   };
