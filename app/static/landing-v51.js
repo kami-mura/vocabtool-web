@@ -381,7 +381,7 @@
           '<div class="lookup-head">' +
           '<div class="lookup-word"><mark class="oil-highlight">' + escapeHtml(displayWord) + "</mark>" +
           ' <button class="demo-audio lookup-audio" data-real-audio="' + escapeHtml(displayWord) +
-          '" type="button" aria-label="朗读发音">▶ 发音</button></div>' +
+          '" type="button" aria-label="朗读发音">▶</button></div>' +
           (lookup.ngsl_rank
             ? '<div class="search-rank">NGSL 排名 #' + Number(lookup.ngsl_rank) + "</div>"
             : "") +
@@ -952,10 +952,10 @@
     let frontButtons = "";
     if (hasFrontAudio) {
       frontButtons =
-        '<button class="demo-audio" data-real-audio="' + escapeHtml(target) + '" type="button">▶ 单词</button>';
+        '<button class="demo-audio" data-real-audio="' + escapeHtml(target) +       '" type="button">▶</button>';
       if (sentence && sentence !== target) {
         frontButtons +=
-          '<button class="demo-audio" data-real-audio="' + escapeHtml(sentence) + '" type="button">▶ 例句</button>';
+          '<button class="demo-audio" data-real-audio="' + escapeHtml(sentence) +       '" type="button">▶</button>';
       }
     }
     let frontInner;
@@ -989,10 +989,10 @@
         // Cloze 卡音频放背面：翻面后答案已可见，听单词/例句不剧透。
         backInner +=
           '<div class="demo-audio-row">' +
-          '<button class="demo-audio" data-real-audio="' + escapeHtml(target) + '" type="button">▶ 单词</button>';
+          '<button class="demo-audio" data-real-audio="' + escapeHtml(target) +       '" type="button">▶</button>';
         if (sentence && sentence !== target) {
           backInner +=
-            '<button class="demo-audio" data-real-audio="' + escapeHtml(sentence) + '" type="button">▶ 例句</button>';
+            '<button class="demo-audio" data-real-audio="' + escapeHtml(sentence) +       '" type="button">▶</button>';
         }
         backInner += "</div>";
       }
@@ -3587,7 +3587,7 @@
           '<div class="lookup-head">' +
           '<div class="lookup-word"><mark class="oil-highlight">' + escapeHtml(text) + "</mark>" +
           ' <button class="demo-audio lookup-audio" data-real-audio="' + escapeHtml(text) +
-          '" type="button" aria-label="朗读发音">▶ 发音</button></div>' +
+          '" type="button" aria-label="朗读发音">▶</button></div>' +
           (quickLookup.ngsl_rank
             ? '<div class="search-rank">NGSL 排名 #' + Number(quickLookup.ngsl_rank) + "</div>"
             : "") +
@@ -3619,7 +3619,7 @@
         '<div class="lookup-head">' +
         '<div class="lookup-word"><mark class="oil-highlight">' + escapeHtml(displayWord) + "</mark>" +
         ' <button class="demo-audio lookup-audio" data-real-audio="' + escapeHtml(displayWord) +
-        '" type="button" aria-label="朗读发音">▶ 发音</button></div>' +
+        '" type="button" aria-label="朗读发音">▶</button></div>' +
         (lookup.ngsl_rank
           ? '<div class="search-rank">NGSL 排名 #' + Number(lookup.ngsl_rank) + "</div>"
           : "") +
