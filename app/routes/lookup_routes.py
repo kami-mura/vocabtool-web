@@ -106,19 +106,29 @@ def _lookup_dict(
         "created_at": row.created_at.isoformat() if row.created_at else None,
     }
     if db is not None and user_id is not None and row.query_type in {"word", "phrase"}:
+        word = _strip_pos_suffix(str(row.query or "").strip())
         payload["has_card"] = db.query(Card.id).filter(
             Card.user_id == user_id,
-            Card.word == row.query,
+            Card.word == word,
         ).first() is not None
-        payload["saved"] = False if payload["has_card"] else (
-            db.query(SavedWord.id).filter(
-                SavedWord.user_id == user_id,
-                SavedWord.word == row.query,
-            ).first() is not None
+        saved_row = db.query(SavedWord).filter(
+            SavedWord.user_id == user_id,
+            SavedWord.word == word,
+        ).first()
+        payload["word_status"] = (
+            "mid" if payload["has_card"] else (saved_row.status if saved_row else None)
+        )
+        payload["easy"] = bool(
+            not payload["has_card"] and saved_row and saved_row.status == "easy"
+        )
+        payload["saved"] = bool(
+            not payload["has_card"] and saved_row and saved_row.status != "easy"
         )
     else:
         payload["has_card"] = False
         payload["saved"] = False
+        payload["easy"] = False
+        payload["word_status"] = None
     return payload
 
 
@@ -485,6 +495,16 @@ def save_lookup_word(
         SavedWord.word == word,
     ).first()
     if existing:
+        if existing.status == "easy":
+            existing.status = "hard"
+            existing.updated_at = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
+            db.commit()
+            return {
+                "ok": True,
+                "created": True,
+                "promoted_from_easy": True,
+                "word": word,
+            }
         return {"ok": True, "created": False, "word": word}
     _require_storage_space(db, user.id, _utf8_size(word) + 16)
     try:

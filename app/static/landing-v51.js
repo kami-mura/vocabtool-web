@@ -3423,12 +3423,17 @@
   function lookupCardActionHtml(lookup) {
     if (!isLoggedIn || !lookup || !lookup.id || !["word", "phrase"].includes(lookup.query_type)) return "";
     if (lookup.has_card || lookup.card_id) {
-      return '<div class="lookup-actions"><button class="small" type="button" disabled>已有学习卡片</button></div>';
+      return '<div class="lookup-actions"><span class="lookup-state">已制成学习卡片</span></div>';
     }
-    const saveButton = lookup.saved
-      ? '<button class="small" type="button" disabled>已在生词库</button>'
-      : '<button class="small" type="button" data-save-lookup-word="' + Number(lookup.id) + '">加入生词库</button>';
-    return '<div class="lookup-actions">' + saveButton + "</div>";
+    if (lookup.saved) {
+      return '<div class="lookup-actions"><span class="lookup-state">已在生词库</span></div>';
+    }
+    const easyState = lookup.easy
+      ? '<span class="lookup-state easy">已标记 Easy</span>'
+      : "";
+    const saveButton = '<button class="small" type="button" data-save-lookup-word="' +
+      Number(lookup.id) + '">加入生词库</button>';
+    return '<div class="lookup-actions">' + easyState + saveButton + "</div>";
   }
 
   async function saveLookupWord(button) {
@@ -3443,7 +3448,12 @@
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.detail || "加入生词库失败");
-      button.textContent = "已在生词库";
+      const actions = button.closest(".lookup-actions");
+      if (actions) {
+        actions.innerHTML = '<span class="lookup-state">已在生词库</span>';
+      } else {
+        button.textContent = "已在生词库";
+      }
       loadRealWords();
     } catch (err) {
       button.disabled = false;

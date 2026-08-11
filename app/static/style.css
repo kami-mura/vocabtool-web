@@ -2129,6 +2129,8 @@ mark.oil-highlight {
 .lookup-explanation.muted { color: var(--muted); }
 .lookup-answer-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
 .lookup-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.lookup-state { color: var(--muted); font-size: 13px; font-weight: 700; }
+.lookup-state.easy { color: var(--known); }
 .mid-action { color: #b87300; border-color: rgba(245, 166, 35, .45); background: rgba(245, 166, 35, .09); }
 .vocab-tools { margin: 14px 0; box-shadow: none; }
 .vocab-tools summary { cursor: pointer; font-weight: 700; color: #3f4f68; }
