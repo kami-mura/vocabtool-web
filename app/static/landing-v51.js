@@ -3503,11 +3503,11 @@
       return '<div class="lookup-actions"><span class="lookup-state">已制成学习卡片</span></div>';
     }
     if (lookup.saved) {
-      const easyBadge = lookup.easy
-        ? ' <span class="lookup-state easy">已标记 Easy</span>'
-        : "";
-      return '<div class="lookup-actions"><span class="lookup-state">已在生词库</span>' +
-        easyBadge + "</div>";
+      // easy/mid/hard 三态互斥：Easy 词只显示 Easy，其余（mid/hard）显示已在生词库
+      if (lookup.easy) {
+        return '<div class="lookup-actions"><span class="lookup-state easy">已标记 Easy</span></div>';
+      }
+      return '<div class="lookup-actions"><span class="lookup-state">已在生词库</span></div>';
     }
     const saveButton = '<button class="small" type="button" data-save-lookup-word="' +
       Number(lookup.id) + '">加入生词库</button>';
