@@ -675,7 +675,6 @@ button.landing-login-btn { border: none; cursor: pointer; }
 }
 .reading-word-row mark { font-size: 26px; }
 .reading-word-row .demo-audio { margin-top: 0; padding: 2px 10px; }
-.demo-card-face .demo-front-text .target-word { font-size: 1.35em; }
 .demo-back-word { margin: 0; font-size: 15px; font-weight: 800; color: var(--accent); }
 .demo-card-face.back p { margin: 4px 0 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
 .demo-card-face mark {
