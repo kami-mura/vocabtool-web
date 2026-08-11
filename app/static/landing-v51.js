@@ -389,6 +389,7 @@
           '<div class="lookup-explanation">' +
           renderLookupExplanation(lookup.explanation || data.ai_error || "暂无解释") +
           "</div>" + lookupCardActionHtml(lookup);
+        warmUpAudioTexts([displayWord].concat(lookupSentenceTexts(lookup.explanation)));
       } else {
         const res = await fetch("/api/lookups/question", {
           method: "POST",
@@ -905,20 +906,9 @@
      拉到浏览器，配合 /tts-audio/ 的 immutable 缓存头实现秒播。 */
   const realAudioWarmed = new Set();
 
-  async function warmUpRealAudio() {
-    const card = realReviewQueue[0];
-    if (!card) return;
-    const texts = [];
-    if (card.card_type === "speaking") {
-      speakingRows(card.back).forEach((row) => {
-        if (row.en) texts.push(row.en);
-      });
-    } else {
-      const target = plainTargetWord(card.word || card.front);
-      if (target) texts.push(target);
-      const sentence = card.context || card.front;
-      if (sentence && sentence !== target) texts.push(sentence);
-    }
+  /* 预下载音频到浏览器缓存：点击播放时无需等待生成/下载。
+     已生成过的文本直接跳过，配合 /tts-audio/ 的 immutable 缓存头实现秒播。 */
+  async function warmUpAudioTexts(texts) {
     for (const text of texts) {
       if (!text || realAudioWarmed.has(text)) continue;
       realAudioWarmed.add(text);
@@ -936,6 +926,23 @@
         warm.load();
       } catch (_) { /* 预加载失败不影响点击播放 */ }
     }
+  }
+
+  async function warmUpRealAudio() {
+    const card = realReviewQueue[0];
+    if (!card) return;
+    const texts = [];
+    if (card.card_type === "speaking") {
+      speakingRows(card.back).forEach((row) => {
+        if (row.en) texts.push(row.en);
+      });
+    } else {
+      const target = plainTargetWord(card.word || card.front);
+      if (target) texts.push(target);
+      const sentence = card.context || card.front;
+      if (sentence && sentence !== target) texts.push(sentence);
+    }
+    await warmUpAudioTexts(texts);
   }
 
   function realReviewCardHtml(card) {
@@ -3445,6 +3452,21 @@
       '" type="button" aria-label="朗读例句">▶</button>';
   }
 
+  /* 收集释义中的英文例句文本（用于渲染后预生成音频，点击即播） */
+  function lookupSentenceTexts(text) {
+    const texts = [];
+    if (!text) return texts;
+    String(text)
+      .split(/\r?\n/)
+      .forEach(function (line) {
+        const m = line.trim().match(/^[•*]\s+(.+)$/);
+        if (!m) return;
+        const sentence = m[1].replace(/\s+/g, " ").trim();
+        if (sentence) texts.push(sentence);
+      });
+    return texts;
+  }
+
   function renderLookupExplanation(text) {
     if (!text) return escapeHtml("暂无解释");
     return String(text)
@@ -3592,9 +3614,10 @@
             ? '<div class="search-rank">NGSL 排名 #' + Number(quickLookup.ngsl_rank) + "</div>"
             : "") +
           "</div>" +
-          '<div class="lookup-explanation">' +
-          renderLookupExplanation(quickLookup.explanation || "暂无解释") +
-          "</div>";
+        '<div class="lookup-explanation">' +
+        renderLookupExplanation(quickLookup.explanation || "暂无解释") +
+        "</div>";
+        warmUpAudioTexts([text].concat(lookupSentenceTexts(quickLookup.explanation)));
         box.className = "landing-search-result ok";
         addSearchClose();
         return;
@@ -3633,6 +3656,7 @@
             "</div>"
           : "");
       box.className = "landing-search-result ok";
+      warmUpAudioTexts([displayWord].concat(lookupSentenceTexts(lookup.explanation)));
       addSearchClose();
     } catch (err) {
       box.textContent = err.message || "网络异常，请稍后重试";

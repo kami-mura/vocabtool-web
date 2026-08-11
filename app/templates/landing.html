@@ -12,12 +12,24 @@
       try {
         var saved = localStorage.getItem("vocabtool.theme");
         if (saved === "dark" || saved === "light") {
+          var dark = saved === "dark";
           document.documentElement.dataset.theme = saved;
           document.documentElement.style.backgroundColor =
-            saved === "dark" ? "#0f1420" : "#f7f9fd";
+            dark ? "#0f1420" : "#f7f9fd";
           document.documentElement.style.colorScheme = saved;
           var meta = document.querySelector('meta[name="theme-color"]');
-          if (meta) meta.setAttribute("content", saved === "dark" ? "#0f1420" : "#007AFF");
+          if (meta) meta.setAttribute("content", dark ? "#0f1420" : "#007AFF");
+          // body 自带不透明背景，CSS 加载前会盖住 html 背景造成闪色；
+          // 临时覆盖 body 背景，样式表加载完成后移除以恢复渐变。
+          var guard = document.createElement("style");
+          guard.id = "theme-flash-guard";
+          guard.textContent = "html, body { background: " +
+            (dark ? "#0f1420" : "#f7f9fd") + " !important; }";
+          document.head.appendChild(guard);
+          window.addEventListener("load", function () {
+            var el = document.getElementById("theme-flash-guard");
+            if (el && el.parentNode) el.parentNode.removeChild(el);
+          });
         }
       } catch (e) {}
     })();
@@ -67,7 +79,7 @@
           <button type="button" class="search-mode-btn" data-search-mode="qa" aria-pressed="false">问答</button>
         </div>
         <div class="landing-search-input">
-          <input type="text" name="q" placeholder="输入单词或短语…（双击可查词）" aria-label="搜索单词">
+          <input type="text" name="q" placeholder="本网站双击都可以查词" aria-label="搜索单词">
           <button id="landing-search-clear" class="landing-clear-btn" type="button" aria-label="清空搜索" hidden>×</button>
         </div>
         <button class="primary" type="submit">DeepSeek</button>
