@@ -72,6 +72,43 @@ def test_quick_lookup_and_qa_and_topic_endpoints(client, monkeypatch):
     assert bad_quick.status_code == 422
 
 
+def test_quick_and_word_qa_results_can_be_saved_to_vocabulary(client, monkeypatch):
+    register(client, "quick-save@example.com")
+    from app import ai as ai_mod
+
+    def fake_quick(_db, _uid, text):
+        return {"explanation": "【释义】\n竞技场", "headword": "arena", "rank": 123}, None
+
+    def fake_answer(_db, _uid, question):
+        return "apple 是苹果的意思。", None
+
+    monkeypatch.setattr(ai_mod, "quick_lookup", fake_quick)
+    monkeypatch.setattr(ai_mod, "answer_question", fake_answer)
+
+    quick = client.post("/api/lookups/quick", json={"text": "arena"})
+    assert quick.status_code == 200
+    lookup = quick.json()["lookup"]
+    assert lookup.get("id")
+    assert lookup["query_type"] == "word"
+    assert lookup["saved"] is False
+    saved = client.post(f"/api/lookups/{lookup['id']}/save")
+    assert saved.status_code == 200
+    assert saved.json()["created"] is True
+
+    qa = client.post("/api/lookups/question", json={"question": "apple"})
+    assert qa.status_code == 200
+    qa_lookup = qa.json().get("lookup") or {}
+    assert qa_lookup.get("id")
+    assert qa_lookup["query_type"] == "word"
+    saved2 = client.post(f"/api/lookups/{qa_lookup['id']}/save")
+    assert saved2.status_code == 200
+    assert saved2.json()["created"] is True
+
+    qa2 = client.post("/api/lookups/question", json={"question": "lie 和 lay 的区别？"})
+    assert qa2.status_code == 200
+    assert "lookup" not in qa2.json()
+
+
 def test_priority_select_endpoint(client, monkeypatch):
     register(client, "priority@example.com")
     from app import ai as ai_mod

@@ -556,16 +556,17 @@ def quick_lookup(body: QuickLookupIn, request: Request, db: Session = Depends(ge
         db.commit()
         return payload
     _require_storage_space(db, user.id, _utf8_size(text) + _utf8_size(explanation))
-    db.add(
-        LookupHistory(
-            user_id=user.id,
-            query=text,
-            query_type=query_type,
-            mode="quick",
-            explanation=explanation,
-        )
+    row = LookupHistory(
+        user_id=user.id,
+        query=text,
+        query_type=query_type,
+        mode="quick",
+        explanation=explanation,
     )
+    db.add(row)
     db.commit()
+    # 带 id 与词库状态：词源结果也可加入生词库
+    payload["lookup"] = {**payload["lookup"], **_lookup_dict(row, db, user.id)}
     return payload
 
 
@@ -591,21 +592,32 @@ def ask_question(body: QuestionIn, request: Request, db: Session = Depends(get_d
     if error:
         raise HTTPException(status_code=400, detail=error)
     question = re.sub(r"\s+", " ", str(body.question or "").strip())
+    # 纯英文单词/短语的问题可加入生词库（如直接问 apple），
+    # 自由提问（含中文/句子）不提供保存。
+    if re.fullmatch(r"[A-Za-z]+(?:['-][A-Za-z]+)*", question):
+        qtype = "word"
+    elif re.fullmatch(
+        r"[A-Za-z]+(?:['-][A-Za-z]+)*(?: [A-Za-z]+(?:['-][A-Za-z]+)*){1,4}", question
+    ):
+        qtype = "phrase"
+    else:
+        qtype = "qa"
     payload = {"ok": True, "answer": answer, "guest_remaining": guest_remaining}
     if guest:
         db.commit()
         return payload
     _require_storage_space(db, user.id, _utf8_size(question) + _utf8_size(answer))
-    db.add(
-        LookupHistory(
-            user_id=user.id,
-            query=question,
-            query_type="qa",
-            mode="qa",
-            explanation=answer,
-        )
+    row = LookupHistory(
+        user_id=user.id,
+        query=question,
+        query_type=qtype,
+        mode="qa",
+        explanation=answer,
     )
+    db.add(row)
     db.commit()
+    if qtype in {"word", "phrase"}:
+        payload["lookup"] = _lookup_dict(row, db, user.id)
     return payload
 
 

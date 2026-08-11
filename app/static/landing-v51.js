@@ -398,7 +398,8 @@
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.detail || "查询失败");
-        html = '<div class="qa-rich">' + renderRichText(data.answer || "") + "</div>";
+        html = '<div class="qa-rich">' + renderRichText(data.answer || "") + "</div>" +
+          (data.lookup ? lookupCardActionHtml(data.lookup) : "");
       }
       floatingLookupBody.innerHTML =
         '<div class="lookup-answer card">' + html +
@@ -3606,7 +3607,8 @@
         });
         const data = await res.json().catch(function () { return {}; });
         if (!res.ok) throw new Error(data.detail || "查询失败");
-        box.innerHTML = '<div class="qa-rich">' + renderRichText(data.answer || "暂无回答") + "</div>";
+        box.innerHTML = '<div class="qa-rich">' + renderRichText(data.answer || "暂无回答") + "</div>" +
+          (data.lookup ? lookupCardActionHtml(data.lookup) : "");
         box.className = "landing-search-result ok";
         addSearchClose();
         return;
@@ -3631,7 +3633,7 @@
           "</div>" +
         '<div class="lookup-explanation">' +
         renderLookupExplanation(quickLookup.explanation || "暂无解释") +
-        "</div>";
+        "</div>" + lookupCardActionHtml(quickLookup);
         warmUpAudioTexts([text].concat(lookupSentenceTexts(quickLookup.explanation)));
         box.className = "landing-search-result ok";
         addSearchClose();
