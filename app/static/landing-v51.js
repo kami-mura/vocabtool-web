@@ -3465,14 +3465,15 @@
       return '<div class="lookup-actions"><span class="lookup-state">已制成学习卡片</span></div>';
     }
     if (lookup.saved) {
-      return '<div class="lookup-actions"><span class="lookup-state">已在生词库</span></div>';
+      const easyBadge = lookup.easy
+        ? ' <span class="lookup-state easy">已标记 Easy</span>'
+        : "";
+      return '<div class="lookup-actions"><span class="lookup-state">已在生词库</span>' +
+        easyBadge + "</div>";
     }
-    const easyState = lookup.easy
-      ? '<span class="lookup-state easy">已标记 Easy</span>'
-      : "";
     const saveButton = '<button class="small" type="button" data-save-lookup-word="' +
       Number(lookup.id) + '">加入生词库</button>';
-    return '<div class="lookup-actions">' + easyState + saveButton + "</div>";
+    return '<div class="lookup-actions">' + saveButton + "</div>";
   }
 
   async function saveLookupWord(button) {

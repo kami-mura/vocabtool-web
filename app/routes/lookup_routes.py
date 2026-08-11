@@ -121,9 +121,7 @@ def _lookup_dict(
         payload["easy"] = bool(
             not payload["has_card"] and saved_row and saved_row.status == "easy"
         )
-        payload["saved"] = bool(
-            not payload["has_card"] and saved_row and saved_row.status != "easy"
-        )
+        payload["saved"] = bool(not payload["has_card"] and saved_row is not None)
     else:
         payload["has_card"] = False
         payload["saved"] = False

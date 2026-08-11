@@ -252,7 +252,7 @@ def test_easy_lookup_can_be_added_to_saved_words(client):
 
     lookup = client.post("/api/lookups", json={"text": "run"}).json()["lookup"]
     assert lookup["has_card"] is False
-    assert lookup["saved"] is False
+    assert lookup["saved"] is True  # Easy 词已在生词库
     assert lookup["easy"] is True
     assert lookup["word_status"] == "easy"
 
