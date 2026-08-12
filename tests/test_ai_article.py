@@ -765,6 +765,7 @@ def test_article_rejects_invalid_source(client):
     _register(client, "article-source@example.com")
     denied = client.post("/api/cards/article", json={"source": "tomorrow"})
     assert denied.status_code == 400
+    assert denied.json()["detail"] == "无效单词范围"
 
 
 def test_article_always_uses_thinking_max(client, monkeypatch):
@@ -845,11 +846,57 @@ def test_article_uses_only_today_new_words(client, monkeypatch):
 
     review_only = client.post("/api/cards/article", json={"source": "review"})
     assert review_only.status_code == 400
-    assert "只使用今天新学" in review_only.json()["detail"]
+    assert review_only.json()["detail"] == "无效单词范围"
 
     mixed = client.post("/api/cards/article", json={"source": "mixed"})
     assert mixed.status_code == 400
-    assert "只使用今天新学" in mixed.json()["detail"]
+    assert mixed.json()["detail"] == "无效单词范围"
+
+
+def test_article_again_source_includes_new_and_review_cards_rated_again(
+    client, monkeypatch
+):
+    """“今天点过不认识”包含新卡和复习卡，但排除只点过认识的卡。"""
+    _register(client, "article-again-source@example.com")
+    created = client.post(
+        "/api/card-studio/cards",
+        json={"words": ["run", "develop", "point"], "card_type": "general"},
+    )
+    assert created.status_code == 200
+    cards = {item["word"]: item["id"] for item in client.get("/api/cards").json()["queue"]}
+
+    assert client.post(
+        f"/api/cards/{cards['run']}/review", json={"rating": "again"}
+    ).status_code == 200
+    assert client.post(
+        f"/api/cards/{cards['develop']}/review", json={"rating": "easy"}
+    ).status_code == 200
+    _force_due(cards["develop"])
+    assert client.post(
+        f"/api/cards/{cards['develop']}/review", json={"rating": "again"}
+    ).status_code == 200
+    assert client.post(
+        f"/api/cards/{cards['point']}/review", json={"rating": "easy"}
+    ).status_code == 200
+
+    captured = []
+
+    def spy_generate(
+        _db, _user_id, new_words, review_words, thinking=False, effort=None
+    ):
+        captured.extend(new_words)
+        assert review_words == []
+        return _fake_generate_article(
+            _db, _user_id, new_words, review_words, thinking=thinking, effort=effort
+        )
+
+    monkeypatch.setattr(
+        "app.routes.card_routes.ai_mod.generate_article", spy_generate
+    )
+    response = client.post("/api/cards/article", json={"source": "again"})
+    assert response.status_code == 200
+    assert set(captured) == {"run", "develop"}
+    assert "point" not in captured
 
 
 def test_article_available_after_completing_today_tasks(client, monkeypatch):
@@ -889,7 +936,7 @@ def test_article_available_after_completing_today_tasks(client, monkeypatch):
 
     review_only = client.post("/api/cards/article", json={"source": "review"})
     assert review_only.status_code == 400
-    assert "只使用今天新学" in review_only.json()["detail"]
+    assert review_only.json()["detail"] == "无效单词范围"
 
     mixed = client.post("/api/cards/article", json={"source": "mixed"})
     assert mixed.status_code == 400

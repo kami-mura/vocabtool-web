@@ -318,10 +318,14 @@
     <section class="landing-section" id="real-article-panel"{% if not logged_in %} hidden{% endif %}>
       <div class="landing-section-head">
         <h2>今日短文</h2>
-        <p class="hint">将今天新学的词均匀拆成多篇自然短文，每篇最多 12 个目标词</p>
+        <p class="hint">可选择今天新学或今天点过不认识的单词，每篇最多 12 个目标词</p>
       </div>
       <div id="real-article-body-wrap">
         <div class="real-article-generate-row">
+          <select id="real-article-source" aria-label="今日短文单词范围">
+            <option value="new" selected>今天新学的单词</option>
+            <option value="again">今天点过“不认识”的单词</option>
+          </select>
           <button id="real-article-generate" class="primary" type="button">生成今日短文</button>
           <span id="real-article-status" class="hint" role="status" aria-live="polite" hidden></span>
         </div>

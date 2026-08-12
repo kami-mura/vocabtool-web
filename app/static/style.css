@@ -1090,9 +1090,11 @@ button.landing-login-btn { border: none; cursor: pointer; }
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-wrap: wrap;
   gap: 12px;
   margin-bottom: 16px;
 }
+.real-article-generate-row select { width: auto; min-width: 190px; }
 .real-article-generate-row .hint { margin: 0; }
 .auth-card {
   width: 100%;

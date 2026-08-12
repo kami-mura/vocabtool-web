@@ -84,7 +84,7 @@ class ReviewSettingsIn(BaseModel):
 
 
 class ArticleIn(BaseModel):
-    """今日短文固定使用今天新学的单词。"""
+    """今日短文可使用今天新学或今天点过不认识的单词。"""
 
     source: str = Field(default="new", max_length=16)
 

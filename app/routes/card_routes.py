@@ -2135,19 +2135,18 @@ def generate_study_article(
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
-    """用今天新学的单词生成今日短文；长任务在响应后后台执行。
+    """按所选范围生成今日短文；长任务在响应后后台执行。
 
-    今日新学词全部覆盖并均匀拆分为每篇最多 12 个目标词，使用
-    DeepSeek 思考模式 `max`。普通复习词不进入今日短文。
+    可选择今天新学的单词，或今天所有点过“不认识”的单词。目标词
+    全部覆盖并均匀拆分为每篇最多 12 个，使用 DeepSeek 思考模式 `max`。
 
     单词来源 = 今天 ReviewLog 中的卡片；新学 = 今天首次学习的卡片
-    （is_new=True，无论评分通过与否，保证“今天新学的所有词汇”都进入文章），
-    复习 = 今天评分为模糊/正确的非新学卡。同一卡片今天先新学、
-    后会话重学，仍只算新学。
+    （is_new=True，无论评分通过与否）；不认识 = 今天至少有一条
+    rating=again 的卡片，包含新卡和复习卡。同一卡片自动去重。
     """
     user = _require_user(db, request)
-    if body.source != "new":
-        raise HTTPException(status_code=400, detail="今日短文只使用今天新学的单词")
+    if body.source not in {"new", "again"}:
+        raise HTTPException(status_code=400, detail="无效单词范围")
     now = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
     _day, start_of_day, end_of_day = _learning_day(now)
 
@@ -2163,7 +2162,9 @@ def generate_study_article(
     new_card_ids = {
         card_id for card_id, is_new, _rating in today_logs if is_new
     }
-    # 同卡先新学、后毕业/会话重学产生的 is_new=False 记录仍只算新学。
+    again_card_ids = {
+        card_id for card_id, _is_new, rating in today_logs if rating == "again"
+    }
     def _card_words(card_ids: set[int]) -> list[str]:
         """按卡片取单词并去重；Anki 卡去掉词头后的 [提示] 后缀。"""
         words: list[str] = []
@@ -2186,13 +2187,22 @@ def generate_study_article(
                 words.append(word)
         return words
 
-    new_words = _card_words(new_card_ids)
-    if not new_words:
+    selected_words = _card_words(
+        new_card_ids if body.source == "new" else again_card_ids
+    )
+    if not selected_words:
+        detail = (
+            "今天还没有新学的单词，请先学习今天的新卡后再生成今日短文"
+            if body.source == "new"
+            else "今天还没有点过不认识的单词"
+        )
         raise HTTPException(
             status_code=400,
-            detail="今天还没有新学的单词，请先学习今天的新卡后再生成今日短文",
+            detail=detail,
         )
-    word_groups = _article_word_groups(new_words, ai_mod.AI_ARTICLE_TARGET_LIMIT)
+    word_groups = _article_word_groups(
+        selected_words, ai_mod.AI_ARTICLE_TARGET_LIMIT
+    )
     if not _start_article_generation(user.id, len(word_groups)):
         raise HTTPException(status_code=409, detail="今日短文正在生成，请稍候")
     background_tasks.add_task(
