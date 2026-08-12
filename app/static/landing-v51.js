@@ -1810,7 +1810,7 @@
     };
   }
 
-  /* ---------- 登录后：DeepSeek 短文（只保留最近一篇） ---------- */
+  /* ---------- 登录后：DeepSeek 今日阅读包（只保留最近一组） ---------- */
   let articleGenerating = false;
   let articleGenerationError = "";
 
@@ -1822,7 +1822,7 @@
         const targetWords = Array.isArray(item.target_words) ? item.target_words : [];
         const targetCount = Number(item.target_count) || targetWords.length;
         const articleWords = Number(item.word_count) || 0;
-        const title = item.article_title || item.title || ("今日文章 " + (index + 1));
+        const title = item.article_title || item.title || ("今日短文 " + (index + 1));
         const multi = items.length > 1;
         return '<section class="ai-article-chapter">' +
           '<div class="ai-article-chapter-head">' +
@@ -2002,7 +2002,7 @@
       articleGenerating = true;
       generateArticle.disabled = true;
       status.hidden = false;
-      status.textContent = "DeepSeek 正在写文章，一般几十秒内完成…";
+      status.textContent = "DeepSeek 正在生成今日阅读包…";
       result.hidden = true;
       if (placeholder) placeholder.hidden = false;
       try {
@@ -2012,7 +2012,7 @@
           body: JSON.stringify({ source: "new" }),
         });
         const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.detail || "无法启动文章生成");
+        if (!res.ok) throw new Error(data.detail || "无法启动阅读包生成");
         articleGenerationError = "";
         status.textContent = data.detail || "文章正在后台生成，可继续使用其他功能…";
         const recovered = await waitForRealArticle(10 * 60);

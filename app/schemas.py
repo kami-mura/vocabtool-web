@@ -84,9 +84,9 @@ class ReviewSettingsIn(BaseModel):
 
 
 class ArticleIn(BaseModel):
-    """AI 文章生成的单词范围。"""
+    """今日阅读包固定使用今天新学的单词。"""
 
-    source: str = Field(default="mixed", max_length=16)
+    source: str = Field(default="new", max_length=16)
 
 
 class WordBatchDeleteIn(BaseModel):

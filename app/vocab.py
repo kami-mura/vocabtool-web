@@ -39,6 +39,7 @@ _IRREGULAR = {
     "knew": "know", "known": "know", "knows": "know", "knowing": "know",
     "thought": "think", "thinks": "think", "thinking": "think",
     "took": "take", "taken": "take", "takes": "take", "taking": "take",
+    "overhung": "overhang", "overhanging": "overhang",
     "saw": "see", "seen": "see", "sees": "see", "seeing": "see",
     "came": "come", "comes": "come", "coming": "come",
     "found": "find", "finds": "find", "finding": "find",

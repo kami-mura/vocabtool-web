@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import math
 import threading
 
 from fastapi import APIRouter, BackgroundTasks
@@ -2061,30 +2062,58 @@ def _save_generated_articles(
     return articles, corpus, book_title
 
 
+def _article_word_groups(words: list[str], maximum: int = 12) -> list[list[str]]:
+    """均匀拆分今日新词，避免最后一篇只剩极少目标词。"""
+    cleaned = [str(word).strip() for word in words if str(word).strip()]
+    if not cleaned:
+        return []
+    group_count = max(1, math.ceil(len(cleaned) / max(1, maximum)))
+    base_size, larger_groups = divmod(len(cleaned), group_count)
+    groups: list[list[str]] = []
+    offset = 0
+    for index in range(group_count):
+        size = base_size + (1 if index < larger_groups else 0)
+        groups.append(cleaned[offset : offset + size])
+        offset += size
+    return groups
+
+
 def _generate_study_articles_in_background(
     user_id: int,
     day: str,
-    new_words: list[str],
-    review_words: list[str],
+    word_groups: list[list[str]],
 ) -> None:
-    """在后台以思考模式生成当天全部目标词的一篇短文。"""
+    """在后台逐篇生成今天新学词的阅读包；全部成功后再原子保存。"""
     db = SessionLocal()
     try:
         user = db.get(User, user_id)
         if user is None:
             raise RuntimeError("登录已失效，请刷新后重试")
-        _update_article_generation(user_id, completed=0, detail="AI 正在思考并写作…")
-        result, error = ai_mod.generate_article(
-            db, user_id, new_words, review_words, thinking=True, effort="max"
-        )
-        if error:
-            raise RuntimeError(error)
-        _save_generated_articles(db, user, day, [result])
+        generated: list[dict] = []
+        total = len(word_groups)
+        for index, words in enumerate(word_groups, start=1):
+            _update_article_generation(
+                user_id,
+                completed=index - 1,
+                detail=f"AI 正在生成第 {index}/{total} 篇…",
+            )
+            result, error = ai_mod.generate_article(
+                db, user_id, words, [], thinking=True, effort="max"
+            )
+            if error:
+                raise RuntimeError(f"第 {index} 篇生成失败：{error}")
+            generated.append(result)
+            _update_article_generation(
+                user_id,
+                completed=index,
+                detail=f"已完成 {index}/{total} 篇",
+            )
+        _save_generated_articles(db, user, day, generated)
         _finish_article_generation(user_id)
         logger.info(
             "AI article background job completed: user_id=%s chapters=%s",
             user_id,
-            1,
+            len(generated),
         )
     except Exception as exc:
         db.rollback()
@@ -2106,9 +2135,10 @@ def generate_study_article(
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
-    """用今天学过的单词生成短文；长任务在响应后后台执行。
+    """用今天新学的单词生成阅读包；长任务在响应后后台执行。
 
-    当天全部目标词只生成一篇短文，使用 DeepSeek 思考模式 `max`。
+    今日新学词全部覆盖并均匀拆分为每篇最多 12 个目标词，使用
+    DeepSeek 思考模式 `max`。普通复习词不进入阅读包。
 
     单词来源 = 今天 ReviewLog 中的卡片；新学 = 今天首次学习的卡片
     （is_new=True，无论评分通过与否，保证“今天新学的所有词汇”都进入文章），
@@ -2116,8 +2146,8 @@ def generate_study_article(
     后会话重学，仍只算新学。
     """
     user = _require_user(db, request)
-    if body.source not in {"new", "review", "mixed"}:
-        raise HTTPException(status_code=400, detail="无效单词范围")
+    if body.source != "new":
+        raise HTTPException(status_code=400, detail="阅读包只使用今天新学的单词")
     now = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
     _day, start_of_day, end_of_day = _learning_day(now)
 
@@ -2134,12 +2164,6 @@ def generate_study_article(
         card_id for card_id, is_new, _rating in today_logs if is_new
     }
     # 同卡先新学、后毕业/会话重学产生的 is_new=False 记录仍只算新学。
-    review_card_ids = {
-        card_id
-        for card_id, is_new, rating in today_logs
-        if not is_new and rating in ("hard", "good", "easy")
-    } - new_card_ids
-
     def _card_words(card_ids: set[int]) -> list[str]:
         """按卡片取单词并去重；Anki 卡去掉词头后的 [提示] 后缀。"""
         words: list[str] = []
@@ -2163,49 +2187,25 @@ def generate_study_article(
         return words
 
     new_words = _card_words(new_card_ids)
-    review_words = _card_words(review_card_ids)
-    if body.source == "new" and not new_words and review_words:
+    if not new_words:
         raise HTTPException(
             status_code=400,
-            detail="今天还没有新学的单词；可改用「复习」或「全部」单词范围",
+            detail="今天还没有新学的单词，请先学习今天的新卡后再生成阅读包",
         )
-    if body.source == "review" and not review_words and new_words:
-        raise HTTPException(
-            status_code=400,
-            detail="今天还没有通过的复习单词；可改用「新学」或「全部」单词范围",
-        )
-    if not new_words and not review_words:
-        raise HTTPException(
-            status_code=400,
-            detail="今天还没有学过的单词，请先学习今天的卡片后再生成文章",
-        )
-    if body.source == "new":
-        review_words = []
-    elif body.source == "review":
-        new_words = []
-    else:
-        # 混合：同一单词同时出现时按新学优先。
-        seen_words = {vocab.user_word_identity(word) for word in new_words}
-        review_words = [
-            word
-            for word in review_words
-            if vocab.user_word_identity(word) not in seen_words
-        ]
-
-    if not _start_article_generation(user.id, 1):
-        raise HTTPException(status_code=409, detail="文章正在生成，请稍候")
+    word_groups = _article_word_groups(new_words, ai_mod.AI_ARTICLE_TARGET_LIMIT)
+    if not _start_article_generation(user.id, len(word_groups)):
+        raise HTTPException(status_code=409, detail="阅读包正在生成，请稍候")
     background_tasks.add_task(
         _generate_study_articles_in_background,
         user.id,
         _day,
-        new_words,
-        review_words,
+        word_groups,
     )
     return {
         "ok": True,
         "state": "generating",
-        "total": 1,
-        "detail": "AI 正在思考并写作，可继续使用其他功能",
+        "total": len(word_groups),
+        "detail": f"AI 正在生成今日阅读包，共 {len(word_groups)} 篇",
     }
 
 

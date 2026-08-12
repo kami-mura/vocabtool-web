@@ -1823,10 +1823,8 @@ def select_priority_words(
 
 # ---------- AI 生成阅读文章 ----------
 
-# 一篇短文最多输入 100 个目标词；DeepSeek V4 Flash 的 1M 上下文不再成为这里的限制。
-AI_ARTICLE_TARGET_LIMIT = 100
-AI_ARTICLE_WORDS_PER_TARGET = 10
-AI_ARTICLE_MAX_WORDS = 1_000
+# 今日阅读包把新词均匀拆成多篇；单篇词少时保持自然，词多时也不硬塞。
+AI_ARTICLE_TARGET_LIMIT = 12
 AI_ARTICLE_TARGET_CHARS = 15_000
 AI_ARTICLE_TEMPERATURE = 0.4
 AI_ARTICLE_REPAIR_TEMPERATURE = 0.1
@@ -1839,7 +1837,9 @@ _AI_ARTICLE_SYSTEM_PROMPT = (
     "word-list exercise. Write short, simple, colloquial sentences with vivid, "
     "concrete images; the reader should be able to picture every scene. Keep "
     "all vocabulary plain and everyday, well within the learner's level, so "
-    "the piece reads aloud smoothly and is easy to imitate."
+    "the piece reads aloud smoothly and is easy to imitate. Prefer a believable "
+    "everyday situation or a concise nonfiction piece. Never invent magical "
+    "creatures, strange jargon, or an unlikely crisis merely to fit the words."
 )
 
 _AI_ARTICLE_PROMPT = """请根据我输入的英文单词，生成一段适合英语学习者背单词的短文。
@@ -1847,18 +1847,37 @@ _AI_ARTICLE_PROMPT = """请根据我输入的英文单词，生成一段适合�
 输入：
 1. 目标单词：
 {target_words}
-2. 短文长度：{word_count} words，大约是目标词汇数量*10
+2. 建议长度：{preferred_length}。这是柔性范围，以自然完整为先，不要为了凑字数灌水。
 3. 学习者词汇量：{known_rank} words
 
 要求：
 短文整体词汇难度必须符合学习者词汇量。
 所有目标单词必须在同一篇短文中自然出现，并能通过上下文理解意思；不要分组、不要分章节。
 句子要简单、口语化、有画面感。
+优先选择可信、日常、逻辑连贯的场景；如果这些词不适合编成故事，就写简洁的非虚构文章。
+不要为了塞入目标词而制造魔法生物、离奇事件、不自然的搭配或突兀转折。
+每个目标词通常使用一次即可，除非自然表达确实需要重复。
+全文只讲一件事或说明一个主题，使用一到两个短段落。
 
-只输出英文正文；不要使用 HTML、Markdown、项目符号或编号。
+正文只使用英文；不要使用 HTML、Markdown、项目符号或编号。
 输出必须是且只能是一个 JSON 对象：
-{{"title": "A short English title", "paragraphs": ["one plain-text paragraph"]}}
+{{"title": "A short English title", "paragraphs": ["one or two plain-text paragraphs"]}}
 """
+
+
+def _article_length_guidance(target_count: int) -> tuple[str, int, int]:
+    """每个目标词对应约 6-12 个正文词；校验只拦截明显异常稿件。"""
+    count = max(1, min(int(target_count or 1), AI_ARTICLE_TARGET_LIMIT))
+    recommended_minimum = count * 6
+    recommended_maximum = count * 12
+    # 允许自然行文略有浮动，只拒绝不足目标语境或明显失控的长度。
+    minimum = max(count * 3, 3)
+    maximum = max(count * 16, 20)
+    return (
+        f"about {recommended_minimum}-{recommended_maximum} words",
+        minimum,
+        maximum,
+    )
 
 
 def _build_article_prompt(
@@ -1869,20 +1888,24 @@ def _build_article_prompt(
         f"- {word}" for word in [*new_words, *review_words]
     ) or "- (none)"
     total = max(1, len(new_words) + len(review_words))
-    word_count = min(
-        AI_ARTICLE_MAX_WORDS,
-        AI_ARTICLE_WORDS_PER_TARGET * total,
-    )
+    preferred_length, _minimum, _maximum = _article_length_guidance(total)
     return _AI_ARTICLE_PROMPT.format(
         target_words=target_words,
         known_rank=max(1, int(known_rank or 0)),
-        word_count=word_count,
+        preferred_length=preferred_length,
     )
 
 
 def _article_max_tokens(target_count: int) -> int:
-    """为 100 词以内的单篇文章及 `max` 思考预留 64K 输出空间。"""
+    """为单篇短文和 `max` 思考预留输出空间。"""
     return 65_536
+
+
+def _article_word_count(paragraphs: list[str]) -> int:
+    """按英文空白词计算正文长度。"""
+    plain_text = re.sub(r"<[^>]+>", " ", "\n".join(paragraphs))
+    normalized = re.sub(r"\s+", " ", plain_text).strip()
+    return len(normalized.split()) if normalized else 0
 
 
 def _parse_article_json(content: str) -> tuple[str, list[str]] | None:
@@ -1989,12 +2012,10 @@ def generate_article(
     thinking: bool = False,
     effort: str | None = None,
 ) -> tuple[dict | None, str | None]:
-    """用今天学过的全部单词生成一篇自然短文，并给新学/复习单词加颜色标注。
+    """为一组不超过 12 个目标词生成一篇自然短文并加高亮。
 
-    学了多少就输入多少：至少 1 个词即可生成；全部目标词写入同一篇文章。
-    文章长度约 10 词/目标词，整体词汇难度按学习者词汇量（NGSL 已知词数）
-    控制。thinking=True 时启用 DeepSeek 思考模式（更慢但可能更精细），
-    默认关闭思考走快速模式。
+    至少 1 个词即可生成；长度采用宽松分档，优先保证文章自然完整。
+    thinking=True 时启用 DeepSeek 思考模式（更慢但可能更精细）。
     effort 控制思考强度：low / high / max，缺省取服务器配置。
     返回 (result, error)；result 结构：
     {"title", "paragraphs": [html...], "new_words": [...], "review_words": [...]}
@@ -2007,11 +2028,7 @@ def generate_article(
         return None, "今天还没有已学习的单词"
     total = len(new_words) + len(review_words)
     if total > AI_ARTICLE_TARGET_LIMIT:
-        # 词太多时优先保留新学词，复习词只补足剩余名额。
-        new_words = new_words[: AI_ARTICLE_TARGET_LIMIT]
-        review_words = review_words[
-            : AI_ARTICLE_TARGET_LIMIT - len(new_words)
-        ]
+        return None, f"每篇最多使用 {AI_ARTICLE_TARGET_LIMIT} 个目标词"
     if not ai_enabled():
         return None, "服务器尚未配置 DEEPSEEK_API_KEY"
     quota_error = ai_quota_reserve(db, user_id, need=1)
@@ -2034,9 +2051,7 @@ def generate_article(
         max_tokens = _article_max_tokens(len(new_words) + len(review_words))
         last_error = "deepseek-v4-flash 生成文章失败，请稍后重试"
         repair_instruction = ""
-        original_title = ""
-        original_paragraphs: list[str] = []
-        is_continuation = False
+        _preferred, minimum_words, maximum_words = _article_length_guidance(total)
         started = time.monotonic()
         for attempt in range(AI_CARD_NETWORK_RETRIES):
             # 只有第一次调用允许思考。格式修复、漏词补写和网络重试都走
@@ -2076,37 +2091,38 @@ def generate_article(
                     )
                     continue
                 title, paragraphs = parsed
-                if is_continuation:
-                    title = original_title
-                    paragraphs = [*original_paragraphs, *paragraphs]
                 joined = "\n".join(paragraphs)
                 if len(joined) > AI_ARTICLE_TARGET_CHARS:
                     last_error = "deepseek-v4-flash 返回的文章过长，请重新生成"
+                    repair_instruction = (
+                        "\n\nRewrite the COMPLETE article from scratch. The previous "
+                        "article was far too long. Do not continue or append to it."
+                    )
                     continue
                 missing_words = _article_missing_words(
                     new_words, review_words, joined
                 )
                 if missing_words:
                     last_error = "deepseek-v4-flash 未包含全部目标词，请重新生成"
-                    if is_continuation:
-                        continue
-                    # 只补写自然续段，不重写或拆分已生成的文章，更不能把词表塞进正文。
-                    original_title = title
-                    original_paragraphs = paragraphs
-                    is_continuation = True
                     repair_instruction = (
                         "\n\nYour previous article omitted these target words: "
                         + ", ".join(missing_words)
-                        + ". Write a natural continuation for the SAME article. "
-                        "Use up to three short paragraphs, put every omitted target "
-                        "word in a meaningful context, and never present them as a list "
-                        "or say that they are vocabulary words. Return ONLY a JSON object "
-                        'like {"title": "", "paragraphs": ["..."]}.'
+                        + ". Rewrite the COMPLETE article from scratch. Do not continue "
+                        "or append to the previous article. Keep one coherent, believable "
+                        "situation and use every target naturally. Return ONLY the required "
+                        "JSON object."
                     )
                     continue
-                # 总词数按纯文本计算（去掉高亮标签后按空白分词）。
-                plain_text = re.sub(r"<[^>]+>", " ", joined)
-                word_count = len(re.sub(r"\s+", " ", plain_text).strip().split())
+                word_count = _article_word_count(paragraphs)
+                if word_count < minimum_words or word_count > maximum_words:
+                    last_error = "deepseek-v4-flash 返回的文章长度明显不合适，请重新生成"
+                    repair_instruction = (
+                        "\n\nRewrite the COMPLETE article from scratch. Do not continue "
+                        f"or append to it. The previous draft had {word_count} words; "
+                        f"keep the new draft naturally between {minimum_words} and "
+                        f"{maximum_words} words."
+                    )
+                    continue
                 target_items = _article_highlight_items(new_words, review_words)
                 html_paragraphs = [
                     _highlight_article_paragraph(paragraph, target_items)

@@ -7,6 +7,7 @@ def test_target_surface_forms_includes_irregulars_and_regulars():
     assert "runs" in forms
     assert "running" in forms
     assert "ran" in forms
+    assert "overhung" in set(word_forms.target_surface_forms("overhang"))
 
 
 def test_target_surface_forms_keeps_phrases_intact():

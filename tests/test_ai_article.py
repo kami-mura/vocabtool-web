@@ -7,6 +7,7 @@ import pytest
 from app import ai as ai_mod
 from app.ai import (
     _article_highlight_items,
+    _article_length_guidance,
     _article_max_tokens,
     _build_article_prompt,
     _highlight_article_paragraph,
@@ -14,6 +15,7 @@ from app.ai import (
 )
 from app.db import SessionLocal
 from app.models import Card, Corpus, User
+from app.routes.card_routes import _article_word_groups
 from app.vocab import rank_of
 
 
@@ -147,7 +149,7 @@ def _fake_generate_article(
     return result, None
 
 
-def _start_article_for_test(client, source="mixed", **extra):
+def _start_article_for_test(client, source="new", **extra):
     response = client.post("/api/cards/article", json={"source": source, **extra})
     assert response.status_code == 200
     assert response.json()["state"] == "generating"
@@ -165,10 +167,12 @@ def test_article_prompt_follows_user_template():
     assert "- pale blue" in prompt
     assert "- develop" in prompt
     assert "适合英语学习者背单词的短文" in prompt
-    assert "30 words" in prompt
+    assert "about 18-36 words" in prompt
     assert "3000 words" in prompt
     assert "所有目标单词必须在同一篇短文中自然出现" in prompt
     assert "句子要简单、口语化、有画面感" in prompt
+    assert "以自然完整为先" in prompt
+    assert "离奇事件" in prompt
     assert '"paragraphs"' in prompt
     # 所有 JSON 花括号都已转义，format 不会再报错。
     assert "{" in prompt and "{{" not in prompt
@@ -176,13 +180,21 @@ def test_article_prompt_follows_user_template():
 
 def test_article_length_scales_with_target_count():
     short = _build_article_prompt(["run"], ["develop", "point"], 3000)
-    assert "30 words" in short
+    assert "about 18-36 words" in short
     medium = _build_article_prompt(["run"] * 10, [], 3000)
-    assert "100 words" in medium
-    long = _build_article_prompt([f"word{i}" for i in range(60)], [], 3000)
-    assert "600 words" in long
-    maximum = _build_article_prompt([f"word{i}" for i in range(1000)], [], 3000)
-    assert "1000 words" in maximum
+    assert "about 60-120 words" in medium
+    maximum = _build_article_prompt([f"word{i}" for i in range(12)], [], 3000)
+    assert "about 72-144 words" in maximum
+    assert _article_length_guidance(1) == ("about 6-12 words", 3, 20)
+    assert _article_length_guidance(12) == ("about 72-144 words", 36, 192)
+
+
+def test_article_word_groups_are_balanced_and_never_exceed_twelve():
+    words = [f"word{i}" for i in range(45)]
+    groups = _article_word_groups(words)
+    assert [len(group) for group in groups] == [12, 11, 11, 11]
+    assert [word for group in groups for word in group] == words
+    assert _article_word_groups(["one"]) == [["one"]]
 
 
 def test_article_output_token_limit_scales_with_article_length():
@@ -332,41 +344,19 @@ def test_generate_article_accepts_single_word(monkeypatch):
         db.close()
 
 
-def test_generate_article_passes_more_than_60_targets(monkeypatch):
-    """目标词上限 1000：100 个目标词全部进入 prompt，不再按 60 截断。"""
+def test_generate_article_rejects_more_than_twelve_targets(monkeypatch):
+    """单篇最多 12 个目标词；上层阅读包负责先分组。"""
     db = SessionLocal()
     try:
         user = _register_user(db, "ai-article-many@example.com")
         monkeypatch.setattr(ai_mod, "ai_enabled", lambda: True)
-        words = [f"word{i}" for i in range(100)]
-
-        class FakeResponse:
-            class FakeMessage:
-                content = (
-                    '{"title": "Many Words", "paragraphs": ["'
-                    + " ".join(words)
-                    + '"]}'
-                )
-
-            choices = [type("Choice", (), {"message": FakeMessage})()]
-
+        words = [f"word{i}" for i in range(13)]
         calls = []
-        monkeypatch.setattr(ai_mod, "_new_ai_client", lambda: object())
-
-        def fake_completion(_client, **kwargs):
-            calls.append(kwargs.get("messages"))
-            return FakeResponse()
-
-        monkeypatch.setattr(ai_mod, "_chat_completion", fake_completion)
+        monkeypatch.setattr(ai_mod, "_chat_completion", lambda *_a, **_k: calls.append(1))
         result, error = ai_mod.generate_article(db, user.id, words, [])
-        assert error is None
-        assert result["new_words"] == words
-        joined = " ".join(
-            str(message.get("content") or "")
-            for message in calls[0]
-        )
-        assert "1000 words" in joined
-        assert all(f"- {word}" in joined for word in words)
+        assert result is None
+        assert error == "每篇最多使用 12 个目标词"
+        assert calls == []
     finally:
         db.close()
 
@@ -382,8 +372,8 @@ def _fake_article_response(responses):
     return fake_completion
 
 
-def test_generate_article_adds_a_natural_continuation_for_missing_targets(monkeypatch):
-    """AI 漏词时补一段自然续写，合并后仍是一篇文章而非词表。"""
+def test_generate_article_rewrites_complete_draft_for_missing_targets(monkeypatch):
+    """AI 漏词时完整重写，不能把补写段落拼到旧稿后面。"""
     db = SessionLocal()
     try:
         user = _register_user(db, "article-missing-fix@example.com")
@@ -391,7 +381,7 @@ def test_generate_article_adds_a_natural_continuation_for_missing_targets(monkey
         monkeypatch.setattr(ai_mod, "_new_ai_client", lambda: object())
         responses = [
             '{"title": "My Day", "paragraphs": ["I ran fast, and the plan developed well."]}',
-            '{"title": "Continuation", "paragraphs": ["A taxi took me home before dinner."]}',
+            '{"title": "A Better Trip", "paragraphs": ["I ran to the taxi, where my developed plan helped us leave safely today."]}',
         ]
         calls = []
 
@@ -405,20 +395,22 @@ def test_generate_article_adds_a_natural_continuation_for_missing_targets(monkey
             thinking=True, effort="max",
         )
         assert error is None
-        assert "taxi" in result["paragraphs"][1]
-        assert "Before leaving" not in " ".join(result["paragraphs"])
+        assert result["title"] == "A Better Trip"
+        assert len(result["paragraphs"]) == 1
+        assert "taxi" in result["paragraphs"][0]
+        assert "plan developed well" not in result["paragraphs"][0]
         assert len(calls) == 2
         assert calls[0]["thinking"] is True
         assert calls[0]["reasoning_effort"] == "max"
         repair_prompt = calls[1]["messages"][-1]["content"]
-        assert "natural continuation" in repair_prompt
-        assert "never present them as a list" in repair_prompt
+        assert "Rewrite the COMPLETE article from scratch" in repair_prompt
+        assert "Do not continue or append" in repair_prompt
     finally:
         db.close()
 
 
-def test_generate_article_rejects_a_continuation_that_still_misses_targets(monkeypatch):
-    """续写仍遗漏目标词时拒绝保存，不回退成词表式补丁。"""
+def test_generate_article_rejects_a_rewrite_that_still_misses_targets(monkeypatch):
+    """完整重写仍遗漏目标词时拒绝保存。"""
     db = SessionLocal()
     try:
         user = _register_user(db, "article-missing-fail@example.com")
@@ -566,7 +558,7 @@ def test_article_latest_returns_newest_article(client, monkeypatch):
         "app.routes.card_routes.ai_mod.generate_article", _fake_generate_article
     )
     _graduate_known(client, queue[0]["id"], 1)
-    assert client.post("/api/cards/article", json={"source": "mixed"}).status_code == 200
+    assert client.post("/api/cards/article", json={"source": "new"}).status_code == 200
     latest = client.get("/api/cards/article/latest").json()["article"]
     assert latest is not None
     assert latest["book_title"].endswith("-test article")
@@ -597,7 +589,7 @@ def test_article_highlights_phrase_targets(client, monkeypatch):
     monkeypatch.setattr(
         "app.routes.card_routes.ai_mod.generate_article", _fake_generate_article
     )
-    generated = client.post("/api/cards/article", json={"source": "mixed"})
+    generated = client.post("/api/cards/article", json={"source": "new"})
     assert generated.status_code == 200
     latest = client.get("/api/cards/article/latest").json()["article"]
     assert "mull it over" in latest["target_words"]
@@ -639,8 +631,8 @@ def test_article_treats_case_variants_as_distinct_words(client, monkeypatch):
     assert set(captured["new_words"]) == {"march", "March"}
 
 
-def test_article_keeps_large_word_sets_in_one_article(client, monkeypatch):
-    """当天全部目标词进入同一篇思考模式短文。"""
+def test_article_splits_large_word_sets_into_a_balanced_reading_pack(client, monkeypatch):
+    """当天新词均匀分篇，每篇不超过 12 个目标词且全部覆盖。"""
     _register(client, "article-single@example.com")
     words = [f"word{i}" for i in range(45)]
     made = client.post(
@@ -666,7 +658,7 @@ def test_article_keeps_large_word_sets_in_one_article(client, monkeypatch):
     calls = []
 
     def fake(_db, _uid, new_words, review_words, thinking=False, effort=None):
-        calls.append((set(new_words), set(review_words)))
+        calls.append((list(new_words), list(review_words)))
         return {
             "title": "One Article",
             "paragraphs": ["<p>" + ", ".join(new_words + review_words) + "</p>"],
@@ -679,10 +671,15 @@ def test_article_keeps_large_word_sets_in_one_article(client, monkeypatch):
         "app.routes.card_routes.ai_mod.generate_article", fake
     )
     _resp, article = _start_article_for_test(client, source="new")
-    assert len(calls) == 1
-    assert calls[0] == (set(words), set())
-    assert len(article["chapters"]) == 1
-    assert article["chapters"][0]["target_words"] == sorted(words)
+    assert [len(new) for new, _review in calls] == [12, 11, 11, 11]
+    assert all(review == [] for _new, review in calls)
+    assert {word for new, _review in calls for word in new} == set(words)
+    assert len(article["chapters"]) == 4
+    assert {
+        word
+        for chapter in article["chapters"]
+        for word in chapter["target_words"]
+    } == set(words)
 
 
 def test_article_includes_new_words_rated_again(client, monkeypatch):
@@ -796,7 +793,7 @@ def test_article_always_uses_thinking_max(client, monkeypatch):
     assert calls == [(True, "max"), (True, "max")]
 
 
-def test_article_new_and_review_words_are_split(client, monkeypatch):
+def test_article_uses_only_today_new_words(client, monkeypatch):
     _register(client, "article-split@example.com")
     created = client.post(
         "/api/card-studio/cards",
@@ -847,18 +844,16 @@ def test_article_new_and_review_words_are_split(client, monkeypatch):
     assert calls[-1][1] == []
 
     review_only = client.post("/api/cards/article", json={"source": "review"})
-    assert review_only.status_code == 200
-    assert calls[-1][0] == []
-    assert calls[-1][1] == ["quasar"]
+    assert review_only.status_code == 400
+    assert "只使用今天新学" in review_only.json()["detail"]
 
-    _mixed, mixed_article = _start_article_for_test(client)
-    assert sorted(calls[-1][0]) == ["develop", "point", "run"]
-    assert calls[-1][1] == ["quasar"]
-    assert mixed_article["article_title"] == "Test Article"
+    mixed = client.post("/api/cards/article", json={"source": "mixed"})
+    assert mixed.status_code == 400
+    assert "只使用今天新学" in mixed.json()["detail"]
 
 
 def test_article_available_after_completing_today_tasks(client, monkeypatch):
-    """学完今日任务后，新学/复习来源仍可用：今天学过的单词都能制卡。"""
+    """学完今日任务后，今天新学的词仍可生成阅读包。"""
     _register(client, "article-done@example.com")
     created = client.post(
         "/api/card-studio/cards",
@@ -894,15 +889,14 @@ def test_article_available_after_completing_today_tasks(client, monkeypatch):
 
     review_only = client.post("/api/cards/article", json={"source": "review"})
     assert review_only.status_code == 400
-    assert "还没有通过的复习单词" in review_only.json()["detail"]
+    assert "只使用今天新学" in review_only.json()["detail"]
 
     mixed = client.post("/api/cards/article", json={"source": "mixed"})
-    assert mixed.status_code == 200
-    assert calls[-1][0] == ["develop", "point", "run"]
+    assert mixed.status_code == 400
 
 
-def test_article_mixed_new_takes_priority_for_same_word(client, monkeypatch):
-    """同一单词既在今日新学又待复习时，混合模式按新学算，只出现一次。"""
+def test_article_new_source_deduplicates_same_word(client, monkeypatch):
+    """同一单词有多张今日新卡时，在阅读包中只出现一次。"""
     _register(client, "article-priority@example.com")
     created = client.post(
         "/api/card-studio/cards",
@@ -953,7 +947,7 @@ def test_article_mixed_new_takes_priority_for_same_word(client, monkeypatch):
     monkeypatch.setattr(
         "app.routes.card_routes.ai_mod.generate_article", spy_generate
     )
-    mixed = client.post("/api/cards/article", json={"source": "mixed"})
-    assert mixed.status_code == 200
+    generated = client.post("/api/cards/article", json={"source": "new"})
+    assert generated.status_code == 200
     assert calls[-1][0] == ["run"]
     assert calls[-1][1] == []
