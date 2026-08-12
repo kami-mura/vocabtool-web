@@ -38,6 +38,9 @@ _MAX_REVIEW_ROWS = 250_000
 _FIELD_SEPARATOR = "\x1f"
 _RATING_TO_EASE = {"again": 1, "hard": 2, "good": 3, "easy": 4}
 _MARKDOWN_BOLD = re.compile(r"\*\*(.+?)\*\*")
+# One-time note-format version: lets Anki refresh previously exported native
+# notes with HTML highlights without changing their guid or scheduling identity.
+_TARGET_WORD_FORMAT_MOD = 1_786_665_600  # 2026-08-14 00:00:00 UTC
 
 
 class _TextExtractor(HTMLParser):
@@ -630,6 +633,8 @@ def export_apkg(db: Session, user_id: int) -> tuple[bytes, int]:
                 note_mod = _timestamp(card.created_at, now_seconds)
                 context = _safe_json_object(card.context) if card.card_type == "anki" else {}
                 note_mod = max(note_mod, int(context.get("anki_note_mod", 0) or 0))
+                if card.card_type != "anki":
+                    note_mod = max(note_mod, _TARGET_WORD_FORMAT_MOD)
                 fields = _FIELD_SEPARATOR.join(
                     (
                         _html_field(card.word),

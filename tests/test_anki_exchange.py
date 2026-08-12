@@ -70,7 +70,8 @@ def test_export_renders_target_word_and_uses_vocabtool_name(client, tmp_path):
         collection_path.write_bytes(archive.read("collection.anki2"))
     connection = sqlite3.connect(str(collection_path))
     try:
-        fields = connection.execute("SELECT flds FROM notes").fetchone()[0].split("\x1f")
+        note_mod, raw_fields = connection.execute("SELECT mod, flds FROM notes").fetchone()
+        fields = raw_fields.split("\x1f")
         models_raw, decks_raw = connection.execute("SELECT models, decks FROM col").fetchone()
     finally:
         connection.close()
@@ -80,6 +81,7 @@ def test_export_renders_target_word_and_uses_vocabtool_name(client, tmp_path):
         '<span class="target-word">dole</span> for several months.'
     )
     assert "**" not in fields[1]
+    assert note_mod == 1_786_665_600
     model = next(iter(json.loads(models_raw).values()))
     deck = next(iter(json.loads(decks_raw).values()))
     assert model["name"] == "vocabtool"
