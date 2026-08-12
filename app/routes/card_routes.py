@@ -1015,7 +1015,7 @@ def export_cards_to_anki(request: Request, db: Session = Depends(get_db)):
     except Exception:
         db.rollback()
         raise
-    filename = f"vocabflow-{dt.datetime.now().strftime('%Y%m%d')}-{count}.apkg"
+    filename = "vocabtool.apkg"
     return Response(
         content=package,
         media_type="application/octet-stream",

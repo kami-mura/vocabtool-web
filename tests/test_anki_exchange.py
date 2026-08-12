@@ -1,5 +1,7 @@
 import datetime as dt
 import io
+import json
+import sqlite3
 import zipfile
 
 from app.anki_exchange import parse_apkg
@@ -8,7 +10,7 @@ from app.models import AnkiReviewLog, Card, ReviewLog, User
 from tests.conftest import register
 
 
-def _scheduled_card(email: str, *, word: str = "durable") -> Card:
+def _scheduled_card(email: str, *, word: str = "durable", front=None) -> Card:
     db = SessionLocal()
     try:
         user = db.query(User).filter(User.email == email).one()
@@ -16,7 +18,7 @@ def _scheduled_card(email: str, *, word: str = "durable") -> Card:
             user_id=user.id,
             word=word,
             card_type="reading",
-            front=f"A {word} design lasts for years.",
+            front=front or f"A {word} design lasts for years.",
             back="adj. able to last a long time | 耐用的",
             context=f"A {word} design lasts for years.",
             state="review",
@@ -50,8 +52,40 @@ def _scheduled_card(email: str, *, word: str = "durable") -> Card:
 def _export_package(client) -> bytes:
     response = client.get("/api/cards/anki/export")
     assert response.status_code == 200, response.text
-    assert response.headers["content-disposition"].endswith('.apkg"')
+    assert response.headers["content-disposition"] == 'attachment; filename="vocabtool.apkg"'
     return response.content
+
+
+def test_export_renders_target_word_and_uses_vocabtool_name(client, tmp_path):
+    register(client)
+    _scheduled_card(
+        "alice@example.com",
+        word="dole",
+        front="After losing his job, he had to rely on the **dole** for several months.",
+    )
+
+    package = _export_package(client)
+    with zipfile.ZipFile(io.BytesIO(package)) as archive:
+        collection_path = tmp_path / "collection.anki2"
+        collection_path.write_bytes(archive.read("collection.anki2"))
+    connection = sqlite3.connect(str(collection_path))
+    try:
+        fields = connection.execute("SELECT flds FROM notes").fetchone()[0].split("\x1f")
+        models_raw, decks_raw = connection.execute("SELECT models, decks FROM col").fetchone()
+    finally:
+        connection.close()
+
+    assert fields[1] == (
+        'After losing his job, he had to rely on the '
+        '<span class="target-word">dole</span> for several months.'
+    )
+    assert "**" not in fields[1]
+    model = next(iter(json.loads(models_raw).values()))
+    deck = next(iter(json.loads(decks_raw).values()))
+    assert model["name"] == "vocabtool"
+    assert ".target-word { color: #2f6fed; font-weight: 700; }" in model["css"]
+    assert ".nightMode .target-word { color: #8fb0f8; }" in model["css"]
+    assert deck["name"] == "vocabtool"
 
 
 def test_apkg_export_contains_schedule_and_review_history(client):

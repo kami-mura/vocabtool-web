@@ -37,6 +37,7 @@ _MAX_COLLECTION_BYTES = 128 * 1024 * 1024
 _MAX_REVIEW_ROWS = 250_000
 _FIELD_SEPARATOR = "\x1f"
 _RATING_TO_EASE = {"again": 1, "hard": 2, "good": 3, "easy": 4}
+_MARKDOWN_BOLD = re.compile(r"\*\*(.+?)\*\*")
 
 
 class _TextExtractor(HTMLParser):
@@ -80,8 +81,11 @@ def _plain_text(value: object) -> str:
     return parser.text()
 
 
-def _html_field(value: object) -> str:
-    return html.escape(str(value or "")).replace("\n", "<br>")
+def _html_field(value: object, *, markdown: bool = False) -> str:
+    escaped = html.escape(str(value or ""))
+    if markdown:
+        escaped = _MARKDOWN_BOLD.sub(r'<span class="target-word">\1</span>', escaped)
+    return escaped.replace("\n", "<br>")
 
 
 def _site_timezone() -> ZoneInfo:
@@ -629,8 +633,8 @@ def export_apkg(db: Session, user_id: int) -> tuple[bytes, int]:
                 fields = _FIELD_SEPARATOR.join(
                     (
                         _html_field(card.word),
-                        _html_field(card.front),
-                        _html_field(card.back),
+                        _html_field(card.front, markdown=card.card_type != "anki"),
+                        _html_field(card.back, markdown=card.card_type != "anki"),
                         _html_field(card.context or ""),
                         card.card_type,
                         guid,
@@ -725,7 +729,7 @@ def _anki_model(model_id: int, deck_id: int, modified: int) -> dict[str, object]
     names = ("Word", "Front", "Back", "Context", "VocabFlowType", "VocabFlowGuid")
     return {
         "id": model_id,
-        "name": "VocabFlow",
+        "name": "vocabtool",
         "type": 0,
         "mod": modified,
         "usn": -1,
@@ -763,7 +767,12 @@ def _anki_model(model_id: int, deck_id: int, modified: int) -> dict[str, object]
             }
             for index, name in enumerate(names)
         ],
-        "css": ".card { font-family: Arial; font-size: 20px; text-align: left; color: #111; background: white; }",
+        "css": (
+            ".card { font-family: Arial; font-size: 20px; text-align: left; "
+            "color: #111; background: white; }\n"
+            ".target-word { color: #2f6fed; font-weight: 700; }\n"
+            ".nightMode .target-word { color: #8fb0f8; }"
+        ),
         "latexPre": "",
         "latexPost": "",
         "latexsvg": False,
@@ -775,14 +784,14 @@ def _anki_model(model_id: int, deck_id: int, modified: int) -> dict[str, object]
 def _anki_deck(deck_id: int, modified: int) -> dict[str, object]:
     return {
         "id": deck_id,
-        "name": "VocabFlow",
+        "name": "vocabtool",
         "mod": modified,
         "usn": -1,
         "lrnToday": [0, 0],
         "revToday": [0, 0],
         "newToday": [0, 0],
         "timeToday": [0, 0],
-        "desc": "VocabFlow 双向交换牌组",
+        "desc": "vocabtool 双向交换牌组",
         "dyn": 0,
         "collapsed": False,
         "browserCollapsed": False,

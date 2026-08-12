@@ -1650,7 +1650,7 @@
         const match = disposition.match(/filename="([^"]+)"/i);
         const link = document.createElement("a");
         link.href = URL.createObjectURL(blob);
-        link.download = match ? match[1] : "vocabflow.apkg";
+        link.download = match ? match[1] : "vocabtool.apkg";
         document.body.appendChild(link);
         link.click();
         link.remove();
