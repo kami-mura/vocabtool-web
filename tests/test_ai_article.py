@@ -345,7 +345,7 @@ def test_generate_article_accepts_single_word(monkeypatch):
 
 
 def test_generate_article_rejects_more_than_twelve_targets(monkeypatch):
-    """单篇最多 12 个目标词；上层阅读包负责先分组。"""
+    """单篇最多 12 个目标词；上层今日短文负责先分组。"""
     db = SessionLocal()
     try:
         user = _register_user(db, "ai-article-many@example.com")
@@ -853,7 +853,7 @@ def test_article_uses_only_today_new_words(client, monkeypatch):
 
 
 def test_article_available_after_completing_today_tasks(client, monkeypatch):
-    """学完今日任务后，今天新学的词仍可生成阅读包。"""
+    """学完今日任务后，今天新学的词仍可生成今日短文。"""
     _register(client, "article-done@example.com")
     created = client.post(
         "/api/card-studio/cards",
@@ -896,7 +896,7 @@ def test_article_available_after_completing_today_tasks(client, monkeypatch):
 
 
 def test_article_new_source_deduplicates_same_word(client, monkeypatch):
-    """同一单词有多张今日新卡时，在阅读包中只出现一次。"""
+    """同一单词有多张今日新卡时，在今日短文中只出现一次。"""
     _register(client, "article-priority@example.com")
     created = client.post(
         "/api/card-studio/cards",

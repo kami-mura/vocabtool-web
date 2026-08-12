@@ -1810,7 +1810,7 @@
     };
   }
 
-  /* ---------- 登录后：DeepSeek 今日阅读包（只保留最近一组） ---------- */
+  /* ---------- 登录后：DeepSeek 今日短文（只保留最近一组） ---------- */
   let articleGenerating = false;
   let articleGenerationError = "";
 
@@ -2002,7 +2002,7 @@
       articleGenerating = true;
       generateArticle.disabled = true;
       status.hidden = false;
-      status.textContent = "DeepSeek 正在生成今日阅读包…";
+      status.textContent = "DeepSeek 正在生成今日短文…";
       result.hidden = true;
       if (placeholder) placeholder.hidden = false;
       try {
@@ -2012,7 +2012,7 @@
           body: JSON.stringify({ source: "new" }),
         });
         const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.detail || "无法启动阅读包生成");
+        if (!res.ok) throw new Error(data.detail || "无法启动今日短文生成");
         articleGenerationError = "";
         status.textContent = data.detail || "文章正在后台生成，可继续使用其他功能…";
         const recovered = await waitForRealArticle(10 * 60);

@@ -2083,7 +2083,7 @@ def _generate_study_articles_in_background(
     day: str,
     word_groups: list[list[str]],
 ) -> None:
-    """在后台逐篇生成今天新学词的阅读包；全部成功后再原子保存。"""
+    """在后台逐篇生成今天新学词的今日短文；全部成功后再原子保存。"""
     db = SessionLocal()
     try:
         user = db.get(User, user_id)
@@ -2135,10 +2135,10 @@ def generate_study_article(
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
-    """用今天新学的单词生成阅读包；长任务在响应后后台执行。
+    """用今天新学的单词生成今日短文；长任务在响应后后台执行。
 
     今日新学词全部覆盖并均匀拆分为每篇最多 12 个目标词，使用
-    DeepSeek 思考模式 `max`。普通复习词不进入阅读包。
+    DeepSeek 思考模式 `max`。普通复习词不进入今日短文。
 
     单词来源 = 今天 ReviewLog 中的卡片；新学 = 今天首次学习的卡片
     （is_new=True，无论评分通过与否，保证“今天新学的所有词汇”都进入文章），
@@ -2147,7 +2147,7 @@ def generate_study_article(
     """
     user = _require_user(db, request)
     if body.source != "new":
-        raise HTTPException(status_code=400, detail="阅读包只使用今天新学的单词")
+        raise HTTPException(status_code=400, detail="今日短文只使用今天新学的单词")
     now = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
     _day, start_of_day, end_of_day = _learning_day(now)
 
@@ -2190,11 +2190,11 @@ def generate_study_article(
     if not new_words:
         raise HTTPException(
             status_code=400,
-            detail="今天还没有新学的单词，请先学习今天的新卡后再生成阅读包",
+            detail="今天还没有新学的单词，请先学习今天的新卡后再生成今日短文",
         )
     word_groups = _article_word_groups(new_words, ai_mod.AI_ARTICLE_TARGET_LIMIT)
     if not _start_article_generation(user.id, len(word_groups)):
-        raise HTTPException(status_code=409, detail="阅读包正在生成，请稍候")
+        raise HTTPException(status_code=409, detail="今日短文正在生成，请稍候")
     background_tasks.add_task(
         _generate_study_articles_in_background,
         user.id,
@@ -2205,7 +2205,7 @@ def generate_study_article(
         "ok": True,
         "state": "generating",
         "total": len(word_groups),
-        "detail": f"AI 正在生成今日阅读包，共 {len(word_groups)} 篇",
+        "detail": f"AI 正在生成今日短文，共 {len(word_groups)} 篇",
     }
 
 

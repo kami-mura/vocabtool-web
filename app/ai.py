@@ -1823,7 +1823,7 @@ def select_priority_words(
 
 # ---------- AI 生成阅读文章 ----------
 
-# 今日阅读包把新词均匀拆成多篇；单篇词少时保持自然，词多时也不硬塞。
+# 今日短文把新词均匀拆成多篇；单篇词少时保持自然，词多时也不硬塞。
 AI_ARTICLE_TARGET_LIMIT = 12
 AI_ARTICLE_TARGET_CHARS = 15_000
 AI_ARTICLE_TEMPERATURE = 0.4

@@ -290,7 +290,7 @@
         <div class="oil-today-actions">
           <button id="oil-today-start" class="primary" type="button">开始今日学习</button>
           <button id="oil-today-add" type="button">制作新卡</button>
-          <button id="oil-today-article" type="button">读今日阅读包</button>
+          <button id="oil-today-article" type="button">读今日短文</button>
           <button id="oil-today-extra" type="button" hidden>继续学习</button>
         </div>
       </div>
@@ -317,17 +317,17 @@
 
     <section class="landing-section" id="real-article-panel"{% if not logged_in %} hidden{% endif %}>
       <div class="landing-section-head">
-        <h2>今日阅读包</h2>
+        <h2>今日短文</h2>
         <p class="hint">将今天新学的词均匀拆成多篇自然短文，每篇最多 12 个目标词</p>
       </div>
       <div id="real-article-body-wrap">
         <div class="real-article-generate-row">
-          <button id="real-article-generate" class="primary" type="button">生成阅读包</button>
+          <button id="real-article-generate" class="primary" type="button">生成今日短文</button>
           <span id="real-article-status" class="hint" role="status" aria-live="polite" hidden></span>
         </div>
         <div id="real-article-placeholder" class="real-article-placeholder">
-          <p>还没有生成今日阅读包</p>
-          <p class="hint">点击上方“生成阅读包”后会显示在这里</p>
+          <p>还没有生成今日短文</p>
+          <p class="hint">点击上方“生成今日短文”后会显示在这里</p>
         </div>
         <article id="real-article-result" class="demo-article" hidden>
           <div id="real-article-body" class="ai-article-body"></div>
