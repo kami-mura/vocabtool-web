@@ -44,6 +44,7 @@ from .auth import (
 )
 from .db import SessionLocal, get_db
 from .models import (
+    AnkiReviewLog,
     Card,
     Corpus,
     CorpusChapter,
@@ -224,6 +225,12 @@ def _user_storage_bytes(db: Session, user_id: int) -> int:
         ReviewLog.previous_word_status,
         extra_per_row=64,
         filters=[(ReviewLog.user_id, user_id)],
+    )
+    total += _sum_storage_bytes(
+        db,
+        AnkiReviewLog.source_key,
+        extra_per_row=72,
+        filters=[(AnkiReviewLog.user_id, user_id)],
     )
     return total
 

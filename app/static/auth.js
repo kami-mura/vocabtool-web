@@ -9,25 +9,25 @@
 
   /* ---------- 夜间模式 ---------- */
   function applyTheme(dark) {
-    document.documentElement.dataset.theme = dark ? "dark" : "light";
-    const toggle = document.getElementById("auth-theme-toggle");
-    if (toggle) toggle.textContent = dark ? "☀" : "☾";
+    if (window.vocabTheme) window.vocabTheme.apply(dark);
+    else document.documentElement.dataset.theme = dark ? "dark" : "light";
   }
   const authThemeToggle = document.getElementById("auth-theme-toggle");
   if (authThemeToggle) {
     authThemeToggle.onclick = function () {
       const dark = document.documentElement.dataset.theme !== "dark";
-      applyTheme(dark);
-      try {
-        localStorage.setItem("vocabtool.theme", dark ? "dark" : "light");
-      } catch (_) { /* 隐私模式等场景忽略 */ }
+      if (window.vocabTheme) window.vocabTheme.setManual(dark);
+      else applyTheme(dark);
     };
   }
   try {
-    const saved = localStorage.getItem("vocabtool.theme");
-    applyTheme(saved
-      ? saved === "dark"
-      : window.matchMedia("(prefers-color-scheme: dark)").matches);
+    if (window.vocabTheme) window.vocabTheme.sync();
+    else {
+      const saved = localStorage.getItem("vocabtool.theme");
+      applyTheme(saved
+        ? saved === "dark"
+        : window.matchMedia("(prefers-color-scheme: dark)").matches);
+    }
   } catch (_) { /* 隐私模式等场景忽略 */ }
 
   function show(text, ok) {

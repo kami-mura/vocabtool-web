@@ -59,6 +59,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     _MAX_API_BODY_BYTES = 48 * 1024 * 1024
     _UPLOAD_PATH_PREFIXES = (
         "/api/card-studio/targets-file",
+        "/api/cards/anki/import",
     )
 
     async def dispatch(self, request: Request, call_next):

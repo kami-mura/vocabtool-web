@@ -219,6 +219,8 @@
             <button id="real-manage-library" type="button" role="menuitem">我的词库</button>
             <button id="real-manage-add-card" type="button" role="menuitem">制作新卡</button>
             <button id="real-manage-browser" type="button" role="menuitem">我的卡片</button>
+            <button id="real-anki-import" type="button" role="menuitem">从 Anki 导入</button>
+            <button id="real-anki-export" type="button" role="menuitem">导出到 Anki</button>
             <div class="review-manage-daily">
               <label for="real-review-daily-new-limit">每天新学习</label>
               <div class="review-manage-daily-row">
@@ -238,7 +240,9 @@
       </div>
       <div class="real-review-toolbar">
         <span id="real-undo-status" class="hint" role="status" aria-live="polite"></span>
+        <span id="real-anki-status" class="hint" role="status" aria-live="polite"></span>
       </div>
+      <input id="real-anki-file" type="file" accept=".apkg,application/octet-stream" hidden>
     </section>
 
     <section class="landing-section" id="guest-demo-cards"{% if logged_in %} hidden{% endif %}>
@@ -564,6 +568,7 @@
   <div id="floating-lookup" class="floating-lookup" role="dialog" aria-label="查词结果" aria-live="polite" hidden>
     <div id="floating-lookup-body"></div>
   </div>
+  <script src="{{ static_url('theme-sync.js') }}"></script>
   <script src="{{ static_url('ui-polish.js') }}"></script>
   <script src="{{ static_url('landing-v51.js') }}"></script>
 </body>

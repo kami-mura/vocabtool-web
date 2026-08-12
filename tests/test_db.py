@@ -119,6 +119,7 @@ def test_old_sqlite_database_migrates_cleanly(monkeypatch, tmp_path):
         assert "fsrs_state" in card_columns
         assert "session_reduce_day" in card_columns
         assert "session_reduce_used" in card_columns
+        assert "anki_guid" in card_columns
         review_columns = {
             row[1] for row in connection.execute("PRAGMA table_info(review_logs)")
         }
@@ -135,6 +136,7 @@ def test_old_sqlite_database_migrates_cleanly(monkeypatch, tmp_path):
         assert "daily_new_assignments" in tables
         assert "schema_migrations" in tables
         assert "saved_words" in tables
+        assert "anki_review_logs" in tables
         assert "word_status" not in tables
         saved_words = connection.execute(
             "SELECT word FROM saved_words WHERE user_id = 1"
@@ -149,6 +151,7 @@ def test_old_sqlite_database_migrates_cleanly(monkeypatch, tmp_path):
         assert "019_card_session_reduce_state" in versions
         assert "020_fsrs_state" in versions
         assert "024_saved_words" in versions
+        assert "026_anki_exchange" in versions
     finally:
         connection.close()
 

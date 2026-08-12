@@ -6,9 +6,9 @@ import logging
 import math
 import threading
 
-from fastapi import APIRouter, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, Response
 
-from .. import speaking_needs, wordlists
+from .. import anki_exchange, speaking_needs, wordlists
 from ..api_support import (
     ALLOWED_CARD_TYPES,
     GENERATABLE_CARD_TYPES,
@@ -1000,6 +1000,78 @@ def create_cards_from_studio(
 
 
 # ---------- 卡片复习 ----------
+
+
+@router.get("/cards/anki/export")
+def export_cards_to_anki(request: Request, db: Session = Depends(get_db)):
+    """导出当前用户全部卡片及学习进度为可由 Anki 导入的 .apkg。"""
+    user = _require_user(db, request)
+    try:
+        package, count = anki_exchange.export_apkg(db, user.id)
+        db.commit()  # 仅保存首次生成的稳定 Anki guid，不改学习状态。
+    except anki_exchange.AnkiExchangeError as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception:
+        db.rollback()
+        raise
+    filename = f"vocabflow-{dt.datetime.now().strftime('%Y%m%d')}-{count}.apkg"
+    return Response(
+        content=package,
+        media_type="application/octet-stream",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "X-VocabFlow-Card-Count": str(count),
+        },
+    )
+
+
+@router.post("/cards/anki/import")
+async def import_cards_from_anki(
+    request: Request,
+    filename: str,
+    db: Session = Depends(get_db),
+):
+    """事务性合并 Anki 包；不删除卡片，较新的站内进度不会被覆盖。"""
+    user = _require_user(db, request)
+    if not filename.lower().endswith(".apkg"):
+        raise HTTPException(status_code=400, detail="请选择 .apkg 文件")
+    if not check_request_rate(
+        db,
+        action="anki-import",
+        identity=f"u{user.id}",
+        limit=20,
+        window_minutes=60,
+    ):
+        raise HTTPException(status_code=429, detail="Anki 导入过于频繁，请稍后再试")
+    data = await _read_limited_body(request, config.MAX_APKG_UPLOAD_BYTES)
+    data, filename = _decode_upload_body(request, data, filename)
+    if not _try_heavy_import_slot():
+        raise HTTPException(status_code=429, detail="服务器导入任务繁忙，请稍后重试")
+    try:
+        parsed = await run_in_threadpool(
+            anki_exchange.parse_apkg, data, config.MAX_APKG_CARDS
+        )
+        estimated_bytes = sum(
+            _utf8_size(str(item.get(key, "")))
+            for item in parsed.get("cards", [])
+            for key in ("word", "front", "back", "context")
+        ) + int(parsed.get("review_count", 0) or 0) * 112
+        _require_storage_space(db, user.id, estimated_bytes)
+        result = anki_exchange.import_parsed(db, user.id, parsed)
+        db.commit()
+        return {"ok": True, **result}
+    except anki_exchange.AnkiExchangeError as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Anki 卡片与现有数据冲突，未导入任何内容",
+        ) from exc
+    finally:
+        _release_heavy_import_slot()
 
 
 @router.get("/cards/settings")

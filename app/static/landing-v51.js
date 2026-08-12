@@ -447,25 +447,25 @@
 
   /* ---------- 登录后：个人菜单 / 每日新学习 / 退出 ---------- */
   function applyLandingTheme(dark) {
-    document.documentElement.dataset.theme = dark ? "dark" : "light";
-    const label = document.getElementById("account-theme-toggle-label");
-    if (label) label.textContent = dark ? "☀ 日间模式" : "☾ 夜间模式";
+    if (window.vocabTheme) window.vocabTheme.apply(dark);
+    else document.documentElement.dataset.theme = dark ? "dark" : "light";
   }
   const accountThemeToggle = document.getElementById("account-theme-toggle");
   if (accountThemeToggle) {
     accountThemeToggle.onclick = () => {
       const dark = document.documentElement.dataset.theme !== "dark";
-      applyLandingTheme(dark);
-      try {
-        localStorage.setItem("vocabtool.theme", dark ? "dark" : "light");
-      } catch (_) { /* 隐私模式等场景忽略 */ }
+      if (window.vocabTheme) window.vocabTheme.setManual(dark);
+      else applyLandingTheme(dark);
     };
   }
   try {
-    const saved = localStorage.getItem("vocabtool.theme");
-    applyLandingTheme(saved
-      ? saved === "dark"
-      : window.matchMedia("(prefers-color-scheme: dark)").matches);
+    if (window.vocabTheme) window.vocabTheme.sync();
+    else {
+      const saved = localStorage.getItem("vocabtool.theme");
+      applyLandingTheme(saved
+        ? saved === "dark"
+        : window.matchMedia("(prefers-color-scheme: dark)").matches);
+    }
   } catch (_) { /* 隐私模式等场景忽略 */ }
 
   const accountPanel = document.getElementById("account-menu-panel");
@@ -1587,6 +1587,82 @@
 
   const realUndo = document.getElementById("real-review-undo");
   if (realUndo) realUndo.onclick = undoRealReview;
+
+  function setAnkiStatus(message) {
+    const status = document.getElementById("real-anki-status");
+    if (status) status.textContent = message;
+  }
+
+  const realAnkiFile = document.getElementById("real-anki-file");
+  const realAnkiImport = document.getElementById("real-anki-import");
+  if (realAnkiImport && realAnkiFile) {
+    realAnkiImport.onclick = () => realAnkiFile.click();
+    realAnkiFile.onchange = async () => {
+      const file = realAnkiFile.files && realAnkiFile.files[0];
+      if (!file) return;
+      if (!file.name.toLowerCase().endsWith(".apkg")) {
+        setAnkiStatus("请选择 .apkg 文件");
+        realAnkiFile.value = "";
+        return;
+      }
+      realAnkiImport.disabled = true;
+      setAnkiStatus("正在校验并合并 Anki 卡片…");
+      try {
+        const res = await fetch(
+          "/api/cards/anki/import?filename=" + encodeURIComponent(file.name),
+          { method: "POST", headers: { "Content-Type": "application/octet-stream" }, body: file }
+        );
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.detail || "导入失败");
+        const summary = [
+          "新增 " + Number(data.created || 0) + " 张",
+          "合并 " + Number(data.updated || 0) + " 张",
+          "保留复习历史 " + Number(data.histories || 0) + " 条",
+        ];
+        if (data.progress_kept) summary.push("保留较新的本地进度 " + Number(data.progress_kept) + " 张");
+        if (data.conflicts) summary.push("跳过冲突 " + Number(data.conflicts) + " 张");
+        setAnkiStatus("Anki 导入完成：" + summary.join("，"));
+        realReviewQueue = [];
+        saveReviewQueueSnapshot();
+        await loadRealReview();
+      } catch (err) {
+        setAnkiStatus("Anki 导入失败：" + err.message);
+      } finally {
+        realAnkiImport.disabled = false;
+        realAnkiFile.value = "";
+      }
+    };
+  }
+
+  const realAnkiExport = document.getElementById("real-anki-export");
+  if (realAnkiExport) {
+    realAnkiExport.onclick = async () => {
+      realAnkiExport.disabled = true;
+      setAnkiStatus("正在导出卡片与学习进度…");
+      try {
+        const res = await fetch("/api/cards/anki/export");
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.detail || "导出失败");
+        }
+        const blob = await res.blob();
+        const disposition = res.headers.get("Content-Disposition") || "";
+        const match = disposition.match(/filename="([^"]+)"/i);
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = match ? match[1] : "vocabflow.apkg";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(link.href);
+        setAnkiStatus("导出完成；导入 Anki 时请选择保留学习进度");
+      } catch (err) {
+        setAnkiStatus("Anki 导出失败：" + err.message);
+      } finally {
+        realAnkiExport.disabled = false;
+      }
+    };
+  }
 
   /* ---------- 卡片管理菜单（卡片下方） ---------- */
   function closeRealReviewManage() {

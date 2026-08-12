@@ -118,6 +118,21 @@ def _migrate_ai_usage_user_created_index() -> None:
         )
 
 
+def _migrate_anki_exchange() -> None:
+    """为旧库增加稳定 Anki 身份；历史表由模型元数据幂等创建。"""
+    inspector = inspect(engine)
+    columns = {column["name"] for column in inspector.get_columns("cards")}
+    with engine.begin() as connection:
+        if "anki_guid" not in columns:
+            connection.execute(text("ALTER TABLE cards ADD COLUMN anki_guid VARCHAR(128)"))
+        connection.execute(
+            text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_cards_user_anki_guid "
+                "ON cards (user_id, anki_guid)"
+            )
+        )
+
+
 def _migrate_graduate_one_day_to_midnight() -> None:
     """把存量卡到期时间对齐到站点时区所在日期 0 点（Anki 日界风格）。
 
@@ -922,6 +937,7 @@ _SCHEMA_MIGRATIONS: list[tuple[str, Callable[[], None]]] = [
     ("023_card_revision", _migrate_card_revision),
     ("024_saved_words", _migrate_saved_words),
     ("025_saved_word_status", _migrate_saved_word_status),
+    ("026_anki_exchange", _migrate_anki_exchange),
 ]
 
 
