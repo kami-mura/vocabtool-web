@@ -62,6 +62,7 @@ from ..api_support import (
     vocab,
 )
 from ..db import SessionLocal, is_sqlite_busy_error, reserve_sqlite_write
+from ..models import AnkiReviewLog
 from ..schemas import (
     ArticleIn,
     CardsBatchDeleteIn,
@@ -1648,10 +1649,16 @@ def daily_cards(
 def undo_last_review(request: Request, db: Session = Depends(get_db)):
     """撤回当前用户最近一次真实评分，并恢复完整调度状态。"""
     user = _require_user(db, request)
+    # 与评分共用写锁：串行化「读取最新日志 → 恢复快照 → 删除日志」，
+    # 防止并发撤回/新评分交错把卡片倒退到过期快照。
+    busy_response = _reserve_review_write(db, user.id, "undo")
+    if busy_response:
+        return busy_response
     log = (
         db.query(ReviewLog)
         .filter(ReviewLog.user_id == user.id)
         .order_by(ReviewLog.reviewed_at.desc(), ReviewLog.id.desc())
+        .with_for_update()
         .first()
     )
     if not log:
@@ -1662,10 +1669,37 @@ def undo_last_review(request: Request, db: Session = Depends(get_db)):
     card = (
         db.query(Card)
         .filter(Card.id == log.card_id, Card.user_id == user.id)
+        .with_for_update()
         .first()
     )
     if not card:
         raise HTTPException(status_code=404, detail="原卡片已不存在")
+    # 锁定卡片后复核：目标日志必须仍是该卡最新评分。若撤回与新的评分
+    # 并发，这里会看到更新的日志并拒绝，而不是把新评分倒退掉。
+    latest_for_card = (
+        db.query(ReviewLog)
+        .filter(ReviewLog.user_id == user.id, ReviewLog.card_id == log.card_id)
+        .order_by(ReviewLog.reviewed_at.desc(), ReviewLog.id.desc())
+        .first()
+    )
+    if latest_for_card is None or latest_for_card.id != log.id:
+        raise HTTPException(status_code=409, detail="这张卡片已有更新的评分，请刷新后重试")
+    # 评分之后又导入过更新的 Anki 进度时拒绝撤回：否则会用它覆盖
+    # 刚导入的 due/reps/lapses 与 FSRS 状态。
+    newer_import = (
+        db.query(AnkiReviewLog.source_key)
+        .filter(
+            AnkiReviewLog.user_id == user.id,
+            AnkiReviewLog.card_id == log.card_id,
+            AnkiReviewLog.reviewed_at > log.reviewed_at,
+        )
+        .first()
+    )
+    if newer_import:
+        raise HTTPException(
+            status_code=409,
+            detail="评分后已导入更新的 Anki 进度，不能撤回",
+        )
     card.state = log.previous_state or ("new" if log.is_new else "review")
     card.due_at = log.previous_due_at
     card.interval_days = float(log.interval_days or 0)
@@ -1889,6 +1923,14 @@ def review_cards_batch(
     busy_response = _reserve_review_write(db, user.id, "batch-review")
     if busy_response:
         return busy_response
+    # 幂等与乐观锁是必填契约：缺少任一字段整体返回 400，
+    # 避免旧客户端或网络重试把同一次点击应用两遍。
+    for item in body.ratings:
+        if not item.action_id.strip() or item.expected_revision is None:
+            raise HTTPException(
+                status_code=400,
+                detail="评分请求缺少幂等标识或卡片版本，请刷新重试",
+            )
     now = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
     results: list[dict] = []
     errors: list[dict] = []

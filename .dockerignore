@@ -11,6 +11,9 @@ __pycache__
 .ruff_cache
 backups
 data/*.db
+data/*.db-wal
+data/*.db-shm
+data/.migrations.lock
 data/tts
 data/temp_uploads
 tests

@@ -14,7 +14,7 @@ cd "${project_dir}"
 sudo systemctl restart "${service_name}"
 
 for attempt in $(seq 1 15); do
-  if curl -fsS http://127.0.0.1:8000/healthz >/dev/null; then
+  if curl -fsS --connect-timeout 3 --max-time 5 http://127.0.0.1:8000/healthz >/dev/null; then
     echo "更新成功：${service_name}"
     exit 0
   fi

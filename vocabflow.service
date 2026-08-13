@@ -1,3 +1,7 @@
+# 【已废弃】请改用 deploy/vocabflow@.service（加固版：沙箱、内存/任务上限、
+# --proxy-headers、--forwarded-allow-ips、优雅停机）。
+# 本文件仅保留作历史参考，不要再安装；误装会导致按 IP 限流与游客配额失效
+# （缺 --forwarded-allow-ips），并失去 systemd 沙箱保护。
 [Unit]
 Description=VocabTool Web
 After=network.target

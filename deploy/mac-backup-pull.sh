@@ -28,6 +28,16 @@ cleanup() {
   rm -f "${lock_dir}/pid"
   rmdir "${lock_dir}" 2>/dev/null || true
 }
+fail() {
+  local status="${1:-1}"
+  local message="${2:-}"
+  printf '%s status=%s message=%s\n' "$(date '+%Y-%m-%d %H:%M:%S %z')" \
+    "${status}" "${message}" >"${failure_marker}"
+  if [[ -n "${message}" ]]; then
+    echo "备份失败：${message}" >&2
+  fi
+  exit "${status}"
+}
 on_error() {
   status=$?
   printf '%s status=%s\n' "$(date '+%Y-%m-%d %H:%M:%S %z')" "${status}" \
@@ -75,8 +85,7 @@ for remote in "${remote_candidates[@]}"; do
   fi
 done
 if [[ -z "${selected_remote}" ]]; then
-  echo "备份失败：Tailscale 与局域网地址均无法连接。" >&2
-  exit 1
+  fail 1 "Tailscale 与局域网地址均无法连接。"
 fi
 
 echo "开始在 Linux 生成数据库快照：${selected_remote}"
@@ -86,8 +95,7 @@ remote_output="$(
 )"
 remote_file="${remote_output##*$'\n'}"
 if [[ ! "${remote_file}" =~ ^vocabflow-sqlite-[0-9]{8}T[0-9]{6}Z\.db$ ]]; then
-  echo "备份失败：服务器没有返回有效的 SQLite 快照文件名。" >&2
-  exit 1
+  fail 1 "服务器没有返回有效的 SQLite 快照文件名。"
 fi
 
 rsync_ssh="/usr/bin/ssh -o BatchMode=yes -o ConnectTimeout=10 -o ConnectionAttempts=2 -o ServerAliveInterval=10 -o ServerAliveCountMax=2"
@@ -96,13 +104,11 @@ rsync_ssh="/usr/bin/ssh -o BatchMode=yes -o ConnectTimeout=10 -o ConnectionAttem
 
 local_file="${backup_dir}/${remote_file}"
 if [[ ! -s "${local_file}" ]]; then
-  echo "备份失败：Mac 上没有收到有效文件 ${local_file}" >&2
-  exit 1
+  fail 1 "Mac 上没有收到有效文件 ${local_file}"
 fi
 integrity="$(/usr/bin/sqlite3 "${local_file}" 'PRAGMA integrity_check;')"
 if [[ "${integrity}" != "ok" ]]; then
-  echo "备份失败：Mac 上的 SQLite 完整性检查未通过。" >&2
-  exit 1
+  fail 1 "Mac 上的 SQLite 完整性检查未通过。"
 fi
 
 marker_tmp="${success_marker}.tmp.$$"

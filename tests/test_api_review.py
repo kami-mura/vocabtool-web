@@ -846,6 +846,161 @@ def test_review_can_restore_exact_previous_schedule(client):
     assert client.post("/api/cards/reviews/undo").status_code == 404
 
 
+def test_batch_requires_action_id_and_expected_revision(client):
+    """批量评分缺幂等字段时整体拒绝：不写日志、不改卡片。"""
+    register(client, "batch-fields@example.com")
+    made = client.post(
+        "/api/card-studio/cards",
+        json={"words": ["run"], "card_type": "general"},
+    )
+    assert made.status_code == 200
+    client.put("/api/cards/settings", json={"new_cards_per_day": 1})
+    card = client.get("/api/cards").json()["new"][0]
+
+    missing_both = client.post(
+        "/api/cards/reviews/batch",
+        json={"ratings": [{"card_id": card["id"], "rating": "again"}]},
+    )
+    assert missing_both.status_code == 400
+
+    missing_revision = client.post(
+        "/api/cards/reviews/batch",
+        json={
+            "ratings": [
+                {
+                    "card_id": card["id"],
+                    "rating": "again",
+                    "action_id": "batch-fields-action",
+                }
+            ]
+        },
+    )
+    assert missing_revision.status_code == 400
+
+    db = SessionLocal()
+    try:
+        assert db.query(ReviewLog).filter(ReviewLog.card_id == card["id"]).count() == 0
+        untouched = db.query(Card).filter(Card.id == card["id"]).one()
+        assert int(untouched.reps or 0) == 0
+        assert int(untouched.revision or 0) == card["revision"]
+    finally:
+        db.close()
+
+
+def test_undo_rejects_when_newer_anki_progress_exists(client):
+    """站内评分后又导入更新的 Anki 进度时，撤回必须拒绝并保留导入进度。"""
+    from app.models import AnkiReviewLog
+
+    register(client, "undo-anki-newer@example.com")
+    made = client.post(
+        "/api/card-studio/cards",
+        json={"words": ["run"], "card_type": "general"},
+    )
+    assert made.status_code == 200
+    client.put("/api/cards/settings", json={"new_cards_per_day": 1})
+    card = client.get("/api/cards").json()["new"][0]
+    reviewed = client.post(
+        f"/api/cards/{card['id']}/review",
+        json={
+            "rating": "again",
+            "action_id": "undo-anki-newer-action",
+            "expected_revision": card["revision"],
+        },
+    )
+    assert reviewed.status_code == 200
+
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.email == "undo-anki-newer@example.com").one()
+        log = (
+            db.query(ReviewLog)
+            .filter(ReviewLog.card_id == card["id"])
+            .one()
+        )
+        now = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
+        imported_at = max(now, (log.reviewed_at or now) + dt.timedelta(seconds=1))
+        db.add(
+            AnkiReviewLog(
+                source_key="sha256:newer-anki-progress",
+                user_id=user.id,
+                card_id=card["id"],
+                anki_review_id=1_700_000_000_000,
+                rating=3,
+                interval_days=10.0,
+                last_interval_days=0.0,
+                ease=2.5,
+                review_type=1,
+                reviewed_at=imported_at,
+            )
+        )
+        # 模拟较新的 Anki 导入已更新排程
+        card_row = db.query(Card).filter(Card.id == card["id"]).one()
+        card_row.state = "review"
+        card_row.due_at = dt.datetime(2030, 1, 1, 0, 0, 0)
+        card_row.reps = 9
+        card_row.revision = int(card_row.revision or 0) + 1
+        db.commit()
+    finally:
+        db.close()
+
+    blocked = client.post("/api/cards/reviews/undo")
+    assert blocked.status_code == 409
+
+    db = SessionLocal()
+    try:
+        kept = db.query(Card).filter(Card.id == card["id"]).one()
+        assert int(kept.reps or 0) == 9
+        assert kept.due_at == dt.datetime(2030, 1, 1, 0, 0, 0)
+        assert db.query(ReviewLog).filter(ReviewLog.card_id == card["id"]).count() == 1
+    finally:
+        db.close()
+
+
+def test_concurrent_undo_deletes_exactly_one_log(client):
+    """并发双撤回只删除一条评分记录，另一个请求得到 404，不产生 500。"""
+    import threading
+
+    register(client, "undo-race@example.com")
+    made = client.post(
+        "/api/card-studio/cards",
+        json={"words": ["run"], "card_type": "general"},
+    )
+    assert made.status_code == 200
+    client.put("/api/cards/settings", json={"new_cards_per_day": 1})
+    card = client.get("/api/cards").json()["new"][0]
+    reviewed = client.post(
+        f"/api/cards/{card['id']}/review",
+        json={
+            "rating": "again",
+            "action_id": "undo-race-action",
+            "expected_revision": card["revision"],
+        },
+    )
+    assert reviewed.status_code == 200
+
+    statuses: list[int] = []
+    barrier = threading.Barrier(2)
+
+    def undo() -> None:
+        barrier.wait(timeout=10)
+        statuses.append(client.post("/api/cards/reviews/undo").status_code)
+
+    threads = [threading.Thread(target=undo) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=15)
+    assert sorted(statuses) == [200, 404]
+
+    db = SessionLocal()
+    try:
+        assert db.query(ReviewLog).filter(ReviewLog.card_id == card["id"]).count() == 0
+        restored = db.query(Card).filter(Card.id == card["id"]).one()
+        assert int(restored.reps or 0) == 0
+    finally:
+        db.close()
+
+
 def test_today_stats_count_cards_and_again_ratio(client):
     register(client, "today-stats@example.com")
     client.post(
