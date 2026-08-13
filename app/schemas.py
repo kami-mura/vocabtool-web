@@ -125,12 +125,22 @@ class VocabularyProfileIn(BaseModel):
     known_rank: int = Field(ge=0, le=31_000)
 
 
+class VocabularyTestAnswer(BaseModel):
+    word: str = Field(min_length=1, max_length=100)
+    known: bool
+
+
+class VocabularyTestSubmitIn(BaseModel):
+    answers: list[VocabularyTestAnswer] = Field(min_length=50, max_length=50)
+
+
 __all__ = [
     "RegisterIn", "VerificationCodeIn", "LoginIn", "PasswordResetIn",
     "ReadingDisplayIn",
     "CardsBatchDeleteIn", "CardTargetsIn", "CardStudioCreateIn", "ReviewIn",
     "ReviewBatchItemIn", "ReviewBatchIn", "ReviewSettingsIn",
     "LookupIn",
-    "VocabularyProfileIn", "QuickLookupIn", "QuestionIn", "TopicWordsIn",
+    "VocabularyProfileIn", "VocabularyTestSubmitIn",
+    "QuickLookupIn", "QuestionIn", "TopicWordsIn",
     "PriorityWordsIn", "ArticleIn",
 ]

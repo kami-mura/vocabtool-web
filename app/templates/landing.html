@@ -45,6 +45,7 @@
         <button id="account-menu-toggle" class="account-menu-summary" data-ico="account" type="button"><span class="ic nav-emoji" aria-hidden="true">👤</span>个人</button>
         <div id="account-menu-panel" class="account-menu-panel" hidden>
           <p class="account-email">邮箱：<strong id="home-email">…</strong></p>
+          <button id="account-vocabulary-test" class="small" type="button">词汇量测试</button>
           <button id="account-theme-toggle" class="small" type="button"><span id="account-theme-toggle-label">☾ 夜间模式</span></button>
           <button id="home-logout" class="danger" type="button">退出登录</button>
         </div>
@@ -568,6 +569,33 @@
   <div id="floating-lookup" class="floating-lookup" role="dialog" aria-label="查词结果" aria-live="polite" hidden>
     <div id="floating-lookup-body"></div>
   </div>
+  {% if logged_in %}
+  <div id="vocabulary-test-modal" class="vocabulary-test-modal" role="dialog" aria-modal="true" aria-labelledby="vocabulary-test-title" hidden>
+    <section class="vocabulary-test-card">
+      <button id="vocabulary-test-close" class="vocabulary-test-close" type="button" aria-label="关闭">×</button>
+      <h2 id="vocabulary-test-title">词汇量测试</h2>
+      <p id="vocabulary-test-help" class="hint">从不同词频区间随机抽取 50 个词。只有能说出一个明确含义时才选“认识”。</p>
+      <div id="vocabulary-test-loading" class="vocabulary-test-loading" hidden>正在准备题目…</div>
+      <div id="vocabulary-test-question" class="vocabulary-test-question" hidden>
+        <div id="vocabulary-test-progress" class="vocabulary-test-progress"></div>
+        <strong id="vocabulary-test-word" lang="en"></strong>
+        <p class="hint">不确定时请选择“不认识”</p>
+        <div class="vocabulary-test-actions">
+          <button id="vocabulary-test-unknown" type="button">不认识</button>
+          <button id="vocabulary-test-known" class="primary" type="button">认识</button>
+        </div>
+      </div>
+      <div id="vocabulary-test-result" class="vocabulary-test-result" hidden>
+        <p>估算词汇量</p>
+        <strong id="vocabulary-test-estimate">0</strong>
+        <span>词</span>
+        <p id="vocabulary-test-result-detail" class="hint"></p>
+        <button id="vocabulary-test-restart" class="primary" type="button">重新测试</button>
+      </div>
+      <p id="vocabulary-test-status" class="hint" role="status" aria-live="polite"></p>
+    </section>
+  </div>
+  {% endif %}
   <script src="{{ static_url('theme-sync.js') }}"></script>
   <script src="{{ static_url('ui-polish.js') }}"></script>
   <script src="{{ static_url('landing-v51.js') }}"></script>

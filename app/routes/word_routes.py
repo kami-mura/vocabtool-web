@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import random
+
 from fastapi import APIRouter
 
 from ..api_support import (
@@ -27,6 +29,7 @@ from ..schemas import (
     PriorityWordsIn,
     TopicWordsIn,
     VocabularyProfileIn,
+    VocabularyTestSubmitIn,
     WordBatchDeleteIn,
     WordBatchStatusIn,
 )
@@ -34,6 +37,9 @@ from ..schemas import (
 router = APIRouter()
 
 ALLOWED_WORD_STATUSES = {"easy", "mid", "hard"}
+VOCABULARY_TEST_BANDS = 10
+VOCABULARY_TEST_WORDS_PER_BAND = 5
+VOCABULARY_TEST_MAX_RANK = 31_000
 
 # ---------- 我的词库 ----------
 
@@ -270,6 +276,79 @@ def update_ngsl_profile(
     db.commit()
     db.refresh(profile)
     return {"ok": True, **_profile_dict(profile)}
+
+
+def _vocabulary_test_band(rank: int) -> int:
+    band_size = VOCABULARY_TEST_MAX_RANK // VOCABULARY_TEST_BANDS
+    return min((rank - 1) // band_size, VOCABULARY_TEST_BANDS - 1)
+
+
+@router.get("/words/vocabulary-test")
+def start_vocabulary_test(request: Request, db: Session = Depends(get_db)):
+    """从十个词频区间各随机抽五词，避免固定题目带来的记忆偏差。"""
+    _require_user(db, request)
+    bands: list[list[str]] = [[] for _ in range(VOCABULARY_TEST_BANDS)]
+    for word, rank in vocab.load_ngsl().items():
+        if 1 <= rank <= VOCABULARY_TEST_MAX_RANK:
+            bands[_vocabulary_test_band(rank)].append(word)
+    if any(len(words) < VOCABULARY_TEST_WORDS_PER_BAND for words in bands):
+        raise HTTPException(status_code=503, detail="词汇测试题库暂不可用")
+    rng = random.SystemRandom()
+    questions = [
+        word
+        for words in bands
+        for word in rng.sample(words, VOCABULARY_TEST_WORDS_PER_BAND)
+    ]
+    rng.shuffle(questions)
+    return {
+        "questions": [{"word": word} for word in questions],
+        "question_count": len(questions),
+    }
+
+
+@router.post("/words/vocabulary-test")
+def finish_vocabulary_test(
+    body: VocabularyTestSubmitIn,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """按每个词频区间的认识比例加权估算，并保存个人阅读基线。"""
+    user = _require_user(db, request)
+    seen: set[str] = set()
+    totals = [0] * VOCABULARY_TEST_BANDS
+    known = [0] * VOCABULARY_TEST_BANDS
+    for answer in body.answers:
+        word = answer.word.strip().lower()
+        rank = vocab.rank_of(word)
+        if not word or word in seen or rank is None:
+            raise HTTPException(status_code=400, detail="词汇测试答案无效，请重新测试")
+        seen.add(word)
+        band = _vocabulary_test_band(rank)
+        totals[band] += 1
+        if answer.known:
+            known[band] += 1
+    if any(total != VOCABULARY_TEST_WORDS_PER_BAND for total in totals):
+        raise HTTPException(status_code=400, detail="词汇测试答案不完整，请重新测试")
+
+    band_size = VOCABULARY_TEST_MAX_RANK // VOCABULARY_TEST_BANDS
+    estimate = sum(
+        band_size * known_count / VOCABULARY_TEST_WORDS_PER_BAND
+        for known_count in known
+    )
+    known_rank = min(
+        VOCABULARY_TEST_MAX_RANK,
+        max(0, int(round(estimate / 100.0) * 100)),
+    )
+    profile = _vocabulary_profile(db, user)
+    profile.ngsl_known_rank = known_rank
+    profile.updated_at = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
+    db.commit()
+    return {
+        "ok": True,
+        "known_rank": known_rank,
+        "known_answers": sum(known),
+        "question_count": sum(totals),
+    }
 
 
 @router.post("/words/topic")

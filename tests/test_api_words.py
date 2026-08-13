@@ -34,6 +34,40 @@ def test_per_user_ngsl_profile_is_only_a_reading_baseline(client):
     assert client.get("/api/words").json()["words"] == []
 
 
+def test_vocabulary_test_uses_frequency_bands_and_only_updates_profile(client):
+    register(client, "vocabulary-test@example.com")
+    started = client.get("/api/words/vocabulary-test")
+    assert started.status_code == 200
+    questions = started.json()["questions"]
+    assert len(questions) == 50
+    assert len({item["word"] for item in questions}) == 50
+
+    from app import vocab
+
+    bands = {}
+    answers = []
+    for item in questions:
+        rank = vocab.rank_of(item["word"])
+        band = min((rank - 1) // 3100, 9)
+        bands[band] = bands.get(band, 0) + 1
+        answers.append({"word": item["word"], "known": band < 4})
+    assert bands == {band: 5 for band in range(10)}
+
+    finished = client.post(
+        "/api/words/vocabulary-test",
+        json={"answers": answers},
+    )
+    assert finished.status_code == 200
+    assert finished.json() == {
+        "ok": True,
+        "known_rank": 12_400,
+        "known_answers": 20,
+        "question_count": 50,
+    }
+    assert client.get("/api/words/ngsl-profile").json() == {"known_rank": 12_400}
+    assert client.get("/api/words").json()["words"] == []
+
+
 def test_reading_display_preference_is_user_scoped_and_validated(client):
     register(client, "reader-layout@example.com")
     default = client.get("/api/reading/display-preference")

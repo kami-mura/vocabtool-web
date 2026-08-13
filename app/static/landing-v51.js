@@ -495,6 +495,105 @@
       location.href = "/";
     };
   }
+
+  /* ---------- 个人：词频分层词汇量小测 ---------- */
+  const vocabularyTestModal = document.getElementById("vocabulary-test-modal");
+  const vocabularyTestQuestion = document.getElementById("vocabulary-test-question");
+  const vocabularyTestResult = document.getElementById("vocabulary-test-result");
+  const vocabularyTestLoading = document.getElementById("vocabulary-test-loading");
+  const vocabularyTestStatus = document.getElementById("vocabulary-test-status");
+  let vocabularyTestQuestions = [];
+  let vocabularyTestAnswers = [];
+  let vocabularyTestIndex = 0;
+
+  function closeVocabularyTest() {
+    if (vocabularyTestModal) vocabularyTestModal.hidden = true;
+  }
+
+  function renderVocabularyTestQuestion() {
+    const item = vocabularyTestQuestions[vocabularyTestIndex];
+    if (!item) return;
+    const progress = document.getElementById("vocabulary-test-progress");
+    const word = document.getElementById("vocabulary-test-word");
+    if (progress) progress.textContent = (vocabularyTestIndex + 1) + " / " + vocabularyTestQuestions.length;
+    if (word) word.textContent = item.word;
+  }
+
+  async function startVocabularyTest() {
+    if (!vocabularyTestModal) return;
+    vocabularyTestModal.hidden = false;
+    if (accountPanel) accountPanel.hidden = true;
+    vocabularyTestLoading.textContent = "正在准备题目…";
+    vocabularyTestLoading.hidden = false;
+    vocabularyTestQuestion.hidden = true;
+    vocabularyTestResult.hidden = true;
+    vocabularyTestStatus.textContent = "";
+    vocabularyTestQuestions = [];
+    vocabularyTestAnswers = [];
+    vocabularyTestIndex = 0;
+    try {
+      const res = await fetch("/api/words/vocabulary-test");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || "题目加载失败");
+      vocabularyTestQuestions = data.questions || [];
+      if (vocabularyTestQuestions.length !== 50) throw new Error("题目数量不完整");
+      vocabularyTestLoading.hidden = true;
+      vocabularyTestQuestion.hidden = false;
+      renderVocabularyTestQuestion();
+    } catch (err) {
+      vocabularyTestLoading.hidden = true;
+      vocabularyTestStatus.textContent = "无法开始测试：" + err.message;
+    }
+  }
+
+  async function answerVocabularyTest(known) {
+    const item = vocabularyTestQuestions[vocabularyTestIndex];
+    if (!item) return;
+    vocabularyTestAnswers.push({ word: item.word, known: Boolean(known) });
+    vocabularyTestIndex += 1;
+    if (vocabularyTestIndex < vocabularyTestQuestions.length) {
+      renderVocabularyTestQuestion();
+      return;
+    }
+    vocabularyTestQuestion.hidden = true;
+    vocabularyTestLoading.hidden = false;
+    vocabularyTestLoading.textContent = "正在计算结果…";
+    try {
+      const res = await fetch("/api/words/vocabulary-test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ answers: vocabularyTestAnswers }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || "结果保存失败");
+      document.getElementById("vocabulary-test-estimate").textContent = Number(data.known_rank).toLocaleString();
+      document.getElementById("vocabulary-test-result-detail").textContent =
+        "已保存到个人词汇量（认识 " + data.known_answers + " / " + data.question_count + "）";
+      const profileInput = document.getElementById("real-profile-known-rank");
+      if (profileInput) profileInput.value = Number(data.known_rank);
+      vocabularyTestLoading.hidden = true;
+      vocabularyTestResult.hidden = false;
+    } catch (err) {
+      vocabularyTestLoading.hidden = true;
+      vocabularyTestStatus.textContent = "计算失败：" + err.message;
+    }
+  }
+
+  const vocabularyTestOpen = document.getElementById("account-vocabulary-test");
+  if (vocabularyTestOpen) vocabularyTestOpen.onclick = startVocabularyTest;
+  const vocabularyTestClose = document.getElementById("vocabulary-test-close");
+  if (vocabularyTestClose) vocabularyTestClose.onclick = closeVocabularyTest;
+  const vocabularyTestUnknown = document.getElementById("vocabulary-test-unknown");
+  if (vocabularyTestUnknown) vocabularyTestUnknown.onclick = () => answerVocabularyTest(false);
+  const vocabularyTestKnown = document.getElementById("vocabulary-test-known");
+  if (vocabularyTestKnown) vocabularyTestKnown.onclick = () => answerVocabularyTest(true);
+  const vocabularyTestRestart = document.getElementById("vocabulary-test-restart");
+  if (vocabularyTestRestart) vocabularyTestRestart.onclick = startVocabularyTest;
+  if (vocabularyTestModal) {
+    vocabularyTestModal.addEventListener("click", (event) => {
+      if (event.target === vocabularyTestModal) closeVocabularyTest();
+    });
+  }
   async function saveRealDailyNewLimit(value) {
     if (!Number.isInteger(value) || value < 0 || value > 200) {
       const status = document.getElementById("real-review-status");

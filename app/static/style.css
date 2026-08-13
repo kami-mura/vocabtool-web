@@ -1257,6 +1257,56 @@ button.landing-login-btn { border: none; cursor: pointer; }
 .account-menu-panel .account-email strong { color: var(--text); }
 .account-menu-panel .storage-usage { margin-top: 0; }
 .account-menu-panel button { width: 100%; }
+.vocabulary-test-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 20, 32, .58);
+}
+.vocabulary-test-modal[hidden] { display: none; }
+.vocabulary-test-card {
+  position: relative;
+  width: min(440px, 100%);
+  min-height: 330px;
+  padding: 28px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--panel);
+  box-shadow: var(--shadow-lg);
+  text-align: center;
+}
+.vocabulary-test-card h2 { margin: 0 0 10px; }
+.vocabulary-test-close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 26px;
+}
+.vocabulary-test-loading { margin-top: 72px; color: var(--muted); }
+.vocabulary-test-question { margin-top: 28px; }
+.vocabulary-test-progress { margin-bottom: 28px; color: var(--muted); font-size: 13px; }
+.vocabulary-test-question > strong {
+  display: block;
+  margin-bottom: 20px;
+  font-size: clamp(34px, 9vw, 52px);
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+.vocabulary-test-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 24px; }
+.vocabulary-test-result { margin-top: 54px; }
+.vocabulary-test-result > p:first-child { margin-bottom: 6px; color: var(--muted); }
+.vocabulary-test-result > strong { color: var(--accent); font-size: 48px; }
+.vocabulary-test-result > span { color: var(--muted); }
+.vocabulary-test-result .primary { margin-top: 18px; }
 .sidebar {
   width: 232px;
   flex-shrink: 0;
