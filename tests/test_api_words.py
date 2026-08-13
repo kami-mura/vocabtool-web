@@ -39,19 +39,28 @@ def test_vocabulary_test_uses_frequency_bands_and_only_updates_profile(client):
     started = client.get("/api/words/vocabulary-test")
     assert started.status_code == 200
     questions = started.json()["questions"]
-    assert len(questions) == 50
-    assert len({item["word"] for item in questions}) == 50
+    assert started.json()["base_level"] == 5000
+    assert len(questions) == 105
+    assert len({item["word"] for item in questions}) == 105
 
     from app import vocab
 
-    bands = {}
-    answers = []
+    levels = {}
     for item in questions:
         rank = vocab.rank_of(item["word"])
-        band = min((rank - 1) // 3100, 9)
-        bands[band] = bands.get(band, 0) + 1
-        answers.append({"word": item["word"], "known": band < 4})
-    assert bands == {band: 5 for band in range(10)}
+        assert abs(rank - item["level"]) <= 100
+        levels.setdefault(item["level"], []).append(item["word"])
+    assert set(levels) == set(range(1000, 21_001, 1000))
+    assert all(len(words) == 5 for words in levels.values())
+
+    answers = [
+        *({"word": word, "known": True} for word in levels[5000]),
+        *({"word": word, "known": True} for word in levels[6000]),
+        *(
+            {"word": word, "known": index < 3}
+            for index, word in enumerate(levels[7000])
+        ),
+    ]
 
     finished = client.post(
         "/api/words/vocabulary-test",
@@ -60,11 +69,11 @@ def test_vocabulary_test_uses_frequency_bands_and_only_updates_profile(client):
     assert finished.status_code == 200
     assert finished.json() == {
         "ok": True,
-        "known_rank": 12_400,
-        "known_answers": 20,
-        "question_count": 50,
+        "known_rank": 7_000,
+        "known_answers": 13,
+        "question_count": 15,
     }
-    assert client.get("/api/words/ngsl-profile").json() == {"known_rank": 12_400}
+    assert client.get("/api/words/ngsl-profile").json() == {"known_rank": 7_000}
     assert client.get("/api/words").json()["words"] == []
 
 

@@ -37,9 +37,10 @@ from ..schemas import (
 router = APIRouter()
 
 ALLOWED_WORD_STATUSES = {"easy", "mid", "hard"}
-VOCABULARY_TEST_BANDS = 10
-VOCABULARY_TEST_WORDS_PER_BAND = 5
-VOCABULARY_TEST_MAX_RANK = 31_000
+VOCABULARY_TEST_LEVELS = tuple(range(1_000, 21_001, 1_000))
+VOCABULARY_TEST_BASE_LEVEL = 5_000
+VOCABULARY_TEST_WINDOW = 100
+VOCABULARY_TEST_WORDS_PER_LEVEL = 5
 
 # ---------- 我的词库 ----------
 
@@ -278,31 +279,39 @@ def update_ngsl_profile(
     return {"ok": True, **_profile_dict(profile)}
 
 
-def _vocabulary_test_band(rank: int) -> int:
-    band_size = VOCABULARY_TEST_MAX_RANK // VOCABULARY_TEST_BANDS
-    return min((rank - 1) // band_size, VOCABULARY_TEST_BANDS - 1)
+def _vocabulary_test_level(rank: int) -> int | None:
+    return next(
+        (
+            level
+            for level in VOCABULARY_TEST_LEVELS
+            if abs(rank - level) <= VOCABULARY_TEST_WINDOW
+        ),
+        None,
+    )
 
 
 @router.get("/words/vocabulary-test")
 def start_vocabulary_test(request: Request, db: Session = Depends(get_db)):
-    """从十个词频区间各随机抽五词，避免固定题目带来的记忆偏差。"""
+    """预备各词频点题目；前端从 5000 起按答题结果自适应升降。"""
     _require_user(db, request)
-    bands: list[list[str]] = [[] for _ in range(VOCABULARY_TEST_BANDS)]
+    levels = {level: [] for level in VOCABULARY_TEST_LEVELS}
     for word, rank in vocab.load_ngsl().items():
-        if 1 <= rank <= VOCABULARY_TEST_MAX_RANK:
-            bands[_vocabulary_test_band(rank)].append(word)
-    if any(len(words) < VOCABULARY_TEST_WORDS_PER_BAND for words in bands):
+        level = _vocabulary_test_level(rank)
+        if level is not None:
+            levels[level].append(word)
+    if any(len(words) < VOCABULARY_TEST_WORDS_PER_LEVEL for words in levels.values()):
         raise HTTPException(status_code=503, detail="词汇测试题库暂不可用")
     rng = random.SystemRandom()
     questions = [
-        word
-        for words in bands
-        for word in rng.sample(words, VOCABULARY_TEST_WORDS_PER_BAND)
+        {"word": word, "level": level}
+        for level, words in levels.items()
+        for word in rng.sample(words, VOCABULARY_TEST_WORDS_PER_LEVEL)
     ]
-    rng.shuffle(questions)
     return {
-        "questions": [{"word": word} for word in questions],
+        "questions": questions,
         "question_count": len(questions),
+        "base_level": VOCABULARY_TEST_BASE_LEVEL,
+        "words_per_level": VOCABULARY_TEST_WORDS_PER_LEVEL,
     }
 
 
@@ -312,33 +321,58 @@ def finish_vocabulary_test(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    """按每个词频区间的认识比例加权估算，并保存个人阅读基线。"""
+    """验证自适应答题路径，按最终确认的千词档位保存结果。"""
     user = _require_user(db, request)
     seen: set[str] = set()
-    totals = [0] * VOCABULARY_TEST_BANDS
-    known = [0] * VOCABULARY_TEST_BANDS
-    for answer in body.answers:
-        word = answer.word.strip().lower()
-        rank = vocab.rank_of(word)
-        if not word or word in seen or rank is None:
-            raise HTTPException(status_code=400, detail="词汇测试答案无效，请重新测试")
-        seen.add(word)
-        band = _vocabulary_test_band(rank)
-        totals[band] += 1
-        if answer.known:
-            known[band] += 1
-    if any(total != VOCABULARY_TEST_WORDS_PER_BAND for total in totals):
+    if len(body.answers) % VOCABULARY_TEST_WORDS_PER_LEVEL:
         raise HTTPException(status_code=400, detail="词汇测试答案不完整，请重新测试")
+    groups: list[tuple[int, int]] = []
+    for offset in range(0, len(body.answers), VOCABULARY_TEST_WORDS_PER_LEVEL):
+        chunk = body.answers[offset : offset + VOCABULARY_TEST_WORDS_PER_LEVEL]
+        chunk_levels: set[int] = set()
+        known_count = 0
+        for answer in chunk:
+            word = answer.word.strip().lower()
+            rank = vocab.rank_of(word)
+            level = _vocabulary_test_level(rank) if rank is not None else None
+            if not word or word in seen or level is None:
+                raise HTTPException(status_code=400, detail="词汇测试答案无效，请重新测试")
+            seen.add(word)
+            chunk_levels.add(level)
+            known_count += int(answer.known)
+        if len(chunk_levels) != 1:
+            raise HTTPException(status_code=400, detail="词汇测试答案无效，请重新测试")
+        groups.append((chunk_levels.pop(), known_count))
 
-    band_size = VOCABULARY_TEST_MAX_RANK // VOCABULARY_TEST_BANDS
-    estimate = sum(
-        band_size * known_count / VOCABULARY_TEST_WORDS_PER_BAND
-        for known_count in known
-    )
-    known_rank = min(
-        VOCABULARY_TEST_MAX_RANK,
-        max(0, int(round(estimate / 100.0) * 100)),
-    )
+    expected_level = VOCABULARY_TEST_BASE_LEVEL
+    direction = 0
+    final_level = 0
+    final_known = 0
+    for index, (level, known_count) in enumerate(groups):
+        if level != expected_level:
+            raise HTTPException(status_code=400, detail="词汇测试答题顺序无效，请重新测试")
+        at_boundary = level in {VOCABULARY_TEST_LEVELS[0], VOCABULARY_TEST_LEVELS[-1]}
+        terminal = 3 <= known_count <= 4 or at_boundary
+        if known_count == VOCABULARY_TEST_WORDS_PER_LEVEL:
+            terminal = terminal or direction < 0
+            if not terminal:
+                direction = 1
+                expected_level += 1_000
+        elif known_count <= 2:
+            terminal = terminal or direction > 0
+            if not terminal:
+                direction = -1
+                expected_level -= 1_000
+        if terminal:
+            if index != len(groups) - 1:
+                raise HTTPException(status_code=400, detail="词汇测试答案过多，请重新测试")
+            final_level = level
+            final_known = known_count
+            break
+    if not final_level:
+        raise HTTPException(status_code=400, detail="词汇测试尚未完成")
+
+    known_rank = final_level - 1_000 if direction > 0 and final_known <= 2 else final_level
     profile = _vocabulary_profile(db, user)
     profile.ngsl_known_rank = known_rank
     profile.updated_at = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
@@ -346,8 +380,8 @@ def finish_vocabulary_test(
     return {
         "ok": True,
         "known_rank": known_rank,
-        "known_answers": sum(known),
-        "question_count": sum(totals),
+        "known_answers": sum(int(answer.known) for answer in body.answers),
+        "question_count": len(body.answers),
     }
 
 

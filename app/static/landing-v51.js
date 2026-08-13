@@ -505,17 +505,20 @@
   let vocabularyTestQuestions = [];
   let vocabularyTestAnswers = [];
   let vocabularyTestIndex = 0;
+  let vocabularyTestLevel = 5000;
+  let vocabularyTestDirection = 0;
 
   function closeVocabularyTest() {
     if (vocabularyTestModal) vocabularyTestModal.hidden = true;
   }
 
   function renderVocabularyTestQuestion() {
-    const item = vocabularyTestQuestions[vocabularyTestIndex];
+    const levelQuestions = vocabularyTestQuestions.filter((item) => item.level === vocabularyTestLevel);
+    const item = levelQuestions[vocabularyTestIndex];
     if (!item) return;
     const progress = document.getElementById("vocabulary-test-progress");
     const word = document.getElementById("vocabulary-test-word");
-    if (progress) progress.textContent = (vocabularyTestIndex + 1) + " / " + vocabularyTestQuestions.length;
+    if (progress) progress.textContent = vocabularyTestLevel + " 词档 · " + (vocabularyTestIndex + 1) + " / 5";
     if (word) word.textContent = item.word;
   }
 
@@ -531,12 +534,15 @@
     vocabularyTestQuestions = [];
     vocabularyTestAnswers = [];
     vocabularyTestIndex = 0;
+    vocabularyTestLevel = 5000;
+    vocabularyTestDirection = 0;
     try {
       const res = await fetch("/api/words/vocabulary-test");
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.detail || "题目加载失败");
       vocabularyTestQuestions = data.questions || [];
-      if (vocabularyTestQuestions.length !== 50) throw new Error("题目数量不完整");
+      if (vocabularyTestQuestions.length !== 105) throw new Error("题目数量不完整");
+      vocabularyTestLevel = Number(data.base_level) || 5000;
       vocabularyTestLoading.hidden = true;
       vocabularyTestQuestion.hidden = false;
       renderVocabularyTestQuestion();
@@ -547,11 +553,23 @@
   }
 
   async function answerVocabularyTest(known) {
-    const item = vocabularyTestQuestions[vocabularyTestIndex];
+    const levelQuestions = vocabularyTestQuestions.filter((row) => row.level === vocabularyTestLevel);
+    const item = levelQuestions[vocabularyTestIndex];
     if (!item) return;
     vocabularyTestAnswers.push({ word: item.word, known: Boolean(known) });
     vocabularyTestIndex += 1;
-    if (vocabularyTestIndex < vocabularyTestQuestions.length) {
+    if (vocabularyTestIndex < 5) {
+      renderVocabularyTestQuestion();
+      return;
+    }
+    const levelAnswers = vocabularyTestAnswers.slice(-5);
+    const knownCount = levelAnswers.filter((answer) => answer.known).length;
+    const canMoveUp = knownCount === 5 && vocabularyTestLevel < 21000 && vocabularyTestDirection >= 0;
+    const canMoveDown = knownCount <= 2 && vocabularyTestLevel > 1000 && vocabularyTestDirection <= 0;
+    if (canMoveUp || canMoveDown) {
+      vocabularyTestDirection = canMoveUp ? 1 : -1;
+      vocabularyTestLevel += canMoveUp ? 1000 : -1000;
+      vocabularyTestIndex = 0;
       renderVocabularyTestQuestion();
       return;
     }
@@ -568,7 +586,7 @@
       if (!res.ok) throw new Error(data.detail || "结果保存失败");
       document.getElementById("vocabulary-test-estimate").textContent = Number(data.known_rank).toLocaleString();
       document.getElementById("vocabulary-test-result-detail").textContent =
-        "已保存到个人词汇量（认识 " + data.known_answers + " / " + data.question_count + "）";
+        "已保存到个人词汇量（本次回答 " + data.question_count + " 题）";
       const profileInput = document.getElementById("real-profile-known-rank");
       if (profileInput) profileInput.value = Number(data.known_rank);
       vocabularyTestLoading.hidden = true;

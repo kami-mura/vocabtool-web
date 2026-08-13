@@ -131,7 +131,7 @@ class VocabularyTestAnswer(BaseModel):
 
 
 class VocabularyTestSubmitIn(BaseModel):
-    answers: list[VocabularyTestAnswer] = Field(min_length=50, max_length=50)
+    answers: list[VocabularyTestAnswer] = Field(min_length=5, max_length=85)
 
 
 __all__ = [
