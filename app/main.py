@@ -51,6 +51,22 @@ templates.env.globals["static_url"] = static_url
 templates.env.auto_reload = config.TEMPLATES_AUTO_RELOAD
 
 
+def _frame_ancestors_csp(ancestors: list[str]) -> str:
+    """把配置的 frame-ancestors 白名单拼成 CSP 源列表；self/none 关键字加引号。"""
+    return " ".join(
+        f"'{value}'" if value in {"self", "none"} else value
+        for value in ancestors
+    )
+
+
+# CSP 与 X-Frame-Options 均在请求时下发，这里只预计算一次配置结果。
+_FRAME_ANCESTORS_CSP = _frame_ancestors_csp(config.FRAME_ANCESTORS)
+# 自定义白名单时省略 X-Frame-Options：该头只能表达 DENY/SAMEORIGIN，
+# 无法表达白名单，且现代浏览器在存在 frame-ancestors 时会忽略它；
+# 保留它会误导旧浏览器（按 SAMEORIGIN 拦截所有跨站嵌入）。
+_ALLOW_CUSTOM_FRAMING = config.FRAME_ANCESTORS != ["self"]
+
+
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """统一安全头 + 请求体大小上限 + 简单 CSRF 防护。"""
 
@@ -99,12 +115,13 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
                     request._receive = counted_receive
         response = await call_next(request)
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
-        response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+        if not _ALLOW_CUSTOM_FRAMING:
+            response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
         response.headers.setdefault("Referrer-Policy", "same-origin")
         response.headers.setdefault(
             "Content-Security-Policy",
             "default-src 'self'; base-uri 'none'; form-action 'self'; "
-            "frame-ancestors 'self'; object-src 'none'; script-src 'self'; "
+            f"frame-ancestors {_FRAME_ANCESTORS_CSP}; object-src 'none'; script-src 'self'; "
             "style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
             "media-src 'self'; connect-src 'self'",
         )

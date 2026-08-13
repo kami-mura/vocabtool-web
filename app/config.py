@@ -95,6 +95,17 @@ GUEST_AI_DAILY_LIMIT = max(0, _env_int("GUEST_AI_DAILY_LIMIT", 500))
 # TTS 音频缓存总容量上限（字节）；超出后按最旧优先清理。
 TTS_CACHE_MAX_BYTES = _env_int("TTS_CACHE_MAX_BYTES", 512 * 1024 * 1024)
 
+def _parse_frame_ancestors(raw: str) -> list[str]:
+    """解析 CSP frame-ancestors 白名单：逗号分隔的来源列表，自动去空白。"""
+    return [item.strip() for item in raw.split(",") if item.strip()]
+
+
+# 允许把本站页面嵌入 iframe 的祖先来源（CSP frame-ancestors 白名单）。
+# 默认仅 'self'（防止点击劫持）；需要被其他页面（如本机 DSH 界面
+# http://127.0.0.1:3080）嵌入时用逗号列出完整来源。
+FRAME_ANCESTORS = _parse_frame_ancestors(os.environ.get("FRAME_ANCESTORS", "self"))
+
+
 # 可选：deepseek-v4-flash 释义。Key 只从服务器环境变量读取，绝不下发到浏览器。
 AI_PROVIDER = os.environ.get("AI_PROVIDER", "").strip().lower()
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
