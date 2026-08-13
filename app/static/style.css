@@ -1294,14 +1294,23 @@ button.landing-login-btn { border: none; cursor: pointer; }
 .vocabulary-test-loading { margin-top: 72px; color: var(--muted); }
 .vocabulary-test-question { margin-top: 28px; }
 .vocabulary-test-progress { margin-bottom: 28px; color: var(--muted); font-size: 13px; }
-.vocabulary-test-question > strong {
-  display: block;
-  margin-bottom: 20px;
-  font-size: clamp(34px, 9vw, 52px);
-  line-height: 1.1;
-  overflow-wrap: anywhere;
+.vocabulary-test-options { display: grid; gap: 9px; margin: 0 auto 18px; text-align: left; }
+.vocabulary-test-options label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 9px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  cursor: pointer;
 }
-.vocabulary-test-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 24px; }
+.vocabulary-test-options label:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.vocabulary-test-options input { width: 20px; height: 20px; }
+.vocabulary-test-options span { font-size: 21px; font-weight: 700; }
 .vocabulary-test-result { margin-top: 54px; }
 .vocabulary-test-result > p:first-child { margin-bottom: 6px; color: var(--muted); }
 .vocabulary-test-result > strong { color: var(--accent); font-size: 48px; }

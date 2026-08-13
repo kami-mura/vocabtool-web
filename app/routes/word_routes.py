@@ -291,26 +291,29 @@ def _vocabulary_test_level(rank: int) -> int | None:
 
 
 @router.get("/words/vocabulary-test")
-def start_vocabulary_test(request: Request, db: Session = Depends(get_db)):
-    """预备各词频点题目；前端从 5000 起按答题结果自适应升降。"""
+def start_vocabulary_test(
+    request: Request,
+    level: int = VOCABULARY_TEST_BASE_LEVEL,
+    db: Session = Depends(get_db),
+):
+    """从指定千词档位附近随机抽五词。"""
     _require_user(db, request)
-    levels = {level: [] for level in VOCABULARY_TEST_LEVELS}
+    if level not in VOCABULARY_TEST_LEVELS:
+        raise HTTPException(status_code=400, detail="词汇测试档位无效")
+    words: list[str] = []
     for word, rank in vocab.load_ngsl().items():
-        level = _vocabulary_test_level(rank)
-        if level is not None:
-            levels[level].append(word)
-    if any(len(words) < VOCABULARY_TEST_WORDS_PER_LEVEL for words in levels.values()):
+        if abs(rank - level) <= VOCABULARY_TEST_WINDOW:
+            words.append(word)
+    if len(words) < VOCABULARY_TEST_WORDS_PER_LEVEL:
         raise HTTPException(status_code=503, detail="词汇测试题库暂不可用")
     rng = random.SystemRandom()
     questions = [
         {"word": word, "level": level}
-        for level, words in levels.items()
         for word in rng.sample(words, VOCABULARY_TEST_WORDS_PER_LEVEL)
     ]
     return {
         "questions": questions,
-        "question_count": len(questions),
-        "base_level": VOCABULARY_TEST_BASE_LEVEL,
+        "level": level,
         "words_per_level": VOCABULARY_TEST_WORDS_PER_LEVEL,
     }
 
@@ -321,7 +324,7 @@ def finish_vocabulary_test(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    """验证自适应答题路径，按最终确认的千词档位保存结果。"""
+    """验证升降路径，按当前档位减去错词数换算并保存。"""
     user = _require_user(db, request)
     seen: set[str] = set()
     if len(body.answers) % VOCABULARY_TEST_WORDS_PER_LEVEL:
@@ -345,23 +348,21 @@ def finish_vocabulary_test(
         groups.append((chunk_levels.pop(), known_count))
 
     expected_level = VOCABULARY_TEST_BASE_LEVEL
-    direction = 0
     final_level = 0
     final_known = 0
     for index, (level, known_count) in enumerate(groups):
         if level != expected_level:
             raise HTTPException(status_code=400, detail="词汇测试答题顺序无效，请重新测试")
-        at_boundary = level in {VOCABULARY_TEST_LEVELS[0], VOCABULARY_TEST_LEVELS[-1]}
-        terminal = 3 <= known_count <= 4 or at_boundary
+        at_lower_boundary = level == VOCABULARY_TEST_LEVELS[0]
+        at_upper_boundary = level == VOCABULARY_TEST_LEVELS[-1]
+        terminal = 3 <= known_count <= 4
         if known_count == VOCABULARY_TEST_WORDS_PER_LEVEL:
-            terminal = terminal or direction < 0
+            terminal = terminal or at_upper_boundary
             if not terminal:
-                direction = 1
                 expected_level += 1_000
         elif known_count <= 2:
-            terminal = terminal or direction > 0
+            terminal = terminal or at_lower_boundary
             if not terminal:
-                direction = -1
                 expected_level -= 1_000
         if terminal:
             if index != len(groups) - 1:
@@ -372,7 +373,7 @@ def finish_vocabulary_test(
     if not final_level:
         raise HTTPException(status_code=400, detail="词汇测试尚未完成")
 
-    known_rank = final_level - 1_000 if direction > 0 and final_known <= 2 else final_level
+    known_rank = max(0, final_level - (VOCABULARY_TEST_WORDS_PER_LEVEL - final_known) * 200)
     profile = _vocabulary_profile(db, user)
     profile.ngsl_known_rank = known_rank
     profile.updated_at = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)

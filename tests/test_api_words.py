@@ -39,26 +39,25 @@ def test_vocabulary_test_uses_frequency_bands_and_only_updates_profile(client):
     started = client.get("/api/words/vocabulary-test")
     assert started.status_code == 200
     questions = started.json()["questions"]
-    assert started.json()["base_level"] == 5000
-    assert len(questions) == 105
-    assert len({item["word"] for item in questions}) == 105
+    assert started.json()["level"] == 5000
+    assert len(questions) == 5
+    assert len({item["word"] for item in questions}) == 5
 
     from app import vocab
 
-    levels = {}
     for item in questions:
         rank = vocab.rank_of(item["word"])
-        assert abs(rank - item["level"]) <= 100
-        levels.setdefault(item["level"], []).append(item["word"])
-    assert set(levels) == set(range(1000, 21_001, 1000))
-    assert all(len(words) == 5 for words in levels.values())
+        assert item["level"] == 5000
+        assert abs(rank - 5000) <= 100
 
+    next_level = client.get("/api/words/vocabulary-test", params={"level": 6000})
+    assert next_level.status_code == 200
+    level_6000 = next_level.json()["questions"]
     answers = [
-        *({"word": word, "known": True} for word in levels[5000]),
-        *({"word": word, "known": True} for word in levels[6000]),
+        *({"word": item["word"], "known": True} for item in questions),
         *(
-            {"word": word, "known": index < 3}
-            for index, word in enumerate(levels[7000])
+            {"word": item["word"], "known": index < 4}
+            for index, item in enumerate(level_6000)
         ),
     ]
 
@@ -69,11 +68,11 @@ def test_vocabulary_test_uses_frequency_bands_and_only_updates_profile(client):
     assert finished.status_code == 200
     assert finished.json() == {
         "ok": True,
-        "known_rank": 7_000,
-        "known_answers": 13,
-        "question_count": 15,
+        "known_rank": 5_800,
+        "known_answers": 9,
+        "question_count": 10,
     }
-    assert client.get("/api/words/ngsl-profile").json() == {"known_rank": 7_000}
+    assert client.get("/api/words/ngsl-profile").json() == {"known_rank": 5_800}
     assert client.get("/api/words").json()["words"] == []
 
 

@@ -504,22 +504,35 @@
   const vocabularyTestStatus = document.getElementById("vocabulary-test-status");
   let vocabularyTestQuestions = [];
   let vocabularyTestAnswers = [];
-  let vocabularyTestIndex = 0;
   let vocabularyTestLevel = 5000;
-  let vocabularyTestDirection = 0;
 
   function closeVocabularyTest() {
     if (vocabularyTestModal) vocabularyTestModal.hidden = true;
   }
 
   function renderVocabularyTestQuestion() {
-    const levelQuestions = vocabularyTestQuestions.filter((item) => item.level === vocabularyTestLevel);
-    const item = levelQuestions[vocabularyTestIndex];
-    if (!item) return;
     const progress = document.getElementById("vocabulary-test-progress");
-    const word = document.getElementById("vocabulary-test-word");
-    if (progress) progress.textContent = vocabularyTestLevel + " 词档 · " + (vocabularyTestIndex + 1) + " / 5";
-    if (word) word.textContent = item.word;
+    const options = document.getElementById("vocabulary-test-options");
+    if (progress) progress.textContent = vocabularyTestLevel + " 词档";
+    if (!options) return;
+    options.innerHTML = vocabularyTestQuestions.map((item, index) =>
+      '<label><input type="checkbox" data-vocabulary-test-index="' + index + '">' +
+      '<span lang="en">' + escapeHtml(item.word) + "</span></label>"
+    ).join("");
+  }
+
+  async function loadVocabularyTestLevel() {
+    vocabularyTestLoading.textContent = "正在准备题目…";
+    vocabularyTestLoading.hidden = false;
+    vocabularyTestQuestion.hidden = true;
+    const res = await fetch("/api/words/vocabulary-test?level=" + vocabularyTestLevel);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || "题目加载失败");
+    vocabularyTestQuestions = data.questions || [];
+    if (vocabularyTestQuestions.length !== 5) throw new Error("题目数量不完整");
+    vocabularyTestLoading.hidden = true;
+    vocabularyTestQuestion.hidden = false;
+    renderVocabularyTestQuestion();
   }
 
   async function startVocabularyTest() {
@@ -533,44 +546,40 @@
     vocabularyTestStatus.textContent = "";
     vocabularyTestQuestions = [];
     vocabularyTestAnswers = [];
-    vocabularyTestIndex = 0;
     vocabularyTestLevel = 5000;
-    vocabularyTestDirection = 0;
     try {
-      const res = await fetch("/api/words/vocabulary-test");
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.detail || "题目加载失败");
-      vocabularyTestQuestions = data.questions || [];
-      if (vocabularyTestQuestions.length !== 105) throw new Error("题目数量不完整");
-      vocabularyTestLevel = Number(data.base_level) || 5000;
-      vocabularyTestLoading.hidden = true;
-      vocabularyTestQuestion.hidden = false;
-      renderVocabularyTestQuestion();
+      await loadVocabularyTestLevel();
     } catch (err) {
       vocabularyTestLoading.hidden = true;
       vocabularyTestStatus.textContent = "无法开始测试：" + err.message;
     }
   }
 
-  async function answerVocabularyTest(known) {
-    const levelQuestions = vocabularyTestQuestions.filter((row) => row.level === vocabularyTestLevel);
-    const item = levelQuestions[vocabularyTestIndex];
-    if (!item) return;
-    vocabularyTestAnswers.push({ word: item.word, known: Boolean(known) });
-    vocabularyTestIndex += 1;
-    if (vocabularyTestIndex < 5) {
-      renderVocabularyTestQuestion();
-      return;
-    }
-    const levelAnswers = vocabularyTestAnswers.slice(-5);
-    const knownCount = levelAnswers.filter((answer) => answer.known).length;
-    const canMoveUp = knownCount === 5 && vocabularyTestLevel < 21000 && vocabularyTestDirection >= 0;
-    const canMoveDown = knownCount <= 2 && vocabularyTestLevel > 1000 && vocabularyTestDirection <= 0;
+  async function submitVocabularyTestLevel() {
+    const submit = document.getElementById("vocabulary-test-submit-level");
+    if (submit) submit.disabled = true;
+    const checked = new Set(
+      Array.from(document.querySelectorAll("[data-vocabulary-test-index]:checked"))
+        .map((input) => Number(input.dataset.vocabularyTestIndex))
+    );
+    const levelAnswers = vocabularyTestQuestions.map((item, index) => ({
+      word: item.word,
+      known: checked.has(index),
+    }));
+    vocabularyTestAnswers.push(...levelAnswers);
+    const knownCount = checked.size;
+    const canMoveUp = knownCount === 5 && vocabularyTestLevel < 21000;
+    const canMoveDown = knownCount <= 2 && vocabularyTestLevel > 1000;
     if (canMoveUp || canMoveDown) {
-      vocabularyTestDirection = canMoveUp ? 1 : -1;
       vocabularyTestLevel += canMoveUp ? 1000 : -1000;
-      vocabularyTestIndex = 0;
-      renderVocabularyTestQuestion();
+      try {
+        await loadVocabularyTestLevel();
+      } catch (err) {
+        vocabularyTestLoading.hidden = true;
+        vocabularyTestStatus.textContent = "无法继续测试：" + err.message;
+      } finally {
+        if (submit) submit.disabled = false;
+      }
       return;
     }
     vocabularyTestQuestion.hidden = true;
@@ -594,6 +603,8 @@
     } catch (err) {
       vocabularyTestLoading.hidden = true;
       vocabularyTestStatus.textContent = "计算失败：" + err.message;
+    } finally {
+      if (submit) submit.disabled = false;
     }
   }
 
@@ -601,10 +612,8 @@
   if (vocabularyTestOpen) vocabularyTestOpen.onclick = startVocabularyTest;
   const vocabularyTestClose = document.getElementById("vocabulary-test-close");
   if (vocabularyTestClose) vocabularyTestClose.onclick = closeVocabularyTest;
-  const vocabularyTestUnknown = document.getElementById("vocabulary-test-unknown");
-  if (vocabularyTestUnknown) vocabularyTestUnknown.onclick = () => answerVocabularyTest(false);
-  const vocabularyTestKnown = document.getElementById("vocabulary-test-known");
-  if (vocabularyTestKnown) vocabularyTestKnown.onclick = () => answerVocabularyTest(true);
+  const vocabularyTestSubmitLevel = document.getElementById("vocabulary-test-submit-level");
+  if (vocabularyTestSubmitLevel) vocabularyTestSubmitLevel.onclick = submitVocabularyTestLevel;
   const vocabularyTestRestart = document.getElementById("vocabulary-test-restart");
   if (vocabularyTestRestart) vocabularyTestRestart.onclick = startVocabularyTest;
   if (vocabularyTestModal) {
