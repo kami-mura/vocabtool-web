@@ -113,6 +113,44 @@ def test_extract_epub_in_spine_order():
     assert text.index("Chapter One") < text.index("Chapter Two")
 
 
+def _epub_without_nav(chapter_raw: bytes) -> bytes:
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, "w") as archive:
+        archive.writestr("mimetype", "application/epub+zip")
+        archive.writestr(
+            "META-INF/container.xml",
+            """<?xml version="1.0"?>
+            <container xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+              <rootfiles><rootfile full-path="OEBPS/content.opf"/></rootfiles>
+            </container>""",
+        )
+        archive.writestr(
+            "OEBPS/content.opf",
+            """<?xml version="1.0"?>
+            <package xmlns="http://www.idpf.org/2007/opf">
+              <manifest>
+                <item id="one" href="one.xhtml" media-type="application/xhtml+xml"/>
+              </manifest>
+              <spine><itemref idref="one"/></spine>
+            </package>""",
+        )
+        archive.writestr("OEBPS/one.xhtml", chapter_raw)
+    return output.getvalue()
+
+
+@pytest.mark.parametrize("heading", [b"<h1></h1>", b"<h1>   </h1>"])
+def test_epub_chapter_with_blank_heading_falls_back_to_filename_title(heading):
+    data = _epub_without_nav(
+        b"<html><body>" + heading + b"<p>Hello world.</p></body></html>"
+    )
+    text, source_type, chapters = extract_file_content("book.epub", data, 10_000)
+    assert source_type == "epub"
+    assert "Hello world." in text
+    assert len(chapters) == 1
+    assert chapters[0]["title"] == "one"
+    assert "Hello world." in chapters[0]["text"]
+
+
 def test_extract_epub_and_text_as_ordered_chapters():
     text, source_type, chapters = extract_file_content(
         "book.epub", sample_epub(), 10_000

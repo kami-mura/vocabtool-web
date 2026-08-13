@@ -4,10 +4,59 @@ import json
 import sqlite3
 import zipfile
 
-from app.anki_exchange import parse_apkg
+from app.anki_exchange import import_parsed, parse_apkg
 from app.db import SessionLocal
 from app.models import AnkiReviewLog, Card, ReviewLog, User
 from tests.conftest import register
+
+
+def _parsed_card(guid: str, front: str) -> dict:
+    return {
+        "anki_guid": guid,
+        "word": "durable",
+        "card_type": "reading",
+        "front": front,
+        "back": "adj. able to last a long time",
+        "context": "",
+        "state": "review",
+        "due_at": dt.datetime(2026, 8, 20, 0, 0),
+        "interval_days": 8,
+        "ease": 2.5,
+        "learning_step": 0,
+        "reps": 3,
+        "lapses": 0,
+        "buried": False,
+        "modified_at": dt.datetime(2026, 8, 12, 0, 0),
+        "reviews": [],
+    }
+
+
+def test_same_package_duplicate_anki_guid_is_not_silently_merged(client):
+    register(client, email="dup-guid@example.com")
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.email == "dup-guid@example.com").one()
+        parsed = {
+            "cards": [
+                _parsed_card("shared-guid:0", "first front"),
+                _parsed_card("shared-guid:0", "second front"),
+            ]
+        }
+        result = import_parsed(db, user.id, parsed)
+        db.commit()
+        assert result == {
+            "created": 1,
+            "updated": 0,
+            "progress_kept": 0,
+            "conflicts": 1,
+            "histories": 0,
+        }
+        cards = db.query(Card).filter(Card.user_id == user.id).all()
+        assert len(cards) == 1
+        assert cards[0].front == "first front"
+        assert cards[0].anki_guid == "shared-guid:0"
+    finally:
+        db.close()
 
 
 def _scheduled_card(email: str, *, word: str = "durable", front=None) -> Card:

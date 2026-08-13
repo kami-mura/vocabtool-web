@@ -259,9 +259,11 @@ def _chapter_title(raw: bytes, fallback: str) -> str:
         flags=re.IGNORECASE | re.DOTALL,
     )
     if match:
-        title = _html_to_text(match.group(1).encode()).splitlines()[0].strip()
-        if title:
-            return title[:300]
+        lines = _html_to_text(match.group(1).encode()).splitlines()
+        if lines:
+            title = lines[0].strip()
+            if title:
+                return title[:300]
     return fallback[:300]
 
 

@@ -46,7 +46,7 @@ def _normalize_tts_text(text: str) -> str:
     cleaned = re.sub(r"\{\{c\d+::(.*?)\}\}", r"\1", cleaned)
     cleaned = cleaned.replace("*", "")
     cleaned = re.sub(r"\s+", " ", cleaned).strip()
-    return cleaned[:TTS_TEXT_MAX_CHARS]
+    return cleaned
 
 
 def _pick_voice(text: str) -> str:
@@ -118,8 +118,18 @@ def _prune_tts_cache_if_due() -> None:
             (path, path.stat().st_mtime, path.stat().st_size)
             for path in TTS_DIR.glob("*.mp3")
         ]
+        stale_parts = [
+            path
+            for path in TTS_DIR.glob("*.part")
+            if time.time() - path.stat().st_mtime > 86400
+        ]
     except OSError:
         return
+    for path in stale_parts:
+        try:
+            path.unlink(missing_ok=True)
+        except OSError:
+            continue
     overflow = sum(size for _path, _mtime, size in entries) - limit
     if overflow <= 0:
         return
@@ -148,7 +158,9 @@ async def audio_url_for_text(raw_text: str) -> str | None:
                 return _TTS_URL_PREFIX + path.name
             _prune_tts_cache_if_due()
             async with _generation_slots:
-                if await asyncio.to_thread(_generate_audio_blocking, text, voice, path):
+                if await asyncio.to_thread(
+                    _generate_audio_blocking, text[:TTS_TEXT_MAX_CHARS], voice, path
+                ):
                     return _TTS_URL_PREFIX + path.name
             return None
         finally:

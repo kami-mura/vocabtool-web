@@ -76,6 +76,52 @@ def test_vocabulary_test_uses_frequency_bands_and_only_updates_profile(client):
     assert client.get("/api/words").json()["words"] == []
 
 
+def test_vocabulary_test_submit_accepts_non_default_start_level(client):
+    register(client, "vocab-start-level@example.com")
+    started = client.get("/api/words/vocabulary-test", params={"level": 1000})
+    assert started.status_code == 200
+    questions = started.json()["questions"]
+    answers = [
+        {"word": item["word"], "known": index < 4}
+        for index, item in enumerate(questions)
+    ]
+
+    finished = client.post(
+        "/api/words/vocabulary-test",
+        json={"level": 1000, "answers": answers},
+    )
+    assert finished.status_code == 200, finished.text
+    assert finished.json() == {
+        "ok": True,
+        "known_rank": 800,
+        "known_answers": 4,
+        "question_count": 5,
+    }
+    assert client.get("/api/words/ngsl-profile").json() == {"known_rank": 800}
+
+    invalid = client.post(
+        "/api/words/vocabulary-test",
+        json={"level": 1_500, "answers": answers},
+    )
+    assert invalid.status_code == 400
+
+
+def test_vocabulary_test_submit_without_level_keeps_default_start(client):
+    register(client, "vocab-default-level@example.com")
+    started = client.get("/api/words/vocabulary-test")
+    assert started.json()["level"] == 5000
+    answers = [
+        {"word": item["word"], "known": index < 4}
+        for index, item in enumerate(started.json()["questions"])
+    ]
+    finished = client.post(
+        "/api/words/vocabulary-test",
+        json={"answers": answers},
+    )
+    assert finished.status_code == 200, finished.text
+    assert finished.json()["known_rank"] == 4_800
+
+
 def test_reading_display_preference_is_user_scoped_and_validated(client):
     register(client, "reader-layout@example.com")
     default = client.get("/api/reading/display-preference")

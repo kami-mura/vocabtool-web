@@ -12,7 +12,28 @@ def test_normalize_strips_cloze_and_html():
     assert tts._normalize_tts_text("  a   b  ") == "a b"
     assert tts._normalize_tts_text("The **apple** is red.") == "The apple is red."
     assert tts._normalize_tts_text("She ate {{c1::the apple}}.") == "She ate the apple."
-    assert len(tts._normalize_tts_text("x" * 500)) <= tts.TTS_TEXT_MAX_CHARS
+    assert len(tts._normalize_tts_text("x" * 500)) == 500
+
+
+def test_long_texts_sharing_prefix_use_distinct_cache_files(monkeypatch, tmp_path):
+    generated = []
+
+    def fake_generate(text, voice, path):
+        generated.append((text, path))
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"x" * 200)
+        return True
+
+    monkeypatch.setattr(tts, "TTS_DIR", tmp_path)
+    monkeypatch.setattr(tts, "_generate_audio_blocking", fake_generate)
+    prefix = "word " * 100
+    url_a = asyncio.run(tts.audio_url_for_text(prefix + "alpha"))
+    url_b = asyncio.run(tts.audio_url_for_text(prefix + "beta"))
+    assert url_a and url_b
+    assert url_a != url_b
+    assert len(generated) == 2
+    assert all(len(text) <= tts.TTS_TEXT_MAX_CHARS for text, _path in generated)
+    assert len({path.name for _text, path in generated}) == 2
 
 
 def test_pick_voice():
@@ -152,6 +173,25 @@ def test_tts_cache_prunes_oldest_when_over_quota(monkeypatch, tmp_path):
     assert asyncio.run(tts.audio_url_for_text("apple")) is not None
     assert not oldest.exists()  # 超限时最旧的先被清理
     assert newer.exists()
+
+
+def test_prune_removes_stale_part_files_and_keeps_fresh_ones(monkeypatch, tmp_path):
+    monkeypatch.setattr(tts, "TTS_DIR", tmp_path)
+    monkeypatch.setattr(tts, "_last_prune_monotonic", time.monotonic() - 301)
+
+    stale_part = tmp_path / ("a" * 24 + ".mp3.123.part")
+    fresh_part = tmp_path / ("b" * 24 + ".mp3.456.part")
+    kept_mp3 = tmp_path / ("c" * 24 + ".mp3")
+    stale_part.write_bytes(b"z" * 50)
+    fresh_part.write_bytes(b"z" * 50)
+    kept_mp3.write_bytes(b"y" * 200)
+    os.utime(stale_part, (time.time() - 90_000, time.time() - 90_000))
+    os.utime(fresh_part, (time.time() - 100, time.time() - 100))
+
+    tts._prune_tts_cache_if_due()
+    assert not stale_part.exists()
+    assert fresh_part.exists()
+    assert kept_mp3.exists()
 
 
 def test_prefetch_dropped_when_max_tasks_active(monkeypatch):

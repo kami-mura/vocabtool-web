@@ -383,11 +383,24 @@ def import_parsed(db: Session, user_id: int, parsed: dict[str, object]) -> dict[
     cards = parsed.get("cards")
     if not isinstance(cards, list):
         raise AnkiExchangeError("Anki 解析结果不完整")
+    seen_guids: dict[str, tuple] = {}
     for item in cards:
         if not isinstance(item, dict) or not item.get("word") or not item.get("front"):
             conflicts += 1
             continue
         guid = str(item["anki_guid"])
+        content_key = (
+            str(item["word"]),
+            str(item["card_type"]),
+            str(item["front"]),
+            str(item["back"]),
+            str(item["context"]),
+        )
+        if guid in seen_guids:
+            if seen_guids[guid] != content_key:
+                conflicts += 1
+            continue
+        seen_guids[guid] = content_key
         card = db.query(Card).filter(Card.user_id == user_id, Card.anki_guid == guid).first()
         if card is None:
             candidate = (

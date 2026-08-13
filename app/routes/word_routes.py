@@ -42,6 +42,11 @@ VOCABULARY_TEST_BASE_LEVEL = 5_000
 VOCABULARY_TEST_WINDOW = 100
 VOCABULARY_TEST_WORDS_PER_LEVEL = 5
 
+
+class _VocabularyTestSubmitIn(VocabularyTestSubmitIn):
+    level: int | None = None
+
+
 # ---------- 我的词库 ----------
 
 
@@ -320,12 +325,17 @@ def start_vocabulary_test(
 
 @router.post("/words/vocabulary-test")
 def finish_vocabulary_test(
-    body: VocabularyTestSubmitIn,
+    body: _VocabularyTestSubmitIn,
     request: Request,
     db: Session = Depends(get_db),
 ):
     """验证升降路径，按当前档位减去错词数换算并保存。"""
     user = _require_user(db, request)
+    start_level = (
+        body.level if body.level is not None else VOCABULARY_TEST_BASE_LEVEL
+    )
+    if start_level not in VOCABULARY_TEST_LEVELS:
+        raise HTTPException(status_code=400, detail="词汇测试档位无效")
     seen: set[str] = set()
     if len(body.answers) % VOCABULARY_TEST_WORDS_PER_LEVEL:
         raise HTTPException(status_code=400, detail="词汇测试答案不完整，请重新测试")
@@ -347,7 +357,7 @@ def finish_vocabulary_test(
             raise HTTPException(status_code=400, detail="词汇测试答案无效，请重新测试")
         groups.append((chunk_levels.pop(), known_count))
 
-    expected_level = VOCABULARY_TEST_BASE_LEVEL
+    expected_level = start_level
     final_level = 0
     final_known = 0
     for index, (level, known_count) in enumerate(groups):
