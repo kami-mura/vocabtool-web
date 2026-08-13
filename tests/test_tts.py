@@ -15,7 +15,9 @@ def test_normalize_strips_cloze_and_html():
     assert len(tts._normalize_tts_text("x" * 500)) == 500
 
 
-def test_long_texts_sharing_prefix_use_distinct_cache_files(monkeypatch, tmp_path):
+def test_long_texts_sharing_prefix_share_one_cache_file(monkeypatch, tmp_path):
+    """前 240 字符相同的长文本生成同一段音频：缓存键与实际生成输入一致，
+    不会重复调用 edge-tts 或多占缓存文件。"""
     generated = []
 
     def fake_generate(text, voice, path):
@@ -30,10 +32,9 @@ def test_long_texts_sharing_prefix_use_distinct_cache_files(monkeypatch, tmp_pat
     url_a = asyncio.run(tts.audio_url_for_text(prefix + "alpha"))
     url_b = asyncio.run(tts.audio_url_for_text(prefix + "beta"))
     assert url_a and url_b
-    assert url_a != url_b
-    assert len(generated) == 2
+    assert url_a == url_b
+    assert len(generated) == 1
     assert all(len(text) <= tts.TTS_TEXT_MAX_CHARS for text, _path in generated)
-    assert len({path.name for _text, path in generated}) == 2
 
 
 def test_pick_voice():

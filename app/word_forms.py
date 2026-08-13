@@ -10,6 +10,10 @@ from . import vocab
 
 def _regular_surface_forms(word: str) -> set[str]:
     """Return conservative regular forms for a lowercase single word."""
+    if len(word) < 2:
+        # 单字母词（i/a）没有规则屈折形式；盲目加 s/es/ed/ing 会产生
+        # is/ied 等假词，污染句子匹配。
+        return {word}
     forms = {word, f"{word}s", f"{word}ed", f"{word}ing"}
     if word.endswith(("s", "x", "z", "ch", "sh")):
         forms.add(f"{word}es")

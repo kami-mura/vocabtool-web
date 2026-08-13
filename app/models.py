@@ -173,6 +173,16 @@ class LoginThrottle(Base):
     locked_until = Column(DateTime, nullable=True)
 
 
+class EmailNoticeThrottle(Base):
+    """不含验证码的提醒邮件按邮箱节流：防止借邮件服务轰炸任意第三方邮箱。"""
+
+    __tablename__ = "email_notice_throttle"
+
+    email = Column(String(255), primary_key=True)
+    attempts = Column(Integer, default=0, nullable=False)
+    window_started = Column(DateTime, default=_utcnow, nullable=False)
+
+
 class RequestThrottle(Base):
     """对昂贵的匿名操作做短窗口限流；key 只保存不可逆摘要。"""
 

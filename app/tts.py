@@ -3,9 +3,11 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import logging
+import os
 import re
 import threading
 import time
+import uuid
 from pathlib import Path
 
 from . import config
@@ -80,7 +82,10 @@ def _generate_audio_blocking(text: str, voice: str, path: Path) -> bool:
 
     path.parent.mkdir(parents=True, exist_ok=True)
     # 先写 .part 再原子替换，避免并发或中断留下半截文件。
-    staging = path.with_name(f"{path.name}.{threading.get_ident()}.part")
+    # 文件名含 PID + 随机后缀：多进程部署时线程 ID 相同也不会互相覆盖。
+    staging = path.with_name(
+        f"{path.name}.{os.getpid()}.{uuid.uuid4().hex[:8]}.part"
+    )
     try:
         async def _run() -> None:
             communicate = edge_tts.Communicate(text, voice)
@@ -148,10 +153,13 @@ async def audio_url_for_text(raw_text: str) -> str | None:
     text = _normalize_tts_text(raw_text)
     if not text:
         return None
-    path, voice = _audio_path(text)
+    # 先截断再哈希：缓存键与实际生成输入一致，前 240 字符相同的不同长文本
+    # 不会重复生成/占用多份缓存文件。
+    speech_text = text[:TTS_TEXT_MAX_CHARS]
+    path, voice = _audio_path(speech_text)
     if _audio_exists(path):
         return _TTS_URL_PREFIX + path.name
-    lock = _generation_lock(text)
+    lock = _generation_lock(speech_text)
     async with lock:
         try:
             if _audio_exists(path):
@@ -159,7 +167,7 @@ async def audio_url_for_text(raw_text: str) -> str | None:
             _prune_tts_cache_if_due()
             async with _generation_slots:
                 if await asyncio.to_thread(
-                    _generate_audio_blocking, text[:TTS_TEXT_MAX_CHARS], voice, path
+                    _generate_audio_blocking, speech_text, voice, path
                 ):
                     return _TTS_URL_PREFIX + path.name
             return None
@@ -167,7 +175,7 @@ async def audio_url_for_text(raw_text: str) -> str | None:
             # 生成结束即移除锁条目，防止恶意/大量不同文本导致字典无界增长；
             # 短暂并发窗口内重复生成无害（幂等 + 原子改名）。
             with _generation_locks_guard:
-                _generation_locks.pop(text, None)
+                _generation_locks.pop(speech_text, None)
 
 
 def is_audio_filename(name: str) -> bool:

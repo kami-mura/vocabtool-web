@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Iterable
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from sqlalchemy import func
+from sqlalchemy import func, insert
 from sqlalchemy.orm import Session
 
 from . import config
@@ -199,7 +199,8 @@ def parse_apkg(data: bytes, max_cards: int) -> dict[str, object]:
     with tempfile.TemporaryDirectory(prefix="vocabflow_anki_import_") as directory:
         path = Path(directory) / "collection.anki2"
         path.write_bytes(collection)
-        uri = f"file:{path.as_posix()}?mode=ro&immutable=1"
+        # 临时副本可写：缺 cid 索引的异常/恶意包补建索引，避免逐块全表扫描。
+        uri = f"file:{path.as_posix()}"
         try:
             connection = sqlite3.connect(uri, uri=True)
             connection.execute("PRAGMA query_only=ON")
@@ -257,6 +258,25 @@ def parse_apkg(data: bytes, max_cards: int) -> dict[str, object]:
                     "revlog",
                     ("id", "cid", "ease", "ivl", "lastIvl", "factor", "type"),
                 )
+                index_names = {
+                    str(row[1])
+                    for row in connection.execute(
+                        "PRAGMA index_list(revlog)"
+                    ).fetchall()
+                }
+                if not index_names:
+                    # 缺 cid 索引的包按 500 卡分块查询会反复全表扫描；补建索引
+                    # 把最坏情况的数十次全表扫描降为一次建索引 + 20 次索引查找。
+                    # 建不出来（仍只读/损坏）时静默退回原扫描路径。
+                    try:
+                        connection.execute("PRAGMA query_only=OFF")
+                        connection.execute(
+                            "CREATE INDEX IF NOT EXISTS idx_vf_import_revlog_cid "
+                            "ON revlog (cid)"
+                        )
+                        connection.execute("PRAGMA query_only=ON")
+                    except sqlite3.DatabaseError:
+                        pass
                 for start in range(0, len(card_ids), 500):
                     chunk = card_ids[start : start + 500]
                     placeholders = ",".join("?" for _ in chunk)
@@ -383,6 +403,53 @@ def import_parsed(db: Session, user_id: int, parsed: dict[str, object]) -> dict[
     cards = parsed.get("cards")
     if not isinstance(cards, list):
         raise AnkiExchangeError("Anki 解析结果不完整")
+
+    # 预取用户全部卡片与已导入复习历史键、每卡最新进度，避免逐卡/逐条重复查询
+    # （此前 1 万卡导入约产生 25 万次历史查询，会拖住唯一全局导入槽）。
+    existing_cards = db.query(Card).filter(Card.user_id == user_id).all()
+    by_guid: dict[str, Card] = {}
+    by_word_type: dict[tuple[str, str], Card] = {}
+    card_ids: list[int] = []
+    for card in existing_cards:
+        card_ids.append(card.id)
+        if card.anki_guid:
+            by_guid.setdefault(str(card.anki_guid), card)
+        by_word_type.setdefault((str(card.word), str(card.card_type)), card)
+    existing_review_keys: set[str] = set()
+    local_progress: dict[int, dt.datetime] = {}
+    imported_progress: dict[int, dt.datetime] = {}
+    for start in range(0, len(card_ids), 500):
+        chunk = card_ids[start : start + 500]
+        existing_review_keys.update(
+            str(row[0])
+            for row in db.query(AnkiReviewLog.source_key)
+            .filter(AnkiReviewLog.user_id == user_id, AnkiReviewLog.card_id.in_(chunk))
+            .all()
+        )
+        for card_id, latest in (
+            db.query(ReviewLog.card_id, func.max(ReviewLog.reviewed_at))
+            .filter(ReviewLog.user_id == user_id, ReviewLog.card_id.in_(chunk))
+            .group_by(ReviewLog.card_id)
+            .all()
+        ):
+            local_progress[int(card_id)] = latest
+        for card_id, latest in (
+            db.query(AnkiReviewLog.card_id, func.max(AnkiReviewLog.reviewed_at))
+            .filter(AnkiReviewLog.user_id == user_id, AnkiReviewLog.card_id.in_(chunk))
+            .group_by(AnkiReviewLog.card_id)
+            .all()
+        ):
+            imported_progress[int(card_id)] = latest
+
+    def _latest_progress(card_id: int) -> dt.datetime | None:
+        values = [
+            value
+            for value in (local_progress.get(card_id), imported_progress.get(card_id))
+            if value is not None
+        ]
+        return max(values, default=None)
+
+    pending_reviews: list[dict[str, object]] = []
     seen_guids: dict[str, tuple] = {}
     for item in cards:
         if not isinstance(item, dict) or not item.get("word") or not item.get("front"):
@@ -401,16 +468,10 @@ def import_parsed(db: Session, user_id: int, parsed: dict[str, object]) -> dict[
                 conflicts += 1
             continue
         seen_guids[guid] = content_key
-        card = db.query(Card).filter(Card.user_id == user_id, Card.anki_guid == guid).first()
+        card = by_guid.get(guid)
         if card is None:
-            candidate = (
-                db.query(Card)
-                .filter(
-                    Card.user_id == user_id,
-                    Card.word == str(item["word"]),
-                    Card.card_type == str(item["card_type"]),
-                )
-                .first()
+            candidate = by_word_type.get(
+                (str(item["word"]), str(item["card_type"]))
             )
             if candidate is not None and candidate.anki_guid not in {None, guid}:
                 conflicts += 1
@@ -428,15 +489,19 @@ def import_parsed(db: Session, user_id: int, parsed: dict[str, object]) -> dict[
             )
             db.add(card)
             db.flush()
+            by_guid[guid] = card
+            by_word_type[(str(item["word"]), str(item["card_type"]))] = card
+            card_ids.append(card.id)
             created += 1
             apply_progress = True
         else:
             if card.anki_guid is None:
                 card.anki_guid = guid
+                by_guid[guid] = card
             # 已有卡片内容保持原样；交换只合并身份、进度和历史，避免导入包
             # 静默覆盖用户原有正反面或上下文。
             updated += 1
-            latest = _latest_local_progress(db, card)
+            latest = _latest_progress(card.id)
             source_modified = item.get("modified_at")
             apply_progress = latest is None or (
                 isinstance(source_modified, dt.datetime) and source_modified >= latest
@@ -461,23 +526,30 @@ def import_parsed(db: Session, user_id: int, parsed: dict[str, object]) -> dict[
         for review in item.get("reviews", []):
             review_id = int(review["id"])
             key = hashlib.sha256(f"{user_id}:{guid}:{review_id}".encode()).hexdigest()
-            if db.get(AnkiReviewLog, key) is not None:
+            if key in existing_review_keys:
                 continue
-            db.add(
-                AnkiReviewLog(
-                    source_key=key,
-                    user_id=user_id,
-                    card_id=card.id,
-                    anki_review_id=review_id,
-                    rating=int(review["ease"]),
-                    interval_days=float(review["interval_days"]),
-                    last_interval_days=float(review["last_interval_days"]),
-                    ease=max(1.3, int(review["factor"] or 2500) / 1000.0),
-                    review_type=int(review["type"]),
-                    reviewed_at=_review_datetime(review_id),
-                )
+            existing_review_keys.add(key)
+            pending_reviews.append(
+                {
+                    "source_key": key,
+                    "user_id": user_id,
+                    "card_id": card.id,
+                    "anki_review_id": review_id,
+                    "rating": int(review["ease"]),
+                    "interval_days": float(review["interval_days"]),
+                    "last_interval_days": float(review["last_interval_days"]),
+                    "ease": max(1.3, int(review["factor"] or 2500) / 1000.0),
+                    "review_type": int(review["type"]),
+                    "reviewed_at": _review_datetime(review_id),
+                }
             )
             histories += 1
+    if pending_reviews:
+        for start in range(0, len(pending_reviews), 1000):
+            db.execute(
+                insert(AnkiReviewLog),
+                pending_reviews[start : start + 1000],
+            )
     return {
         "created": created,
         "updated": updated,

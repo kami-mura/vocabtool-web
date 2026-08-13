@@ -7,11 +7,13 @@ import secrets
 import uuid
 
 import httpx
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from . import config
 from .auth import hash_password, normalize_email, valid_email
 from .models import (
+    EmailNoticeThrottle,
     EmailVerification,
     LoginThrottle,
     PasswordResetVerification,
@@ -215,6 +217,36 @@ def verify_code(db: Session, email: str, code: str) -> str | None:
     return None
 
 
+def _notice_email_throttled(db: Session, email: str, now: dt.datetime) -> bool:
+    """提醒邮件按邮箱节流：60 秒内最多 1 封、每小时最多 5 封。
+
+    返回 True 表示应跳过本次发送。并发首次请求由唯一约束兜底：
+    插入失败的一方保守跳过，宁可少发一封提醒邮件。
+    """
+    row = db.get(EmailNoticeThrottle, email)
+    if row is not None:
+        if row.window_started < now - dt.timedelta(hours=1):
+            row.attempts = 1
+            row.window_started = now
+            db.commit()
+            return False
+        if int(row.attempts or 0) >= 5:
+            return True
+        if row.window_started > now - dt.timedelta(seconds=60):
+            return True
+        row.attempts = int(row.attempts or 0) + 1
+        db.commit()
+        return False
+    try:
+        with db.begin_nested():
+            db.add(EmailNoticeThrottle(email=email, attempts=1, window_started=now))
+        db.commit()
+        return False
+    except IntegrityError:
+        db.rollback()
+        return True
+
+
 def request_password_reset_code(db: Session, email: str) -> str | None:
     """请求密码重置码；对有效邮箱统一成功响应，避免枚举注册账号。"""
     email = _normalize_email(email)
@@ -223,10 +255,14 @@ def request_password_reset_code(db: Session, email: str) -> str | None:
     if not valid_email(email):
         return "邮箱格式不正确"
 
+    now = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
     user = db.query(User).filter(User.email == email).first()
     if not user:
         # 无账号邮箱也发一封提醒邮件：响应时间与有账号时一致，
-        # 避免通过耗时判断邮箱是否注册。
+        # 避免通过耗时判断邮箱是否注册；提醒邮件本身同样按邮箱节流，
+        # 防止借邮件服务轰炸任意第三方邮箱。
+        if _notice_email_throttled(db, email, now):
+            return None
         try:
             _send_account_notice_email(
                 email,
@@ -239,7 +275,6 @@ def request_password_reset_code(db: Session, email: str) -> str | None:
             return None
         return None
 
-    now = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
     latest = (
         db.query(PasswordResetVerification)
         .filter(PasswordResetVerification.user_id == user.id)
@@ -266,17 +301,27 @@ def request_password_reset_code(db: Session, email: str) -> str | None:
         expires_at=now
         + dt.timedelta(minutes=config.VERIFICATION_CODE_TTL_MINUTES),
     )
+    # 先落库本次请求的限流行再发信，发信期间的并发请求会被 60 秒限流拒绝
+    # （与注册码路径一致）；发信失败时删除该行，避免留下发不出的验证码。
+    db.add(row)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        return None
     try:
         _send_password_reset_email(email, code)
     except Exception:
         # 仍返回统一成功响应，避免通过邮件服务响应判断账号是否存在。
+        db.delete(row)
+        db.commit()
         return None
     # 新码生效时作废旧码，避免旧码残留可被继续试探。
     db.query(PasswordResetVerification).filter(
         PasswordResetVerification.user_id == user.id,
         PasswordResetVerification.consumed_at.is_(None),
+        PasswordResetVerification.id != row.id,
     ).update({PasswordResetVerification.consumed_at: now})
-    db.add(row)
     db.commit()
     return None
 

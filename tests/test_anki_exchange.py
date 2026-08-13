@@ -76,6 +76,10 @@ def _scheduled_card(email: str, *, word: str = "durable", front=None) -> Card:
             ease=2.4,
             reps=3,
             lapses=1,
+            # created_at 固定在过去：导出包的 mod 取 max(复习时间, created_at)，
+            # 若用真实当前时间，时钟越过下方本地进度的固定时间后
+            # 会误判为“包里进度更新”，测试随时间漂移失败。
+            created_at=dt.datetime(2026, 8, 1, 0, 0),
         )
         db.add(card)
         db.flush()
@@ -202,7 +206,8 @@ def test_apkg_round_trip_is_idempotent_and_keeps_history(client):
         db.close()
 
 
-def test_import_does_not_overwrite_newer_local_progress(client):
+def test_import_does_not_overwrite_newer_local_progress(client, monkeypatch):
+    del monkeypatch
     register(client)
     _scheduled_card("alice@example.com")
     package = _export_package(client)

@@ -244,6 +244,14 @@ def card_studio_targets(
 ):
     """按旧 Streamlit 的三类来源准备可编辑的目标词表。"""
     user = _require_user(db, request)
+    if not check_request_rate(
+        db,
+        action="targets",
+        identity=f"u{user.id}",
+        limit=300,
+        window_minutes=60,
+    ):
+        raise HTTPException(status_code=429, detail="解析请求过多，请稍后再试")
     if body.to_rank < body.from_rank:
         raise HTTPException(status_code=400, detail="结束排名必须大于等于起始排名")
     candidates: list[tuple[str, int | None, int]] = []
@@ -1006,6 +1014,14 @@ def create_cards_from_studio(
 def export_cards_to_anki(request: Request, db: Session = Depends(get_db)):
     """导出当前用户全部卡片及学习进度为可由 Anki 导入的 .apkg。"""
     user = _require_user(db, request)
+    if not check_request_rate(
+        db,
+        action="anki-export",
+        identity=f"u{user.id}",
+        limit=20,
+        window_minutes=60,
+    ):
+        raise HTTPException(status_code=429, detail="Anki 导出过于频繁，请稍后再试")
     try:
         package, count = anki_exchange.export_apkg(db, user.id)
         db.commit()  # 仅保存首次生成的稳定 Anki guid，不改学习状态。
@@ -2205,7 +2221,8 @@ def _generate_study_articles_in_background(
             user_id,
             message,
         )
-        _finish_article_generation(user_id, error=message)
+        # 对外只暴露固定文案；供应商/内部异常细节只进日志，不外传给前端。
+        _finish_article_generation(user_id, error="文章生成失败，请稍后重试")
     finally:
         db.close()
 

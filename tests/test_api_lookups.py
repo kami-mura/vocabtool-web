@@ -320,7 +320,7 @@ def test_successful_deepseek_lookup_is_saved_and_reused_locally(client, monkeypa
 一个适应性系统会通过经验不断改进。""",
             "card_front": "An adaptive system improves through experience.",
             "card_back": "适应性强的 | Able to adjust to change\n一个适应性系统会通过经验不断改进。",
-        }, None
+        }, None, True
 
     monkeypatch.setattr("app.routes.lookup_routes.ai_mod.ai_enabled", lambda: True)
     monkeypatch.setattr("app.routes.lookup_routes.ai_mod.explain_lookup", fake_lookup)
@@ -358,7 +358,7 @@ def test_lookup_preserves_user_case_and_distinguishes_march(client, monkeypatch)
             "explanation": f"explain {text}",
             "card_front": text,
             "card_back": f"def {text}",
-        }, None
+        }, None, True
 
     monkeypatch.setattr(ai_mod, "ai_enabled", lambda: True)
     monkeypatch.setattr(ai_mod, "explain_lookup", fake_explain)
@@ -415,7 +415,7 @@ def test_ai_corrected_headword_marks_spelling_note(client, monkeypatch):
             "explanation": "environment /ɪnˈvaɪrənmənt/\n1. 环境 | The surroundings in which someone lives",
             "card_front": "The environment needs our protection.",
             "card_back": "环境\nThe environment needs our protection.",
-        }, None
+        }, None, True
 
     monkeypatch.setattr("app.routes.lookup_routes.ai_mod.ai_enabled", lambda: True)
     monkeypatch.setattr("app.routes.lookup_routes.ai_mod.explain_lookup", fake_lookup)
@@ -465,12 +465,11 @@ def test_lookup_always_cleans_and_preserves_pos(client, monkeypatch):
             "explanation": f"explain {text}",
             "card_front": text,
             "card_back": f"def {text}",
-        }, None
+        }, None, True
 
     monkeypatch.setattr(ai_mod, "ai_enabled", lambda: True)
     monkeypatch.setattr(ai_mod, "explain_lookup", fake_explain)
 
-    # 查词一律词形还原：running -> run
     cleaned = client.post("/api/lookups", json={"text": "running"})
     assert cleaned.status_code == 200
     assert cleaned.json()["lookup"]["query"] == "run"
@@ -498,7 +497,7 @@ def test_lookup_pos_suffix_classified_as_word_with_separate_cache(client, monkey
             "explanation": f"explain {text}",
             "card_front": text,
             "card_back": f"def {text}",
-        }, None
+        }, None, True
 
     monkeypatch.setattr(ai_mod, "ai_enabled", lambda: True)
     monkeypatch.setattr(ai_mod, "explain_lookup", fake_explain)
@@ -539,7 +538,7 @@ def test_lookup_pos_variants_do_not_share_cache(client, monkeypatch):
             "explanation": f"explain {text}",
             "card_front": text,
             "card_back": f"def {text}",
-        }, None
+        }, None, True
 
     monkeypatch.setattr(ai_mod, "ai_enabled", lambda: True)
     monkeypatch.setattr(ai_mod, "explain_lookup", fake_explain)
@@ -574,16 +573,17 @@ def test_guest_spelling_correction_charges_ai_quota_once(client, monkeypatch):
     calls = []
 
     def fake_explain(db, uid, text, query_type, reserve_quota=True):
-        calls.append(text)
+        calls.append((text, reserve_quota))
         if uid is None and reserve_quota:
             ai_mod.guest_ai_quota_reserve(db, need=1)
         if text == "environemnt":
-            return None, "deepseek-v4-flash 查询暂时失败"
+            # 首次调用已实际扣费（登录用户语义，或游客尚未退还时），纠错应复用。
+            return None, "deepseek-v4-flash 查询暂时失败", True
         return {
             "explanation": "environment /ɪnˈvaɪrənmənt/\n1. 环境 | The surroundings\n• The environment needs our protection.\n环境需要我们的保护。",
             "card_front": "The environment needs our protection.",
             "card_back": "环境\nThe environment needs our protection.",
-        }, None
+        }, None, True
 
     monkeypatch.setattr(ai_mod, "explain_lookup", fake_explain)
     result = client.post("/api/lookups", json={"text": "environemnt"})
@@ -594,6 +594,8 @@ def test_guest_spelling_correction_charges_ai_quota_once(client, monkeypatch):
         "corrected": "environment",
     }
     assert data["lookup"]["explanation"].startswith("environment")
+    # 第二次查询复用首次已扣配额，不再预占。
+    assert calls == [("environemnt", True), ("environment", False)]
     db = SessionLocal()
     try:
         day = ai_mod._quota_day()
@@ -602,6 +604,30 @@ def test_guest_spelling_correction_charges_ai_quota_once(client, monkeypatch):
         assert row.count == 1
     finally:
         db.close()
+
+
+def test_spelling_correction_reserves_quota_when_first_call_did_not_charge(
+    client, monkeypatch
+):
+    """首次 AI 查询未实际扣费（配额不足被拒）时，拼写纠错必须重新预占，
+    不能在配额耗尽后获得免费查词通道。"""
+    from app import ai as ai_mod
+
+    monkeypatch.setattr(ai_mod, "ai_enabled", lambda: True)
+    calls = []
+
+    def fake_explain(_db, uid, text, query_type, reserve_quota=True):
+        calls.append((text, reserve_quota))
+        return None, "今日 AI 请求已达上限", False
+
+    monkeypatch.setattr(ai_mod, "explain_lookup", fake_explain)
+    result = client.post("/api/lookups", json={"text": "environemnt"})
+    assert result.status_code == 200
+    data = result.json()
+    assert data["lookup"]["explanation"] == ""
+    assert data["ai_error"] == "今日 AI 请求已达上限"
+    # 两次调用都带 reserve_quota=True：纠错路径不绕过配额。
+    assert calls == [("environemnt", True), ("environment", True)]
 
 
 def test_guest_lookup_ai_quota_exhausted_returns_quota_error(client, monkeypatch):
@@ -778,7 +804,7 @@ def test_long_phrase_lookup_cache_uses_hashed_key(client, monkeypatch):
             "explanation": f"explain {text}",
             "card_front": text,
             "card_back": f"def {text}",
-        }, None
+        }, None, True
 
     monkeypatch.setattr(ai_mod, "ai_enabled", lambda: True)
     monkeypatch.setattr(ai_mod, "explain_lookup", fake_explain)
@@ -830,7 +856,7 @@ def test_ai_failure_falls_back_to_existing_word_entry(client, monkeypatch):
         db.close()
 
     def fake_explain(_db, _uid, text, query_type, reserve_quota=True):
-        return None, "deepseek-v4-flash 查询暂时失败，请稍后重试"
+        return None, "deepseek-v4-flash 查询暂时失败，请稍后重试", False
 
     monkeypatch.setattr(ai_mod, "ai_enabled", lambda: True)
     monkeypatch.setattr(ai_mod, "explain_lookup", fake_explain)
@@ -840,6 +866,27 @@ def test_ai_failure_falls_back_to_existing_word_entry(client, monkeypatch):
     assert data["lookup"]["explanation"]
     assert "类星体" in data["lookup"]["explanation"]
     assert data["lookup_source"] == "word_cache"
+
+
+def test_trusted_proxy_ips_restrict_forwarded_identity(monkeypatch):
+    """配置 TRUSTED_PROXY_IPS 后，仅白名单来源的转发头被信任。"""
+    from app import config
+    from app.api_support import _anonymous_request_identity, _is_trusted_proxy_peer
+
+    monkeypatch.setattr(config, "TRUSTED_PROXY_IPS", "127.0.0.1")
+    assert _is_trusted_proxy_peer("127.0.0.1") is True
+    assert _is_trusted_proxy_peer("10.0.0.5") is False
+    assert _is_trusted_proxy_peer("::1") is False
+
+    request = SimpleNamespace(
+        client=SimpleNamespace(host="10.0.0.5"),
+        headers={"x-forwarded-for": "1.2.3.4, 5.6.7.8"},
+    )
+    assert _anonymous_request_identity(request) == "10.0.0.5"
+
+    monkeypatch.setattr(config, "TRUSTED_PROXY_IPS", "loopback")
+    assert _is_trusted_proxy_peer("127.0.0.1") is True
+    assert _is_trusted_proxy_peer("10.0.0.5") is False
 
 
 def test_reserve_guest_lookup_atomic_refuses_at_limit(monkeypatch):

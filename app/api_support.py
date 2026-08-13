@@ -842,12 +842,34 @@ def _set_auth_cookie(response: Response, token: str, request: Request) -> None:
 
 
 def _is_trusted_proxy_peer(host: str) -> bool:
-    """仅信任来自本机或内网的回源连接，防止公网攻击者伪造代理头。"""
+    """只信任本机/内网回源或显式配置的可信代理 IP，防止伪造代理头。
+
+    默认信任 loopback/私网地址；设置 TRUSTED_PROXY_IPS 后收紧为
+    白名单（具体 IP 或 token：loopback / private），可防止同内网
+    其他主机/容器伪造转发头轮换身份绕过按 IP 限流。
+    """
     try:
         ip = ipaddress.ip_address(host)
     except ValueError:
         return False
-    return ip.is_loopback or ip.is_private
+    configured = [
+        item.strip()
+        for item in config.TRUSTED_PROXY_IPS.split(",")
+        if item.strip()
+    ]
+    if not configured:
+        return ip.is_loopback or ip.is_private
+    for item in configured:
+        if item == "loopback" and ip.is_loopback:
+            return True
+        if item == "private" and ip.is_private:
+            return True
+        try:
+            if ip == ipaddress.ip_address(item):
+                return True
+        except ValueError:
+            continue
+    return False
 
 
 def _anonymous_request_identity(request: Request) -> str:

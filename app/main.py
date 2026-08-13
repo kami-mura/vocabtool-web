@@ -127,6 +127,13 @@ async def lifespan(_: FastAPI):
         logger.warning(
             "COOKIE_SECURE 未开启：生产环境应设为 true，并确保反向代理传递 HTTPS 协议头"
         )
+    if config.EMAIL_VERIFICATION_REQUIRED:
+        if not config.VERIFICATION_SECRET:
+            logger.warning(
+                "VERIFICATION_SECRET 未配置：验证码 HMAC 密钥可预测，生产环境必须设置"
+            )
+        if not config.RESEND_API_KEY:
+            logger.warning("RESEND_API_KEY 未配置：注册/重置验证邮件无法发送")
     init_db()
     # 全量清理与历史数据同步挪到后台线程执行：用户量大时这些任务
     # 可能跑几十秒，留在启动路径会触发 systemd 启动超时被杀、

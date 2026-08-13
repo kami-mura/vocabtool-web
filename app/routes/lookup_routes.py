@@ -245,6 +245,7 @@ def create_lookup(body: LookupIn, request: Request, db: Session = Depends(get_db
 
     result = None
     ai_error = None
+    first_call_charged = False
     lookup_source = "unavailable"
     builtin_result = builtin_lookup.get(identity) if query_type == "word" else None
     cached = db.get(LookupCache, _lookup_cache_storage_key(cache_key))
@@ -271,7 +272,7 @@ def create_lookup(body: LookupIn, request: Request, db: Session = Depends(get_db
         }
         lookup_source = "local_cache"
     elif ai_mod.ai_enabled():
-        result, ai_error = ai_mod.explain_lookup(
+        result, ai_error, first_call_charged = ai_mod.explain_lookup(
             db, user.id if user else None, text, query_type
         )
         if result:
@@ -376,10 +377,12 @@ def create_lookup(body: LookupIn, request: Request, db: Session = Depends(get_db
                     }
                     corrected_source = "local_cache"
                 elif ai_mod.ai_enabled():
-                    # 同一请求的第二次 AI 查询复用第一次已预占的配额。
-                    corrected, _ = ai_mod.explain_lookup(
+                    # 第一次 AI 查询已实际消耗配额时才复用（不再重复扣）；
+                    # 未消耗（配额不足被拒、游客失败已退还）时必须重新预占，
+                    # 否则拼写纠错路径会成为绕过配额免费调用 AI 的通道。
+                    corrected, _, _ = ai_mod.explain_lookup(
                         db, user.id if user else None, suggestion, query_type,
-                        reserve_quota=False,
+                        reserve_quota=not first_call_charged,
                     )
                     if corrected:
                         corrected_source = "deepseek"

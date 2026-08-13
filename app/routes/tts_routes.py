@@ -15,7 +15,7 @@ class PrefetchIn(BaseModel):
 
 
 class TtsIn(BaseModel):
-    text: str = Field(default="", max_length=500)
+    text: str = Field(default="", min_length=1, max_length=500)
 
 
 @router.post("")

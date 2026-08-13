@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime as dt
 import sqlite3
+import time
 from collections.abc import Callable
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -33,6 +34,9 @@ if config.DATABASE_URL.startswith("sqlite"):
         try:
             cursor.execute("PRAGMA foreign_keys=ON")
             cursor.execute("PRAGMA busy_timeout=5000")
+            # synchronous 是连接级设置：只执行一次不会作用于后续连接，
+            # 必须放在 connect 监听器里对每个新连接生效。
+            cursor.execute("PRAGMA synchronous=NORMAL")
         finally:
             cursor.close()
 SessionLocal = sessionmaker(
@@ -69,12 +73,53 @@ def run_startup_maintenance() -> None:
 def _apply_schema_migrations() -> None:
     """版本化迁移：每条只跑一次；函数本身仍保持幂等以兼容旧库。"""
     _ensure_schema_migrations_table()
-    applied = _applied_migration_versions()
-    for version, runner in _SCHEMA_MIGRATIONS:
-        if version in applied:
-            continue
-        runner()
-        _record_migration_version(version)
+    _lock = _acquire_migration_lock()
+    try:
+        applied = _applied_migration_versions()
+        for version, runner in _SCHEMA_MIGRATIONS:
+            if version in applied:
+                continue
+            runner()
+            _record_migration_version(version)
+    finally:
+        if _lock is not None:
+            try:
+                import fcntl
+
+                fcntl.flock(_lock, fcntl.LOCK_UN)
+            except (ImportError, OSError):
+                pass
+            try:
+                _lock.close()
+            except OSError:
+                pass
+
+
+def _acquire_migration_lock():
+    """迁移互斥文件锁：多进程同时启动时串行执行迁移，防止并发 ALTER/重建表。
+
+    等待期间说明另一进程正在迁移；等它完成后重新读取版本表，
+    本进程会跳过已应用的版本。Windows 无 fcntl 时跳过（本项目部署在
+    Linux/macOS 单机）。
+    """
+    try:
+        import fcntl
+    except ImportError:
+        return None
+    path = config.DATA_DIR / ".migrations.lock"
+    handle = open(path, "w")
+    deadline = time.monotonic() + 120
+    while True:
+        try:
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return handle
+        except OSError as exc:
+            if time.monotonic() > deadline:
+                handle.close()
+                raise RuntimeError(
+                    "等待数据库迁移锁超时：另一进程可能卡在迁移中"
+                ) from exc
+            time.sleep(0.5)
 
 
 def _ensure_schema_migrations_table() -> None:
@@ -478,6 +523,10 @@ def _prune_ephemeral_rows() -> None:
             {"cutoff": now - dt.timedelta(days=2)},
         )
         connection.execute(
+            text("DELETE FROM email_notice_throttle WHERE window_started < :cutoff"),
+            {"cutoff": now - dt.timedelta(days=2)},
+        )
+        connection.execute(
             text("DELETE FROM guest_lookup_quota WHERE updated_at < :cutoff"),
             {"cutoff": now - dt.timedelta(days=365)},
         )
@@ -561,11 +610,14 @@ def _migrate_card_due_nullable() -> None:
     inspector = inspect(engine)
     if "cards" not in inspector.get_table_names():
         return
+    columns = inspector.get_columns("cards")
     due_column = next(
-        (column for column in inspector.get_columns("cards") if column["name"] == "due_at"),
+        (column for column in columns if column["name"] == "due_at"),
         None,
     )
-    if due_column and due_column.get("nullable"):
+    if due_column is None:
+        return
+    if due_column.get("nullable"):
         with engine.begin() as connection:
             connection.execute(
                 text("UPDATE cards SET due_at = NULL WHERE state = 'new' AND reps = 0")
@@ -581,47 +633,89 @@ def _migrate_card_due_nullable() -> None:
     if engine.dialect.name != "sqlite":
         return
 
+    # 重建表时列清单、外键、唯一约束全部取自当前真实表结构，任何新增列
+    # 都不会被静默丢弃；复制完成后校验行数一致才允许删旧表。
+    def _quoted(name: object) -> str:
+        return f'"{name}"'
+
+    def _render_type(column: dict) -> str:
+        col_type = column.get("type")
+        if col_type is None:
+            return "TEXT"
+        if hasattr(col_type, "compile"):
+            return str(col_type.compile(dialect=engine.dialect))
+        return str(col_type)
+
+    column_defs: list[str] = []
+    for column in columns:
+        name = column["name"]
+        pieces = [_quoted(name), _render_type(column)]
+        if not column.get("nullable") and name != "due_at":
+            pieces.append("NOT NULL")
+        if column.get("default") is not None:
+            pieces.append(f"DEFAULT {column['default']}")
+        if column.get("primary_key"):
+            pieces.append("PRIMARY KEY")
+        column_defs.append(" ".join(pieces))
+
+    constraint_lines: list[str] = []
+    # SQLite 的 get_columns 不返回外键信息，需要单独从 get_foreign_keys 取。
+    for fk in inspector.get_foreign_keys("cards"):
+        constrained = ",".join(
+            _quoted(item) for item in (fk.get("constrained_columns") or [])
+        )
+        referred = ",".join(
+            _quoted(item) for item in (fk.get("referred_columns") or [])
+        )
+        options = fk.get("options") or {}
+        ondelete = (
+            f" ON DELETE {options['ondelete']}" if options.get("ondelete") else ""
+        )
+        constraint_lines.append(
+            f'CONSTRAINT "{fk.get("name") or "fk"}" FOREIGN KEY ({constrained}) '
+            f'REFERENCES "{fk.get("referred_table")}" ({referred}){ondelete}'
+        )
+    for unique in inspector.get_unique_constraints("cards"):
+        unique_cols = ",".join(
+            _quoted(item) for item in (unique.get("column_names") or [])
+        )
+        if not unique_cols:
+            continue
+        constraint_lines.append(
+            f'CONSTRAINT "{unique.get("name") or "uq"}" UNIQUE ({unique_cols})'
+        )
+
+    create_lines = column_defs + constraint_lines
+    create_sql = "CREATE TABLE cards_new (\n" + ",\n".join(create_lines) + "\n)"
+    insert_columns = ",".join(_quoted(column["name"]) for column in columns)
+    select_parts = [
+        (
+            "CASE WHEN state = 'new' AND COALESCE(reps, 0) = 0 THEN NULL ELSE due_at END"
+            if column["name"] == "due_at"
+            else _quoted(column["name"])
+        )
+        for column in columns
+    ]
+    copy_sql = (
+        f"INSERT INTO cards_new ({insert_columns}) "
+        f"SELECT {','.join(select_parts)} FROM cards"
+    )
+
     raw = engine.raw_connection()
     try:
         raw.commit()
         raw.execute("PRAGMA foreign_keys=OFF")
         raw.execute("BEGIN IMMEDIATE")
-        raw.execute(
-            """
-            CREATE TABLE cards_new (
-                id INTEGER NOT NULL PRIMARY KEY,
-                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                word VARCHAR(100) NOT NULL,
-                card_type VARCHAR(20) NOT NULL,
-                front TEXT NOT NULL,
-                back TEXT NOT NULL,
-                context TEXT,
-                state VARCHAR(20),
-                interval_days FLOAT,
-                ease FLOAT,
-                learning_step INTEGER NOT NULL DEFAULT 0,
-                due_at DATETIME NULL,
-                reps INTEGER,
-                lapses INTEGER,
-                created_at DATETIME,
-                CONSTRAINT uq_user_word_type UNIQUE (user_id, word, card_type)
-            )
-            """
+        row_count_before = int(raw.execute("SELECT COUNT(*) FROM cards").fetchone()[0])
+        raw.execute(create_sql)
+        raw.execute(copy_sql)
+        row_count_after = int(
+            raw.execute("SELECT COUNT(*) FROM cards_new").fetchone()[0]
         )
-        raw.execute(
-            """
-            INSERT INTO cards_new (
-                id, user_id, word, card_type, front, back, context, state,
-                interval_days, ease, learning_step, due_at,
-                reps, lapses, created_at
+        if row_count_after != row_count_before:
+            raise RuntimeError(
+                f"卡片日期迁移行数不一致：{row_count_before} -> {row_count_after}"
             )
-            SELECT id, user_id, word, card_type, front, back, context, state,
-                   interval_days, ease, COALESCE(learning_step, 0),
-                   CASE WHEN state = 'new' AND COALESCE(reps, 0) = 0 THEN NULL ELSE due_at END,
-                   reps, lapses, created_at
-            FROM cards
-            """
-        )
         raw.execute("DROP TABLE cards")
         raw.execute("ALTER TABLE cards_new RENAME TO cards")
         raw.execute("CREATE INDEX ix_cards_user_id ON cards (user_id)")
@@ -891,7 +985,9 @@ def _migrate_saved_words() -> None:
                 ),
                 {"user_id": user_id, "known_rank": inferred, "updated_at": now},
             )
-        connection.execute(text("DROP TABLE word_status"))
+        # 旧表不直接 DROP：learning 等未被迁入新表的历史行改为整体改名保留，
+        # 数据可随时恢复；新代码不再读写该表。
+        connection.execute(text("ALTER TABLE word_status RENAME TO word_status_legacy"))
 
 
 def reserve_sqlite_write(db: Session) -> None:
@@ -921,7 +1017,6 @@ def _configure_sqlite_journal() -> None:
         return
     with engine.connect() as connection:
         connection.exec_driver_sql("PRAGMA journal_mode=WAL")
-        connection.exec_driver_sql("PRAGMA synchronous=NORMAL")
 
 
 # 一次性 schema 变更按版本顺序登记；新增迁移只往列表末尾追加。

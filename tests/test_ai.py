@@ -496,9 +496,11 @@ def test_explain_lookup_guest_ai_failure_refunds_quota(monkeypatch):
     monkeypatch.setattr(ai, "_chat_completion", fake_chat)
     db = SessionLocal()
     try:
-        result, error = ai.explain_lookup(db, None, "quasar", "word")
+        result, error, charged = ai.explain_lookup(db, None, "quasar", "word")
         assert result is None
         assert error
+        # 游客失败已退还配额：charged 必须为 False，供纠错路径决定重新预占。
+        assert charged is False
         day = ai._quota_day()
         row = db.get(GuestAiQuota, day)
         assert row is None or row.count == 0
@@ -526,11 +528,13 @@ def test_explain_lookup_reserve_quota_false_skips_guest_quota(monkeypatch):
     monkeypatch.setattr(ai, "_chat_completion", fake_chat)
     db = SessionLocal()
     try:
-        result, error = ai.explain_lookup(
+        result, error, charged = ai.explain_lookup(
             db, None, "environment", "word", reserve_quota=False
         )
         assert error is None
         assert result["explanation"].startswith("environment")
+        # 未预占配额时 charged 为 False。
+        assert charged is False
         day = ai._quota_day()
         assert db.get(GuestAiQuota, day) is None
     finally:

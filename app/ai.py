@@ -1473,21 +1473,28 @@ def explain_lookup(
     text: str,
     query_type: str,
     reserve_quota: bool = True,
-) -> tuple[dict | None, str | None]:
-    """用 AI查词格式解释单词、短语或中文释义。"""
+) -> tuple[dict | None, str | None, bool]:
+    """用 AI查词格式解释单词、短语或中文释义。
+
+    返回 (result, error, charged)：charged 表示本次调用实际预占并消耗了
+    配额（游客失败已退还、配额不足未预占时均为 False）。调用方据此决定
+    后续重查是否复用本次配额，防止「拼写纠错免费重查」绕过配额。
+    """
     if query_type == "sentence":
-        return None, "AI查词不能查询完整句子"
+        return None, "AI查词不能查询完整句子", False
     if not ai_enabled():
-        return None, "服务器尚未配置 DEEPSEEK_API_KEY"
+        return None, "服务器尚未配置 DEEPSEEK_API_KEY", False
+    charged = False
     if reserve_quota:
         if user_id is not None:
             quota_error = ai_quota_reserve(db, user_id, need=1)
             if quota_error:
-                return None, quota_error
+                return None, quota_error, False
         else:
             quota_error = guest_ai_quota_reserve(db, need=1)
             if quota_error:
-                return None, quota_error
+                return None, quota_error, False
+        charged = True
     try:
         client = _new_ai_client()
         last_error = "deepseek-v4-flash 查询暂时失败，请稍后重试"
@@ -1543,7 +1550,7 @@ def explain_lookup(
                     "card_back": card_back,
                 }
                 db.commit()
-                return result, None
+                return result, None, charged
             except Exception as exc:
                 db.rollback()
                 last_error = _safe_api_error(exc, "lookup")
@@ -1551,16 +1558,19 @@ def explain_lookup(
                 if status != 503 or attempt >= AI_CARD_NETWORK_RETRIES - 1:
                     if user_id is None and reserve_quota:
                         guest_ai_quota_refund(db)
-                    return None, last_error
+                        charged = False
+                    return None, last_error, charged
                 time.sleep(1 + attempt)
         if user_id is None and reserve_quota:
             guest_ai_quota_refund(db)
-        return None, last_error
+            charged = False
+        return None, last_error, charged
     except Exception as exc:
         db.rollback()
         if user_id is None and reserve_quota:
             guest_ai_quota_refund(db)
-        return None, _safe_api_error(exc, "lookup")
+            charged = False
+        return None, _safe_api_error(exc, "lookup"), charged
 
 
 def _looks_like_missing_lookup_input(raw_content: str) -> bool:

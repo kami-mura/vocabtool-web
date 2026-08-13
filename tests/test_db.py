@@ -176,6 +176,24 @@ def _create_fk_orphan_schema(path):
     connection.close()
 
 
+def test_config_numeric_parsing_errors_name_the_variable(monkeypatch):
+    """数字环境变量非法时抛出指明变量名的清晰错误，而不是裸 ValueError。"""
+    from app import config
+
+    monkeypatch.setenv("NEW_CARDS_PER_DAY", "abc")
+    try:
+        config._env_int("NEW_CARDS_PER_DAY", 10)
+    except RuntimeError as exc:
+        assert "NEW_CARDS_PER_DAY" in str(exc)
+        assert "abc" in str(exc)
+    else:
+        raise AssertionError("非法整数配置应抛出明确错误")
+    assert config._env_int("SOME_UNSET_VAR", 42) == 42
+    assert config._env_float("UPLOAD_BODY_TIMEOUT_SECONDS_UNSET", 1.5) == 1.5
+    monkeypatch.setenv("MAX_UPLOAD_BYTES", "2048")
+    assert config._env_int("MAX_UPLOAD_BYTES", 0) == 2048
+
+
 def test_old_sqlite_database_migrates_cleanly(monkeypatch, tmp_path):
     path = str(tmp_path / "old.db")
     _create_old_schema(path)
@@ -215,6 +233,16 @@ def test_old_sqlite_database_migrates_cleanly(monkeypatch, tmp_path):
         assert "saved_words" in tables
         assert "anki_review_logs" in tables
         assert "word_status" not in tables
+        assert "word_status_legacy" in tables
+        legacy = connection.execute(
+            "SELECT word, status FROM word_status_legacy WHERE user_id = 1"
+        ).fetchall()
+        assert set(legacy) == {
+            ("run", "unknown"),
+            ("quasar", "unknown"),
+            ("the", "known"),
+            ("orphan", "learning"),
+        }
         saved_words = connection.execute(
             "SELECT word FROM saved_words WHERE user_id = 1"
         ).fetchall()

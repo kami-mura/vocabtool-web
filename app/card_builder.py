@@ -151,16 +151,22 @@ def refresh_sentence_cards(db: Session, user_id: int) -> int:
         return changed
     words = {card.word for card in cards}
     histories: dict[str, LookupHistory] = {}
-    for row in (
-        db.query(LookupHistory)
-        .filter(
-            LookupHistory.user_id == user_id,
-            LookupHistory.query.in_(list(words)),
-        )
-        .order_by(LookupHistory.created_at.desc(), LookupHistory.id.desc())
-        .all()
-    ):
-        histories.setdefault(row.query.strip(), row)
+    word_list = list(words)
+    for index in range(0, len(word_list), 500):
+        # 与 LookupCache 一致按 500 分块，避免旧版 SQLite 绑定参数上限报错。
+        for row in (
+            db.query(LookupHistory)
+            .filter(
+                LookupHistory.user_id == user_id,
+                LookupHistory.query.in_(word_list[index : index + 500]),
+            )
+            .order_by(LookupHistory.created_at.desc(), LookupHistory.id.desc())
+            .all()
+        ):
+            key = row.query.strip()
+            current = histories.get(key)
+            if current is None or row.id > current.id:
+                histories[key] = row
     caches: dict[str, LookupCache] = {}
     word_list = list(words)
     for index in range(0, len(word_list), 500):
