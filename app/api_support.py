@@ -156,17 +156,30 @@ def _today_stats(db: Session, user_id: int, now: dt.datetime) -> dict:
 
 
 def _text_bytes(db: Session, *columns) -> int:
-    """返回列 UTF-8 字节数表达式：PostgreSQL 用 octet_length，SQLite 转 BLOB。"""
+    """返回各列 UTF-8 字节数之和的表达式；NULL 列按 0 字节计，
+    避免任一列为 NULL 时整行被 SUM 跳过。PostgreSQL 用 octet_length，
+    SQLite 转 BLOB。
+    """
     if db.bind.dialect.name == "postgresql":
-        return sum((func.octet_length(column) for column in columns), 0)
-    return sum((func.length(cast(column, LargeBinary)) for column in columns), 0)
+        return sum(
+            (func.coalesce(func.octet_length(column), 0) for column in columns), 0
+        )
+    return sum(
+        (
+            func.coalesce(func.length(cast(column, LargeBinary)), 0)
+            for column in columns
+        ),
+        0,
+    )
 
 
 def _sum_storage_bytes(
     db: Session, *columns, extra_per_row: int = 0, filters=()
 ) -> int:
     query = db.query(
-        func.coalesce(func.sum(_text_bytes(db, *columns) + extra_per_row), 0)
+        func.coalesce(
+            func.sum(_text_bytes(db, *columns)) + extra_per_row * func.count(), 0
+        )
     )
     for column, value in filters:
         query = query.filter(column == value)
@@ -835,15 +848,16 @@ def _anonymous_request_identity(request: Request) -> str:
     否则任何人都能伪造转发头绕过限流。
 
     反向代理（Caddy/Nginx）部署时使用 X-Forwarded-For 的原始客户端地址，
-    代理会自动把真实 IP 追加到末尾，因此只取第一项。
+    代理会把真实 IP 追加到列表末尾，因此只取最后一项。
     """
     peer = request.client.host if request.client else ""
     if _is_trusted_proxy_peer(peer):
         forwarded = request.headers.get("cf-connecting-ip", "").strip()
-        if not forwarded:
-            forwarded = request.headers.get("x-forwarded-for", "").strip()
         if forwarded:
-            return forwarded.split(",", 1)[0].strip()[:64]
+            return forwarded[:64]
+        forwarded = request.headers.get("x-forwarded-for", "").strip()
+        if forwarded:
+            return forwarded.split(",")[-1].strip()[:64]
     return (peer or "unknown")[:64]
 
 

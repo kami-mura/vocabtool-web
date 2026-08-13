@@ -156,6 +156,9 @@ def request_code(db: Session, email: str) -> str | None:
         expires_at=now
         + dt.timedelta(minutes=config.VERIFICATION_CODE_TTL_MINUTES),
     )
+    # 先落库本次请求的限流行再发信，发信期间的并发请求会被 60 秒限流拒绝。
+    db.add(row)
+    db.commit()
     if already_registered:
         # 不发送可用的注册验证码，改为发提醒邮件：耗时相同、响应相同，
         # 且邮箱主人能得知有人正在试探注册。
@@ -167,18 +170,22 @@ def request_code(db: Session, email: str) -> str | None:
                 "如果不是你本人操作，请忽略这封邮件，无需处理。",
             )
         except Exception:  # 不向浏览器暴露邮件服务商或 Key 相关细节
+            db.delete(row)
+            db.commit()
             return "验证码暂时无法发送，请稍后重试"
     else:
         try:
             _send_email(email, code)
         except Exception:  # 不向浏览器暴露邮件服务商或 Key 相关细节
+            db.delete(row)
+            db.commit()
             return "验证码暂时无法发送，请稍后重试"
     # 新码生效时作废旧码，避免旧码残留可被继续试探。
     db.query(EmailVerification).filter(
         EmailVerification.email == email,
         EmailVerification.consumed_at.is_(None),
+        EmailVerification.id != row.id,
     ).update({EmailVerification.consumed_at: now})
-    db.add(row)
     db.commit()
     return None
 
@@ -204,6 +211,7 @@ def verify_code(db: Session, email: str, code: str) -> str | None:
         db.commit()
         return "验证码错误"
     row.consumed_at = now
+    db.commit()
     return None
 
 

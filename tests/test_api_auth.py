@@ -3,7 +3,7 @@ import datetime as dt
 from app import config, email_verification
 from app.auth import hash_password
 from app.db import SessionLocal
-from app.models import Session as DbSession
+from app.models import LoginThrottle, Session as DbSession
 from app.models import User
 from tests.conftest import register
 
@@ -286,6 +286,70 @@ def test_login_throttles_repeated_wrong_passwords(client):
         for _ in range(6)
     ]
     assert responses[-1].status_code == 429
+
+
+def test_wrong_password_during_lock_extends_lock(client):
+    register(client, "lock-extend@example.com")
+    client.post("/api/logout")
+    for _ in range(5):
+        assert client.post(
+            "/api/login",
+            json={"email": "lock-extend@example.com", "password": "wrong-password"},
+        ).status_code == 400
+    assert client.post(
+        "/api/login",
+        json={"email": "lock-extend@example.com", "password": "wrong-password"},
+    ).status_code == 429
+
+    db = SessionLocal()
+    try:
+        row = db.get(LoginThrottle, "lock-extend@example.com")
+        locked_before = row.locked_until
+        assert locked_before is not None
+    finally:
+        db.close()
+
+    retry = client.post(
+        "/api/login",
+        json={"email": "lock-extend@example.com", "password": "wrong-password"},
+    )
+    assert retry.status_code == 429
+
+    db = SessionLocal()
+    try:
+        row = db.get(LoginThrottle, "lock-extend@example.com")
+        now = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
+        assert row.failures == 5
+        assert row.locked_until > locked_before
+        assert row.locked_until >= now + dt.timedelta(minutes=15) - dt.timedelta(seconds=2)
+    finally:
+        db.close()
+
+
+def test_correct_password_during_lock_logs_in_and_clears_lock(client):
+    register(client, "lock-clear@example.com")
+    client.post("/api/logout")
+    for _ in range(5):
+        assert client.post(
+            "/api/login",
+            json={"email": "lock-clear@example.com", "password": "wrong-password"},
+        ).status_code == 400
+    assert client.post(
+        "/api/login",
+        json={"email": "lock-clear@example.com", "password": "wrong-password"},
+    ).status_code == 429
+
+    ok = client.post(
+        "/api/login",
+        json={"email": "lock-clear@example.com", "password": "password123"},
+    )
+    assert ok.status_code == 200
+    assert client.get("/api/me").status_code == 200
+    db = SessionLocal()
+    try:
+        assert db.get(LoginThrottle, "lock-clear@example.com") is None
+    finally:
+        db.close()
 
 
 def test_real_email_verification_code_registration(client, monkeypatch):
@@ -572,6 +636,67 @@ def test_api_rejects_oversized_json_body(client, monkeypatch):
     assert normal.status_code == 400
 
 
+def test_storage_bytes_counts_rows_with_null_columns():
+    from sqlalchemy import insert
+
+    from app.api_support import _sum_storage_bytes
+    from app.models import Card
+
+    db = SessionLocal()
+    try:
+        user = User(email="storage-null@example.com", password_hash="x", salt="y")
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        db.execute(
+            insert(Card).values(
+                user_id=user.id,
+                word="alpha",
+                card_type="general",
+                front="front",
+                back="back",
+                context=None,
+            )
+        )
+        db.execute(
+            insert(Card).values(
+                user_id=user.id,
+                word="beta",
+                card_type="general",
+                front="f",
+                back="b",
+                context="ctx",
+            )
+        )
+        db.commit()
+        total = _sum_storage_bytes(
+            db,
+            Card.word,
+            Card.front,
+            Card.back,
+            Card.context,
+            filters=[(Card.user_id, user.id)],
+        )
+        per_row = _sum_storage_bytes(
+            db,
+            Card.word,
+            Card.front,
+            Card.back,
+            Card.context,
+            extra_per_row=16,
+            filters=[(Card.user_id, user.id)],
+        )
+    finally:
+        db.close()
+
+    expected = sum(
+        len(value.encode("utf-8"))
+        for value in ("alpha", "front", "back", "", "beta", "f", "b", "ctx")
+    )
+    assert total == expected
+    assert per_row == expected + 16 * 2
+
+
 def test_check_request_rate_blocks_after_limit_and_resets():
     from app.auth import check_request_rate
     from app.db import SessionLocal
@@ -596,6 +721,48 @@ def test_check_request_rate_blocks_after_limit_and_resets():
         db.close()
 
 
+def test_check_request_rate_concurrent_writes_do_not_raise():
+    import hashlib
+    import threading
+
+    from app.auth import check_request_rate
+    from app.db import SessionLocal
+    from app.models import RequestThrottle
+
+    results = []
+    errors = []
+
+    def worker():
+        db = SessionLocal()
+        try:
+            results.append(
+                check_request_rate(
+                    db, action="race", identity="z", limit=3, window_minutes=15
+                )
+            )
+        except Exception as exc:
+            errors.append(exc)
+        finally:
+            db.close()
+
+    threads = [threading.Thread(target=worker) for _ in range(10)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert not errors
+    assert sum(results) == 3
+    db = SessionLocal()
+    try:
+        key = hashlib.sha256("race:z".encode()).hexdigest()
+        row = db.get(RequestThrottle, key)
+        assert row is not None
+        assert row.attempts == 3
+    finally:
+        db.close()
+
+
 def test_anonymous_identity_trusts_x_forwarded_for_from_trusted_proxy():
     from types import SimpleNamespace
 
@@ -611,9 +778,17 @@ def test_anonymous_identity_trusts_x_forwarded_for_from_trusted_proxy():
 
     chained = SimpleNamespace(
         client=SimpleNamespace(host="10.0.0.7"),
-        headers=Headers({"X-Forwarded-For": "203.0.113.5, 10.0.0.1"}),
+        headers=Headers({"X-Forwarded-For": "1.2.3.4, 10.0.0.5"}),
     )
-    assert _anonymous_request_identity(chained) == "203.0.113.5"
+    assert _anonymous_request_identity(chained) == "10.0.0.5"
+
+    cloudflare = SimpleNamespace(
+        client=SimpleNamespace(host="127.0.0.1"),
+        headers=Headers(
+            {"CF-Connecting-IP": "203.0.113.9", "X-Forwarded-For": "1.2.3.4, 10.0.0.5"}
+        ),
+    )
+    assert _anonymous_request_identity(cloudflare) == "203.0.113.9"
 
 
 def test_anonymous_identity_ignores_forwarded_headers_from_untrusted_peer():

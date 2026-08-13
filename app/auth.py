@@ -11,7 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from . import config
-from .db import get_db
+from .db import get_db, is_sqlite_busy_error, reserve_sqlite_write
 from .models import LoginThrottle, RequestThrottle, User
 from .models import Session as DbSession
 
@@ -167,6 +167,18 @@ def _record_login_failure(db: Session, email: str) -> None:
     db.commit()
 
 
+def _extend_login_lock(db: Session, email: str) -> None:
+    """锁定期间再试错密码时延长锁定，失败次数保持上限不再累加。"""
+    now = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
+    window = dt.timedelta(minutes=_LOGIN_WINDOW_MINUTES)
+    db.execute(
+        update(LoginThrottle)
+        .where(LoginThrottle.email == email)
+        .values(failures=_LOGIN_MAX_FAILURES, locked_until=now + window)
+    )
+    db.commit()
+
+
 def register_user(
     db: Session, email: str, password: str
 ) -> tuple[User | None, str | None]:
@@ -198,7 +210,7 @@ def login_user(
     if locked:
         # 锁定期间仍校验密码：本人输入正确密码可正常登录并解除锁定，
         # 避免知道邮箱的攻击者用持续失败把真正用户挡在门外；
-        # 错误密码不延长锁定（锁定到期自然解除）。
+        # 错误密码会延长锁定，使暴力破解持续付出代价。
         password_ok = verify_password(
             password,
             user.salt if user else "",
@@ -212,6 +224,7 @@ def login_user(
                 user.password_hash, user.salt = hash_password(password)
             db.commit()
             return user, None
+        _extend_login_lock(db, email)
         return None, "登录尝试过多，请稍后再试"
     password_ok = verify_password(
         password,
@@ -298,6 +311,13 @@ def check_request_rate(
     key = hashlib.sha256(f"{action}:{identity}".encode()).hexdigest()
     now = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
     window = dt.timedelta(minutes=window_minutes)
+    try:
+        reserve_sqlite_write(db)
+    except Exception as exc:
+        db.rollback()
+        if not is_sqlite_busy_error(exc):
+            raise
+        return False
     for _attempt in range(4):
         row = db.get(RequestThrottle, key)
         if row is None:
