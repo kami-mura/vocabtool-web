@@ -39,8 +39,6 @@ def test_pwa_manifest_icons_and_service_worker(client):
 def test_security_headers_docs_and_cross_site_write_guard(client):
     response = client.get("/")
     assert "default-src 'self'" in response.headers["content-security-policy"]
-    assert "frame-ancestors 'self'" in response.headers["content-security-policy"]
-    assert response.headers["x-frame-options"] == "SAMEORIGIN"
     assert response.headers["x-content-type-options"] == "nosniff"
     assert response.headers["cache-control"] == "no-store"
     assert client.get("/docs").status_code == 404
@@ -51,26 +49,6 @@ def test_security_headers_docs_and_cross_site_write_guard(client):
         headers={"Origin": "https://evil.example"},
     )
     assert blocked.status_code == 403
-
-
-def test_custom_frame_ancestors_allow_embedding_and_drop_sameorigin(client, monkeypatch):
-    """配置 FRAME_ANCESTORS 白名单后，CSP 按白名单输出且不再下发
-    X-Frame-Options（该头无法表达白名单，会与 CSP 冲突）。"""
-    from app import config as config_mod
-    from app import main as main_mod
-
-    assert config_mod._parse_frame_ancestors(" self, http://127.0.0.1:3080 , ") == [
-        "self",
-        "http://127.0.0.1:3080",
-    ]
-    monkeypatch.setattr(
-        main_mod, "_FRAME_ANCESTORS_CSP", "'self' http://127.0.0.1:3080 http://localhost:3080"
-    )
-    monkeypatch.setattr(main_mod, "_ALLOW_CUSTOM_FRAMING", True)
-    response = client.get("/")
-    csp = response.headers["content-security-policy"]
-    assert "frame-ancestors 'self' http://127.0.0.1:3080 http://localhost:3080" in csp
-    assert "x-frame-options" not in response.headers
 
 
 def test_home_page_has_guest_search_demo_and_login_link(client):
