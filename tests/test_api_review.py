@@ -57,6 +57,25 @@ def test_new_user_defaults_to_ten_new_cards_per_day(client, monkeypatch):
     assert settings.json()["new_cards_per_day"] == 10
 
 
+def test_review_without_expected_revision_is_rejected(client):
+    register(client, "review-missing-revision@example.com")
+    made = client.post(
+        "/api/card-studio/cards",
+        json={"words": ["run"], "card_type": "general"},
+    )
+    assert made.status_code == 200
+    client.put("/api/cards/settings", json={"new_cards_per_day": 1})
+    card = client.get("/api/cards").json()["new"][0]
+    blocked = client.post(f"/api/cards/{card['id']}/review", json={"rating": "good"})
+    assert blocked.status_code == 400
+    assert "缺少卡片版本" in blocked.json()["detail"]
+    again_blocked = client.post(
+        f"/api/cards/{card['id']}/review",
+        json={"rating": "good", "action_id": "no-revision-action"},
+    )
+    assert again_blocked.status_code == 400
+
+
 def test_review_action_id_is_idempotent(client):
     register(client, "review-idempotent@example.com")
     made = client.post(
@@ -100,7 +119,12 @@ def test_review_writes_count_against_storage_quota(client, monkeypatch):
         config, "USER_STORAGE_QUOTA_BYTES", usage["used_bytes"] + 50
     )
     blocked = client.post(
-        f"/api/cards/{card['id']}/review", json={"rating": "good"}
+        f"/api/cards/{card['id']}/review",
+        json={
+            "rating": "good",
+            "action_id": "quota-blocked-action",
+            "expected_revision": card["revision"],
+        },
     )
     assert blocked.status_code == 413
     assert "个人存储空间不足" in blocked.json()["detail"]
@@ -122,7 +146,12 @@ def test_review_endpoints_honor_rate_limit(client, monkeypatch):
         card_routes, "check_request_rate", lambda *_args, **_kwargs: False
     )
     single = client.post(
-        f"/api/cards/{card['id']}/review", json={"rating": "good"}
+        f"/api/cards/{card['id']}/review",
+        json={
+            "rating": "good",
+            "action_id": "rate-limit-single-action",
+            "expected_revision": card["revision"],
+        },
     )
     batch = client.post(
         "/api/cards/reviews/batch",
@@ -150,13 +179,26 @@ def test_daily_new_limit_blocks_extra_study_and_early_review(client):
     blocked = client.get("/api/cards", params={"extra_new": 10})
     assert blocked.status_code == 409
 
-    card_id = queue["new"][0]["id"]
-    reviewed = client.post(f"/api/cards/{card_id}/review", json={"rating": "easy"})
+    new_card = queue["new"][0]
+    card_id = new_card["id"]
+    reviewed = client.post(
+        f"/api/cards/{card_id}/review",
+        json={
+            "rating": "easy",
+            "action_id": "daily-limit-1",
+            "expected_revision": new_card["revision"],
+        },
+    )
     assert reviewed.status_code == 200
     assert reviewed.json()["card"]["session_repeat"] is False
     # 认识后 2 天才到期，未到期不能提前评分。
     assert client.post(
-        f"/api/cards/{card_id}/review", json={"rating": "good"}
+        f"/api/cards/{card_id}/review",
+        json={
+            "rating": "good",
+            "action_id": "daily-limit-2",
+            "expected_revision": reviewed.json()["card"]["revision"],
+        },
     ).status_code == 409
     assert client.get("/api/cards").json()["new"] == []
     extra = client.get("/api/cards", params={"extra_new": 10})
@@ -170,12 +212,24 @@ def test_daily_new_limit_blocks_extra_study_and_early_review(client):
         db.commit()
     finally:
         db.close()
-    reviewed = client.post(f"/api/cards/{card_id}/review", json={"rating": "easy"})
+    reviewed = client.post(
+        f"/api/cards/{card_id}/review",
+        json={
+            "rating": "easy",
+            "action_id": "daily-limit-3",
+            "expected_revision": reviewed.json()["card"]["revision"],
+        },
+    )
     assert reviewed.status_code == 200
     assert reviewed.json()["card"]["session_repeat"] is False
     assert client.get("/api/cards", params={"practice_limit": 20}).status_code == 410
     assert client.post(
-        f"/api/cards/{card_id}/review", json={"rating": "easy"}
+        f"/api/cards/{card_id}/review",
+        json={
+            "rating": "easy",
+            "action_id": "daily-limit-4",
+            "expected_revision": reviewed.json()["card"]["revision"],
+        },
     ).status_code == 409
 
     browsed = client.get("/api/cards/browse", params={"q": "run"}).json()
@@ -274,9 +328,14 @@ def test_today_queue_mixes_reviews_and_new_cards(client, monkeypatch):
     assert {item["queue_kind"] for item in queue["queue"]} == {"due", "new"}
     assert {item["word"] for item in queue["queue"]} == {"run", "set"}
 
-    due_card_id = queue["queue"][0]["id"]
+    due_card = queue["queue"][0]
     assert client.post(
-        f"/api/cards/{due_card_id}/review", json={"rating": "easy"}
+        f"/api/cards/{due_card['id']}/review",
+        json={
+            "rating": "easy",
+            "action_id": "mixed-queue-action",
+            "expected_revision": due_card["revision"],
+        },
     ).status_code == 200
     after = client.get("/api/cards").json()
     assert after["remaining_counts"] == {"due": 0, "new": 1, "again": 0}
@@ -292,7 +351,14 @@ def test_future_review_card_does_not_enter_today_queue(client):
     )
     client.put("/api/cards/settings", json={"new_cards_per_day": 1})
     card = client.get("/api/cards").json()["new"][0]
-    reviewed = client.post(f"/api/cards/{card['id']}/review", json={"rating": "easy"})
+    reviewed = client.post(
+        f"/api/cards/{card['id']}/review",
+        json={
+            "rating": "easy",
+            "action_id": "future-review-1",
+            "expected_revision": card["revision"],
+        },
+    )
     assert reviewed.status_code == 200
     # 第一次认识后 2 天才到期，不会立刻回队列。
     waiting = client.get("/api/cards").json()
@@ -301,7 +367,12 @@ def test_future_review_card_does_not_enter_today_queue(client):
     assert card["id"] not in {item["id"] for item in waiting["queue"]}
     # 未到期不能提前评分。
     assert client.post(
-        f"/api/cards/{card['id']}/review", json={"rating": "good"}
+        f"/api/cards/{card['id']}/review",
+        json={
+            "rating": "good",
+            "action_id": "future-review-2",
+            "expected_revision": reviewed.json()["card"]["revision"],
+        },
     ).status_code == 409
     # 模拟到期后完成下一次复习。
     db = SessionLocal()
@@ -311,7 +382,14 @@ def test_future_review_card_does_not_enter_today_queue(client):
         db.commit()
     finally:
         db.close()
-    reviewed = client.post(f"/api/cards/{card['id']}/review", json={"rating": "easy"})
+    reviewed = client.post(
+        f"/api/cards/{card['id']}/review",
+        json={
+            "rating": "easy",
+            "action_id": "future-review-3",
+            "expected_revision": reviewed.json()["card"]["revision"],
+        },
+    )
     assert reviewed.status_code == 200
     assert reviewed.json()["card"]["next_review_date"] is not None
 
@@ -331,7 +409,14 @@ def test_known_ends_today_and_schedules(client):
     client.put("/api/cards/settings", json={"new_cards_per_day": 1})
     card = client.get("/api/cards").json()["new"][0]
 
-    easy = client.post(f"/api/cards/{card['id']}/review", json={"rating": "easy"})
+    easy = client.post(
+        f"/api/cards/{card['id']}/review",
+        json={
+            "rating": "easy",
+            "action_id": "known-ends-1",
+            "expected_revision": card["revision"],
+        },
+    )
     assert easy.status_code == 200
     assert easy.json()["card"]["session_repeat"] is False
     assert easy.json()["card"]["interval_days"] >= 1
@@ -340,7 +425,12 @@ def test_known_ends_today_and_schedules(client):
     assert queue["remaining_counts"]["again"] == 0
     # 未到期不能提前评分。
     assert client.post(
-        f"/api/cards/{card['id']}/review", json={"rating": "good"}
+        f"/api/cards/{card['id']}/review",
+        json={
+            "rating": "good",
+            "action_id": "known-ends-2",
+            "expected_revision": easy.json()["card"]["revision"],
+        },
     ).status_code == 409
     # 模拟到期后回到队列。
     db = SessionLocal()
@@ -355,7 +445,12 @@ def test_known_ends_today_and_schedules(client):
     assert queue["remaining_counts"]["due"] == 1
     assert queue["can_extra_new"] is False
     assert client.post(
-        f"/api/cards/{card['id']}/review", json={"rating": "easy"}
+        f"/api/cards/{card['id']}/review",
+        json={
+            "rating": "easy",
+            "action_id": "known-ends-3",
+            "expected_revision": easy.json()["card"]["revision"],
+        },
     ).status_code == 200
 
 
@@ -368,7 +463,14 @@ def test_again_card_keeps_learning_until_known(client):
     )
     client.put("/api/cards/settings", json={"new_cards_per_day": 1})
     card = client.get("/api/cards").json()["new"][0]
-    again = client.post(f"/api/cards/{card['id']}/review", json={"rating": "again"})
+    again = client.post(
+        f"/api/cards/{card['id']}/review",
+        json={
+            "rating": "again",
+            "action_id": "again-keeps-1",
+            "expected_revision": card["revision"],
+        },
+    )
     assert again.status_code == 200
     assert again.json()["card"]["session_repeat"] is True
     assert again.json()["card"]["interval_days"] == 0.0
@@ -380,7 +482,12 @@ def test_again_card_keeps_learning_until_known(client):
     assert waiting["queue"][0]["queue_kind"] == "again"
 
     first_easy = client.post(
-        f"/api/cards/{card['id']}/review", json={"rating": "easy"}
+        f"/api/cards/{card['id']}/review",
+        json={
+            "rating": "easy",
+            "action_id": "again-keeps-2",
+            "expected_revision": again.json()["card"]["revision"],
+        },
     )
     assert first_easy.status_code == 200
     assert first_easy.json()["card"]["interval_days"] >= 1
@@ -394,7 +501,12 @@ def test_again_card_keeps_learning_until_known(client):
     finally:
         db.close()
     second_easy = client.post(
-        f"/api/cards/{card['id']}/review", json={"rating": "easy"}
+        f"/api/cards/{card['id']}/review",
+        json={
+            "rating": "easy",
+            "action_id": "again-keeps-3",
+            "expected_revision": first_easy.json()["card"]["revision"],
+        },
     )
     assert second_easy.status_code == 200
     assert second_easy.json()["card"]["interval_days"] >= 1
@@ -414,12 +526,23 @@ def test_again_then_easy_graduates_to_review(client):
     card = client.get("/api/cards").json()["new"][0]
     again = client.post(
         f"/api/cards/{card['id']}/review",
-        json={"rating": "again"},
+        json={
+            "rating": "again",
+            "action_id": "again-reset-1",
+            "expected_revision": card["revision"],
+        },
     )
     assert again.status_code == 200
     assert again.json()["card"]["interval_days"] == 0.0
 
-    known = client.post(f"/api/cards/{card['id']}/review", json={"rating": "easy"})
+    known = client.post(
+        f"/api/cards/{card['id']}/review",
+        json={
+            "rating": "easy",
+            "action_id": "again-reset-2",
+            "expected_revision": again.json()["card"]["revision"],
+        },
+    )
     assert known.status_code == 200
     assert known.json()["card"]["interval_days"] >= 1
     assert known.json()["card"]["state"] == "scheduled"
@@ -612,6 +735,83 @@ def test_batch_review_rejects_stale_card_revision(client):
     assert "其他页面" in stale.json()["errors"][0]["detail"]
 
 
+def test_undo_clears_review_request_so_retry_reapplies(client):
+    register(client, "undo-retry@example.com")
+    made = client.post(
+        "/api/card-studio/cards",
+        json={"words": ["run"], "card_type": "general"},
+    )
+    assert made.status_code == 200
+    client.put("/api/cards/settings", json={"new_cards_per_day": 1})
+    card = client.get("/api/cards").json()["new"][0]
+    payload = {
+        "rating": "easy",
+        "action_id": "undo-retry-action",
+        "expected_revision": card["revision"],
+    }
+    first = client.post(f"/api/cards/{card['id']}/review", json=payload)
+    assert first.status_code == 200
+    assert "idempotent" not in first.json()
+
+    undone = client.post("/api/cards/reviews/undo")
+    assert undone.status_code == 200
+
+    retry = client.post(
+        f"/api/cards/{card['id']}/review",
+        json={
+            "rating": "easy",
+            "action_id": "undo-retry-action",
+            "expected_revision": undone.json()["card"]["revision"],
+        },
+    )
+    assert retry.status_code == 200
+    assert "idempotent" not in retry.json()
+    assert retry.json()["card"]["state"] == "scheduled"
+    assert retry.json()["card"]["reps"] == 1
+    db = SessionLocal()
+    try:
+        assert db.query(ReviewLog).filter(ReviewLog.card_id == card["id"]).count() == 1
+    finally:
+        db.close()
+
+
+def test_undo_rejects_review_older_than_fifteen_minutes(client):
+    register(client, "undo-expired@example.com")
+    made = client.post(
+        "/api/card-studio/cards",
+        json={"words": ["run"], "card_type": "general"},
+    )
+    assert made.status_code == 200
+    client.put("/api/cards/settings", json={"new_cards_per_day": 1})
+    card = client.get("/api/cards").json()["new"][0]
+    reviewed = client.post(
+        f"/api/cards/{card['id']}/review",
+        json={
+            "rating": "easy",
+            "action_id": "undo-expired-action",
+            "expected_revision": card["revision"],
+        },
+    )
+    assert reviewed.status_code == 200
+
+    db = SessionLocal()
+    try:
+        row = (
+            db.query(ReviewLog)
+            .filter(ReviewLog.card_id == card["id"])
+            .one()
+        )
+        row.reviewed_at = (
+            dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
+            - dt.timedelta(minutes=20)
+        )
+        db.commit()
+    finally:
+        db.close()
+    blocked = client.post("/api/cards/reviews/undo")
+    assert blocked.status_code == 409
+
+
 def test_review_can_restore_exact_previous_schedule(client):
     register(client, "undo-review@example.com")
     made = client.post(
@@ -622,7 +822,12 @@ def test_review_can_restore_exact_previous_schedule(client):
     before = client.get("/api/cards").json()["new"][0]
 
     reviewed = client.post(
-        f"/api/cards/{before['id']}/review", json={"rating": "easy"}
+        f"/api/cards/{before['id']}/review",
+        json={
+            "rating": "easy",
+            "action_id": "undo-review-action",
+            "expected_revision": before["revision"],
+        },
     )
     assert reviewed.status_code == 200
     assert reviewed.json()["card"]["state"] == "scheduled"
@@ -650,7 +855,12 @@ def test_today_stats_count_cards_and_again_ratio(client):
     client.put("/api/cards/settings", json={"new_cards_per_day": 1})
     card = client.get("/api/cards").json()["new"][0]
     reviewed = client.post(
-        f"/api/cards/{card['id']}/review", json={"rating": "again"}
+        f"/api/cards/{card['id']}/review",
+        json={
+            "rating": "again",
+            "action_id": "today-stats-1",
+            "expected_revision": card["revision"],
+        },
     )
     assert reviewed.status_code == 200
     assert "today_stats" in reviewed.json()
@@ -661,7 +871,15 @@ def test_today_stats_count_cards_and_again_ratio(client):
         db.commit()
     finally:
         db.close()
-    client.post(f"/api/cards/{card['id']}/review", json={"rating": "easy"})
+    second = client.post(
+        f"/api/cards/{card['id']}/review",
+        json={
+            "rating": "easy",
+            "action_id": "today-stats-2",
+            "expected_revision": reviewed.json()["card"]["revision"],
+        },
+    )
+    assert second.status_code == 200
     db = SessionLocal()
     try:
         row = db.get(Card, card["id"])
@@ -669,7 +887,14 @@ def test_today_stats_count_cards_and_again_ratio(client):
         db.commit()
     finally:
         db.close()
-    client.post(f"/api/cards/{card['id']}/review", json={"rating": "easy"})
+    client.post(
+        f"/api/cards/{card['id']}/review",
+        json={
+            "rating": "easy",
+            "action_id": "today-stats-3",
+            "expected_revision": second.json()["card"]["revision"],
+        },
+    )
     stats = client.get("/api/cards").json()["today_stats"]
     assert stats == {
         "studied": 3,
@@ -702,7 +927,14 @@ def test_today_stats_count_cards_and_again_ratio(client):
         due_id = due.id
     finally:
         db.close()
-    assert client.post(f"/api/cards/{due_id}/review", json={"rating": "easy"}).status_code == 200
+    assert client.post(
+        f"/api/cards/{due_id}/review",
+        json={
+            "rating": "easy",
+            "action_id": "today-stats-due",
+            "expected_revision": 0,
+        },
+    ).status_code == 200
     combined = client.get("/api/cards").json()["today_stats"]
     assert combined["unique_cards"] == 2
     assert combined["new_learned"] == 1

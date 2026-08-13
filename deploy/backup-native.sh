@@ -9,6 +9,15 @@ timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
 mkdir -p "${backup_dir}"
 cd "${project_dir}"
 
+database_url="${DATABASE_URL:-}"
+if [[ -z "${database_url}" && -f "${project_dir}/.env" ]]; then
+  database_url="$(grep -E '^DATABASE_URL=' "${project_dir}/.env" | tail -n1 | cut -d= -f2- | tr -d '"' || true)"
+fi
+postgres_backend=false
+if [[ "${database_url}" == postgres* ]]; then
+  postgres_backend=true
+fi
+
 postgres_backup="${backup_dir}/vocabflow-db-${timestamp}.dump"
 database_backup_created=false
 if pg_dump \
@@ -24,6 +33,10 @@ if pg_dump \
   database_backup_created=true
 else
   rm -f "${postgres_backup}"
+  if [[ "${postgres_backend}" == true ]]; then
+    echo "PostgreSQL 后端备份失败，终止部署" >&2
+    exit 1
+  fi
   echo "提示：PostgreSQL 备份未生成，继续检查 SQLite。" >&2
 fi
 

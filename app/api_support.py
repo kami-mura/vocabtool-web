@@ -796,7 +796,14 @@ def _card_dict(
         "session_reduce_day": str(getattr(card, "session_reduce_day", "") or ""),
         "session_reduce_used": int(getattr(card, "session_reduce_used", 0) or 0),
         "due_at": card.due_at.isoformat() if card.due_at else None,
-        "next_review_date": card.due_at.date().isoformat() if card.due_at else None,
+        "next_review_date": (
+            card.due_at.replace(tzinfo=dt.timezone.utc)
+            .astimezone(srs._site_timezone())
+            .date()
+            .isoformat()
+            if card.due_at
+            else None
+        ),
         "deck": deck,
         "defaults": defaults,
         "session_repeat": session_repeat,

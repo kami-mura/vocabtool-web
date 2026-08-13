@@ -32,9 +32,15 @@ def test_full_learning_flow(client):
     assert queue.status_code == 200
     new_cards = queue.json()["new"]
     assert len(new_cards) >= 1
-    card_id = new_cards[0]["id"]
 
-    review = client.post(f"/api/cards/{card_id}/review", json={"rating": "easy"})
+    review = client.post(
+        f"/api/cards/{new_cards[0]['id']}/review",
+        json={
+            "rating": "easy",
+            "action_id": "full-flow-action",
+            "expected_revision": new_cards[0]["revision"],
+        },
+    )
     assert review.status_code == 200
     assert review.json()["card"]["state"] == "scheduled"
     assert review.json()["card"]["interval_days"] >= 1
@@ -745,24 +751,36 @@ def test_extra_new_cards_persist_until_finished(client):
         assert made.json()["created"] == 1
 
     first = client.get("/api/cards", params={"extra_new": 2}).json()
-    extra_ids = {card["id"] for card in first["new"]}
-    assert len(extra_ids) == 2
+    extra_cards = {card["id"]: card["revision"] for card in first["new"]}
+    assert len(extra_cards) == 2
 
     refreshed = client.get("/api/cards").json()
-    assert {card["id"] for card in refreshed["new"]} == extra_ids
+    assert {card["id"] for card in refreshed["new"]} == set(extra_cards)
     assert refreshed["remaining_counts"]["new"] == 2
     assert refreshed["can_extra_new"] is False
 
+    extra_id = next(iter(extra_cards))
     done = client.post(
-        f"/api/cards/{extra_ids.pop()}/review", json={"rating": "good"}
+        f"/api/cards/{extra_id}/review",
+        json={
+            "rating": "good",
+            "action_id": "extra-sticky-1",
+            "expected_revision": extra_cards.pop(extra_id),
+        },
     )
     assert done.status_code == 200
     refreshed = client.get("/api/cards").json()
-    assert {card["id"] for card in refreshed["new"]} == extra_ids
+    assert {card["id"] for card in refreshed["new"]} == set(extra_cards)
     assert refreshed["remaining_counts"]["new"] == 1
 
+    extra_id = next(iter(extra_cards))
     done = client.post(
-        f"/api/cards/{extra_ids.pop()}/review", json={"rating": "good"}
+        f"/api/cards/{extra_id}/review",
+        json={
+            "rating": "good",
+            "action_id": "extra-sticky-2",
+            "expected_revision": extra_cards.pop(extra_id),
+        },
     )
     assert done.status_code == 200
     refreshed = client.get("/api/cards").json()
@@ -999,7 +1017,12 @@ def test_creating_card_marks_saved_word_mid_and_preserves_review_evidence(client
     assert words and words[0]["status"] == "mid"
     card = client.get("/api/cards").json()["new"][0]
     reviewed = client.post(
-        f"/api/cards/{card['id']}/review", json={"rating": "good"}
+        f"/api/cards/{card['id']}/review",
+        json={
+            "rating": "good",
+            "action_id": "saved-to-card-action",
+            "expected_revision": card["revision"],
+        },
     )
     assert reviewed.status_code == 200
     assert client.get("/api/cards/browse", params={"q": "run"}).json()["total"] == 1
@@ -1243,6 +1266,35 @@ def test_card_targets_builtin_rejects_unknown_list(client):
     assert response.status_code == 400
 
 
+def test_next_review_date_uses_site_timezone(client):
+    import datetime as dt
+    from zoneinfo import ZoneInfo
+
+    from app import config
+
+    register(client, "tz-date@example.com")
+    client.post(
+        "/api/card-studio/cards",
+        json={"card_type": "general", "words": ["harbor"]},
+    )
+    queue = client.get("/api/cards").json()
+    card = queue["new"][0]
+    reviewed = client.post(
+        f"/api/cards/{card['id']}/review",
+        json={
+            "rating": "easy",
+            "action_id": "tz-date-1",
+            "expected_revision": card["revision"],
+        },
+    )
+    assert reviewed.status_code == 200
+    reviewed_card = reviewed.json()["card"]
+    tz = ZoneInfo(config.APP_TIMEZONE)
+    due_at = dt.datetime.fromisoformat(reviewed_card["due_at"])
+    expected = due_at.replace(tzinfo=dt.timezone.utc).astimezone(tz).date().isoformat()
+    assert reviewed_card["next_review_date"] == expected
+
+
 def test_card_targets_builtin_rank_filter_flag_applies_range(client):
     register(client, "builtin-rank@example.com")
     response = client.post(
@@ -1259,3 +1311,30 @@ def test_card_targets_builtin_rank_filter_flag_applies_range(client):
     assert response.status_code == 200
     assert response.json()["words"]
     assert all(1 <= item["rank"] <= 500 for item in response.json()["words"])
+
+
+def test_anki_import_gzip_uses_apkg_decompress_limit(client, monkeypatch):
+    import gzip
+
+    from app import config
+    from app.anki_exchange import AnkiExchangeError
+
+    register(client, "apkg-gzip-limit@example.com")
+
+    def fake_parse(_data, _max_cards):
+        raise AnkiExchangeError("模拟解析失败")
+
+    monkeypatch.setattr("app.routes.card_routes.anki_exchange.parse_apkg", fake_parse)
+    monkeypatch.setattr(config, "MAX_UPLOAD_BYTES", 1024)
+    monkeypatch.setattr(config, "MAX_APKG_UPLOAD_BYTES", 4096)
+    payload = gzip.compress(b"x" * 2048)
+    response = client.post(
+        "/api/cards/anki/import?filename=cards.apkg",
+        content=payload,
+        headers={
+            "Content-Type": "application/octet-stream",
+            "x-upload-encoding": "gzip",
+        },
+    )
+    assert response.status_code == 400
+    assert "模拟解析失败" in response.json()["detail"]

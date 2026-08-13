@@ -3,6 +3,7 @@ from __future__ import annotations
 import datetime as dt
 import sqlite3
 from collections.abc import Callable
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.orm import Session, declarative_base, sessionmaker
@@ -442,12 +443,18 @@ def _prune_ai_usage() -> None:
     from .models import AiDailyQuota, AiUsage
 
     cutoff = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None) - dt.timedelta(days=config.AI_USAGE_RETENTION_DAYS)
+    try:
+        timezone = ZoneInfo(config.APP_TIMEZONE)
+    except ZoneInfoNotFoundError:
+        timezone = ZoneInfo("Asia/Shanghai")
     with engine.begin() as connection:
         connection.execute(
             AiUsage.__table__.delete().where(AiUsage.created_at < cutoff)
         )
         # 每日计数只关心当天，最多保留 3 天即可。
-        old_day = (dt.date.today() - dt.timedelta(days=2)).isoformat()
+        old_day = (
+            dt.datetime.now(timezone).date() - dt.timedelta(days=2)
+        ).isoformat()
         connection.execute(
             AiDailyQuota.__table__.delete().where(AiDailyQuota.day < old_day)
         )
@@ -456,6 +463,11 @@ def _prune_ai_usage() -> None:
 def _prune_ephemeral_rows() -> None:
     """清理一次性/限流表与过期会话行，防止长期运行后无限膨胀。"""
     now = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
+    try:
+        timezone = ZoneInfo(config.APP_TIMEZONE)
+    except ZoneInfoNotFoundError:
+        timezone = ZoneInfo("Asia/Shanghai")
+    old_day = (dt.datetime.now(timezone).date() - dt.timedelta(days=2)).isoformat()
     with engine.begin() as connection:
         connection.execute(
             text("DELETE FROM login_throttle WHERE window_started < :cutoff"),
@@ -471,7 +483,7 @@ def _prune_ephemeral_rows() -> None:
         )
         connection.execute(
             text("DELETE FROM guest_ai_quota WHERE day < :old_day"),
-            {"old_day": (dt.date.today() - dt.timedelta(days=2)).isoformat()},
+            {"old_day": old_day},
         )
         connection.execute(
             text(
@@ -615,10 +627,10 @@ def _migrate_card_due_nullable() -> None:
         raw.execute("CREATE INDEX ix_cards_user_id ON cards (user_id)")
         raw.execute("CREATE INDEX ix_cards_word ON cards (word)")
         raw.execute("CREATE INDEX ix_cards_due_at ON cards (due_at)")
-        raw.commit()
         violations = list(raw.execute("PRAGMA foreign_key_check"))
         if violations:
             raise RuntimeError("卡片日期迁移后的外键检查失败")
+        raw.commit()
     except Exception:
         raw.rollback()
         raise

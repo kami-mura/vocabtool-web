@@ -1045,7 +1045,12 @@ async def import_cards_from_anki(
     ):
         raise HTTPException(status_code=429, detail="Anki 导入过于频繁，请稍后再试")
     data = await _read_limited_body(request, config.MAX_APKG_UPLOAD_BYTES)
-    data, filename = _decode_upload_body(request, data, filename)
+    data, filename = _decode_upload_body(
+        request,
+        data,
+        filename,
+        decompress_limit=config.MAX_APKG_UPLOAD_BYTES,
+    )
     if not _try_heavy_import_slot():
         raise HTTPException(status_code=429, detail="服务器导入任务繁忙，请稍后重试")
     try:
@@ -1635,6 +1640,9 @@ def undo_last_review(request: Request, db: Session = Depends(get_db)):
     )
     if not log:
         raise HTTPException(status_code=404, detail="没有可以撤回的评分")
+    now = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
+    if log.reviewed_at and log.reviewed_at < now - dt.timedelta(minutes=15):
+        raise HTTPException(status_code=409, detail="评分已超过 15 分钟，不能撤回")
     card = (
         db.query(Card)
         .filter(Card.id == log.card_id, Card.user_id == user.id)
@@ -1656,9 +1664,11 @@ def undo_last_review(request: Request, db: Session = Depends(get_db)):
     # 直接恢复即可；绝不能把 previous_session_rating 再 apply 一遍，否则
     # reps/lapses 会被重复计数。恢复后若卡片在学习步骤中（state=learning），
     # 重新进入会话重学队列，由前端按 session_repeat 展示。
+    db.query(ReviewRequest).filter(
+        ReviewRequest.review_log_id == log.id
+    ).delete(synchronize_session=False)
     db.delete(log)
     db.commit()
-    now = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
     can_undo = (
         db.query(ReviewLog.id)
         .filter(
@@ -1712,7 +1722,7 @@ def review_card(
     if body.practice:
         raise HTTPException(status_code=410, detail="不能提前复习未到期卡片")
     action_id = body.action_id.strip()
-    if action_id and body.expected_revision is None:
+    if body.expected_revision is None:
         raise HTTPException(status_code=400, detail="评分请求缺少卡片版本，请刷新重试")
     action_key = _scoped_action_key(user.id, action_id) if action_id else ""
     review_request = None

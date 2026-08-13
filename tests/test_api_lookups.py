@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 from tests.conftest import register
 
 
@@ -483,14 +485,14 @@ def test_lookup_always_cleans_and_preserves_pos(client, monkeypatch):
     assert run_pos.json()["lookup_source"] == "builtin"
 
 
-def test_lookup_pos_suffix_classified_as_word_and_shared_cache(client, monkeypatch):
-    """括号词性按词头归类为 word：命中内置词库/缓存，原文仍给 AI。"""
+def test_lookup_pos_suffix_classified_as_word_with_separate_cache(client, monkeypatch):
+    """括号词性按词头归类为 word：命中内置词库，缓存按含词性的键隔离。"""
     register(client, "pos-word@example.com")
     from app import ai as ai_mod
 
     calls = []
 
-    def fake_explain(_db, _uid, text, query_type):
+    def fake_explain(_db, _uid, text, query_type, reserve_quota=True):
         calls.append((text, query_type))
         return {
             "explanation": f"explain {text}",
@@ -506,14 +508,14 @@ def test_lookup_pos_suffix_classified_as_word_and_shared_cache(client, monkeypat
     assert first.status_code == 200
     assert calls == [("adaptive", "word")]
 
-    # 带括号词性：分类为 word、原文给 AI、命中同一缓存
+    # 带括号词性：分类为 word、原文给 AI；词性不同不命中普通词的缓存
     pos = client.post("/api/lookups", json={"text": "adaptive (adj.)"})
     assert pos.status_code == 200
     body = pos.json()
     assert body["lookup"]["query_type"] == "word"
     assert body["lookup"]["query"] == "adaptive (adj.)"
-    assert body["lookup_source"] == "local_cache"
-    assert calls == [("adaptive", "word")]
+    assert body["lookup_source"] == "deepseek"
+    assert calls == [("adaptive", "word"), ("adaptive (adj.)", "word")]
 
     # 词形还原只作用于词头：running (v.) -> run (v.)；run 命中内置词库不再调 AI
     run_pos = client.post("/api/lookups", json={"text": "running (v.)"})
@@ -522,7 +524,377 @@ def test_lookup_pos_suffix_classified_as_word_and_shared_cache(client, monkeypat
     assert rbody["lookup"]["query"] == "run (v.)"
     assert rbody["lookup"]["query_type"] == "word"
     assert rbody["lookup_source"] == "builtin"
-    assert calls == [("adaptive", "word")]
+    assert calls == [("adaptive", "word"), ("adaptive (adj.)", "word")]
+
+
+def test_lookup_pos_variants_do_not_share_cache(client, monkeypatch):
+    """quasar (n.) 与 quasar (v.) 各自使用独立的缓存键，释义不串味。"""
+    from app import ai as ai_mod
+
+    calls = []
+
+    def fake_explain(_db, _uid, text, query_type, reserve_quota=True):
+        calls.append(text)
+        return {
+            "explanation": f"explain {text}",
+            "card_front": text,
+            "card_back": f"def {text}",
+        }, None
+
+    monkeypatch.setattr(ai_mod, "ai_enabled", lambda: True)
+    monkeypatch.setattr(ai_mod, "explain_lookup", fake_explain)
+
+    run_v = client.post("/api/lookups", json={"text": "quasar (n.)"})
+    assert run_v.status_code == 200
+    assert run_v.json()["lookup_source"] == "deepseek"
+    assert run_v.json()["lookup"]["explanation"] == "explain quasar (n.)"
+
+    run_n = client.post("/api/lookups", json={"text": "quasar (v.)"})
+    assert run_n.status_code == 200
+    assert run_n.json()["lookup_source"] == "deepseek"
+    assert run_n.json()["lookup"]["explanation"] == "explain quasar (v.)"
+    assert calls == ["quasar (n.)", "quasar (v.)"]
+
+    run_v_again = client.post("/api/lookups", json={"text": "quasar (n.)"})
+    assert run_v_again.status_code == 200
+    assert run_v_again.json()["lookup_source"] == "local_cache"
+    assert run_v_again.json()["lookup"]["explanation"] == "explain quasar (n.)"
+    assert calls == ["quasar (n.)", "quasar (v.)"]
+
+
+def test_guest_spelling_correction_charges_ai_quota_once(client, monkeypatch):
+    """拼写纠错对同一请求第二次查 AI 时复用第一次的配额，只扣一次。"""
+    from app import ai as ai_mod
+    from app import config
+    from app.db import SessionLocal
+    from app.models import GuestAiQuota
+
+    monkeypatch.setattr(config, "GUEST_AI_DAILY_LIMIT", 10)
+    monkeypatch.setattr(ai_mod, "ai_enabled", lambda: True)
+    calls = []
+
+    def fake_explain(db, uid, text, query_type, reserve_quota=True):
+        calls.append(text)
+        if uid is None and reserve_quota:
+            ai_mod.guest_ai_quota_reserve(db, need=1)
+        if text == "environemnt":
+            return None, "deepseek-v4-flash 查询暂时失败"
+        return {
+            "explanation": "environment /ɪnˈvaɪrənmənt/\n1. 环境 | The surroundings\n• The environment needs our protection.\n环境需要我们的保护。",
+            "card_front": "The environment needs our protection.",
+            "card_back": "环境\nThe environment needs our protection.",
+        }, None
+
+    monkeypatch.setattr(ai_mod, "explain_lookup", fake_explain)
+    result = client.post("/api/lookups", json={"text": "environemnt"})
+    assert result.status_code == 200
+    data = result.json()
+    assert data["spelling_note"] == {
+        "original": "environemnt",
+        "corrected": "environment",
+    }
+    assert data["lookup"]["explanation"].startswith("environment")
+    db = SessionLocal()
+    try:
+        day = ai_mod._quota_day()
+        row = db.get(GuestAiQuota, day)
+        assert row is not None
+        assert row.count == 1
+    finally:
+        db.close()
+
+
+def test_guest_lookup_ai_quota_exhausted_returns_quota_error(client, monkeypatch):
+    from app import ai as ai_mod
+    from app import config
+    from app.db import SessionLocal
+    from app.models import GuestAiQuota
+
+    monkeypatch.setattr(config, "GUEST_AI_DAILY_LIMIT", 1)
+    monkeypatch.setattr(ai_mod, "ai_enabled", lambda: True)
+    real_explain = ai_mod.explain_lookup
+
+    def fake_explain(db, uid, text, query_type, reserve_quota=True):
+        return real_explain(db, uid, text, query_type, reserve_quota=reserve_quota)
+
+    monkeypatch.setattr(ai_mod, "explain_lookup", fake_explain)
+    db = SessionLocal()
+    try:
+        db.add(GuestAiQuota(day=ai_mod._quota_day(), count=1))
+        db.commit()
+    finally:
+        db.close()
+    result = client.post("/api/lookups", json={"text": "quasar (n.)"})
+    assert result.status_code == 200
+    data = result.json()
+    assert data["lookup"]["explanation"] == ""
+    assert data["ai_error"]
+    assert "上限" in data["ai_error"]
+
+
+def test_guest_quick_lookup_charges_ai_quota_and_refunds_on_failure(client, monkeypatch):
+    from app import ai as ai_mod
+    from app import config
+    from app.db import SessionLocal
+    from app.models import GuestAiQuota
+
+    monkeypatch.setattr(config, "GUEST_AI_DAILY_LIMIT", 10)
+    monkeypatch.setattr(ai_mod, "ai_enabled", lambda: True)
+    content = (
+        "【释义】\n竞技场；活动场所\n\n【底层逻辑】\n沙地上的舞台。\n\n"
+        "【🌱 Etymology 词源史诗】\narena 来自拉丁语 harena，意思是沙子。"
+    )
+
+    def fake_chat(_client, **kwargs):
+        return _api_fake_chat_response(content)
+
+    monkeypatch.setattr(ai_mod, "_chat_completion", fake_chat)
+    quick = client.post("/api/lookups/quick", json={"text": "arena"})
+    assert quick.status_code == 200, quick.text
+    assert quick.json()["lookup"]["headword"] == "arena"
+    db = SessionLocal()
+    try:
+        day = ai_mod._quota_day()
+        row = db.get(GuestAiQuota, day)
+        assert row is not None
+        assert row.count == 1
+    finally:
+        db.close()
+
+    def failing_chat(_client, **kwargs):
+        raise ConnectionError("network down")
+
+    monkeypatch.setattr(ai_mod, "_chat_completion", failing_chat)
+    failed = client.post("/api/lookups/quick", json={"text": "arena"})
+    assert failed.status_code == 400
+    db = SessionLocal()
+    try:
+        day = ai_mod._quota_day()
+        row = db.get(GuestAiQuota, day)
+        assert row is not None
+        assert row.count == 1
+    finally:
+        db.close()
+
+
+def test_guest_answer_question_charges_ai_quota_and_refunds_on_failure(client, monkeypatch):
+    from app import ai as ai_mod
+    from app import config
+    from app.db import SessionLocal
+    from app.models import GuestAiQuota
+
+    monkeypatch.setattr(config, "GUEST_AI_DAILY_LIMIT", 10)
+    monkeypatch.setattr(ai_mod, "ai_enabled", lambda: True)
+
+    def fake_chat(_client, **kwargs):
+        return _api_fake_chat_response("lie 表示主动躺下，lay 表示放置或下蛋。")
+
+    monkeypatch.setattr(ai_mod, "_chat_completion", fake_chat)
+    qa = client.post("/api/lookups/question", json={"question": "lie 和 lay 的区别？"})
+    assert qa.status_code == 200, qa.text
+    assert "lie" in qa.json()["answer"]
+    db = SessionLocal()
+    try:
+        day = ai_mod._quota_day()
+        row = db.get(GuestAiQuota, day)
+        assert row is not None
+        assert row.count == 1
+    finally:
+        db.close()
+
+    def failing_chat(_client, **kwargs):
+        raise ConnectionError("network down")
+
+    monkeypatch.setattr(ai_mod, "_chat_completion", failing_chat)
+    failed = client.post("/api/lookups/question", json={"question": "lie 和 lay 的区别？"})
+    assert failed.status_code == 400
+    db = SessionLocal()
+    try:
+        day = ai_mod._quota_day()
+        row = db.get(GuestAiQuota, day)
+        assert row is not None
+        assert row.count == 1
+    finally:
+        db.close()
+
+
+def test_guest_quick_and_answer_reject_exhausted_ai_quota(client, monkeypatch):
+    from app import ai as ai_mod
+    from app import config
+    from app.db import SessionLocal
+    from app.models import GuestAiQuota
+
+    monkeypatch.setattr(config, "GUEST_AI_DAILY_LIMIT", 1)
+    monkeypatch.setattr(ai_mod, "ai_enabled", lambda: True)
+    db = SessionLocal()
+    try:
+        db.add(GuestAiQuota(day=ai_mod._quota_day(), count=1))
+        db.commit()
+    finally:
+        db.close()
+    quick = client.post("/api/lookups/quick", json={"text": "arena"})
+    assert quick.status_code == 400
+    assert "上限" in quick.json()["detail"]
+    qa = client.post("/api/lookups/question", json={"question": "lie 和 lay 的区别？"})
+    assert qa.status_code == 400
+    assert "上限" in qa.json()["detail"]
+
+
+def _api_fake_chat_response(content: str):
+    class Message:
+        pass
+
+    class Choice:
+        pass
+
+    class Response:
+        pass
+
+    message = Message()
+    message.content = content
+    choice = Choice()
+    choice.message = message
+    response = Response()
+    response.choices = [choice]
+    return response
+
+
+def test_long_phrase_lookup_cache_uses_hashed_key(client, monkeypatch):
+    """超过 80 字符的查询写入 LookupCache 用 sha256 摘要键，且能再次命中。"""
+    from app import ai as ai_mod
+    from app.db import SessionLocal
+    from app.models import LookupCache
+
+    long_phrase = (
+        "the quick brown fox jumps over the lazy dog and then runs around the "
+        "forest looking for shelter"
+    )
+    assert len(long_phrase) > 80
+    calls = []
+
+    def fake_explain(_db, _uid, text, query_type, reserve_quota=True):
+        calls.append(text)
+        return {
+            "explanation": f"explain {text}",
+            "card_front": text,
+            "card_back": f"def {text}",
+        }, None
+
+    monkeypatch.setattr(ai_mod, "ai_enabled", lambda: True)
+    monkeypatch.setattr(ai_mod, "explain_lookup", fake_explain)
+
+    first = client.post("/api/lookups", json={"text": long_phrase})
+    assert first.status_code == 200
+    assert first.json()["lookup_source"] == "deepseek"
+    assert calls == [long_phrase]
+
+    second = client.post("/api/lookups", json={"text": long_phrase})
+    assert second.status_code == 200
+    assert second.json()["lookup_source"] == "local_cache"
+    assert second.json()["lookup"]["explanation"] == f"explain {long_phrase}"
+    assert calls == [long_phrase]
+
+    db = SessionLocal()
+    try:
+        import hashlib
+
+        stored_key = hashlib.sha256(long_phrase.encode()).hexdigest()
+        assert db.get(LookupCache, long_phrase) is None
+        row = db.get(LookupCache, stored_key)
+        assert row is not None
+        assert row.explanation == f"explain {long_phrase}"
+    finally:
+        db.close()
+
+
+def test_ai_failure_falls_back_to_existing_word_entry(client, monkeypatch):
+    """AI 已启用但调用失败时，若 WordEntry 已有该词释义则使用本地释义。"""
+    register(client, "wordentry-fallback@example.com")
+    from app import ai as ai_mod
+    from app.db import SessionLocal
+    from app.models import WordEntry
+
+    db = SessionLocal()
+    try:
+        db.add(
+            WordEntry(
+                word="quasar",
+                pos="n.",
+                en_def="a very distant bright object in space",
+                zh_def="类星体",
+                source="deepseek",
+            )
+        )
+        db.commit()
+    finally:
+        db.close()
+
+    def fake_explain(_db, _uid, text, query_type, reserve_quota=True):
+        return None, "deepseek-v4-flash 查询暂时失败，请稍后重试"
+
+    monkeypatch.setattr(ai_mod, "ai_enabled", lambda: True)
+    monkeypatch.setattr(ai_mod, "explain_lookup", fake_explain)
+    result = client.post("/api/lookups", json={"text": "quasar"})
+    assert result.status_code == 200
+    data = result.json()
+    assert data["lookup"]["explanation"]
+    assert "类星体" in data["lookup"]["explanation"]
+    assert data["lookup_source"] == "word_cache"
+
+
+def test_reserve_guest_lookup_atomic_refuses_at_limit(monkeypatch):
+    from fastapi import HTTPException
+
+    from app.db import SessionLocal
+    from app.models import GuestLookupQuota
+    from app.routes import lookup_routes
+
+    monkeypatch.setattr(
+        lookup_routes, "_anonymous_request_identity", lambda _request: "unit-anon"
+    )
+    request = SimpleNamespace(client=SimpleNamespace(host="127.0.0.1"), headers={})
+    key = lookup_routes._guest_lookup_key(request)
+    db = SessionLocal()
+    try:
+        db.add(GuestLookupQuota(key=key, count=20))
+        db.commit()
+        try:
+            lookup_routes._reserve_guest_lookup(db, request)
+        except HTTPException as exc:
+            assert exc.status_code == 429
+            assert "登录" in exc.detail
+        else:
+            raise AssertionError("配额用尽时应拒绝")
+        row = db.get(GuestLookupQuota, key)
+        assert row.count == 20
+    finally:
+        db.close()
+
+
+def test_reserve_guest_lookup_atomic_increments_below_limit(monkeypatch):
+    from app.db import SessionLocal
+    from app.models import GuestLookupQuota
+    from app.routes import lookup_routes
+
+    monkeypatch.setattr(
+        lookup_routes, "_anonymous_request_identity", lambda _request: "unit-anon-2"
+    )
+    request = SimpleNamespace(client=SimpleNamespace(host="127.0.0.1"), headers={})
+    key = lookup_routes._guest_lookup_key(request)
+    db = SessionLocal()
+    try:
+        db.add(GuestLookupQuota(key=key, count=5))
+        db.commit()
+        remaining = lookup_routes._reserve_guest_lookup(db, request)
+        assert remaining == 14
+        row = db.get(GuestLookupQuota, key)
+        assert row.count == 6
+        remaining = lookup_routes._reserve_guest_lookup(db, request)
+        assert remaining == 13
+        row = db.get(GuestLookupQuota, key)
+        assert row.count == 7
+    finally:
+        db.close()
 
 
 def test_analyze_keeps_surface_forms_when_normalize_off():

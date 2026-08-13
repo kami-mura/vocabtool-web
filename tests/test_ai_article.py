@@ -34,14 +34,26 @@ def _force_due(card_id):
 
 def _graduate_known(client, card_id, count=2):
     """按到期规则连续点“认识”，完成多次复习。"""
+    db = SessionLocal()
+    try:
+        revision = int(db.get(Card, card_id).revision or 0)
+    finally:
+        db.close()
+    reviewed = None
     for index in range(count):
         # 新卡第一次评分本来就未到期；只有后续复习需要先等到期。
         if index > 0:
             _force_due(card_id)
         reviewed = client.post(
-            f"/api/cards/{card_id}/review", json={"rating": "easy"}
+            f"/api/cards/{card_id}/review",
+            json={
+                "rating": "easy",
+                "action_id": f"graduate-{card_id}-{index}",
+                "expected_revision": revision,
+            },
         )
         assert reviewed.status_code == 200
+        revision = reviewed.json()["card"]["revision"]
     return reviewed
 
 
@@ -690,9 +702,14 @@ def test_article_includes_new_words_rated_again(client, monkeypatch):
         json={"words": ["quasar"], "card_type": "general"},
     )
     assert made.status_code == 200
-    card_id = client.get("/api/cards").json()["queue"][0]["id"]
+    first_card = client.get("/api/cards").json()["queue"][0]
     reviewed = client.post(
-        f"/api/cards/{card_id}/review", json={"rating": "again"}
+        f"/api/cards/{first_card['id']}/review",
+        json={
+            "rating": "again",
+            "action_id": "article-again-action",
+            "expected_revision": first_card["revision"],
+        },
     )
     assert reviewed.status_code == 200
 
@@ -821,10 +838,16 @@ def test_article_uses_only_today_new_words(client, monkeypatch):
         ) - dt.timedelta(days=1)
         db.commit()
         quasar_id = quasar_card.id
+        quasar_revision = int(quasar_card.revision or 0)
     finally:
         db.close()
     assert client.post(
-        f"/api/cards/{quasar_id}/review", json={"rating": "easy"}
+        f"/api/cards/{quasar_id}/review",
+        json={
+            "rating": "easy",
+            "action_id": "article-split-quasar",
+            "expected_revision": quasar_revision,
+        },
     ).status_code == 200
 
     calls = []
@@ -863,20 +886,46 @@ def test_article_again_source_includes_new_and_review_cards_rated_again(
         json={"words": ["run", "develop", "point"], "card_type": "general"},
     )
     assert created.status_code == 200
-    cards = {item["word"]: item["id"] for item in client.get("/api/cards").json()["queue"]}
+    cards = {
+        item["word"]: {"id": item["id"], "revision": item["revision"]}
+        for item in client.get("/api/cards").json()["queue"]
+    }
 
+    first = client.post(
+        f"/api/cards/{cards['run']['id']}/review",
+        json={
+            "rating": "again",
+            "action_id": "again-source-run",
+            "expected_revision": cards["run"]["revision"],
+        },
+    )
+    assert first.status_code == 200
+    second = client.post(
+        f"/api/cards/{cards['develop']['id']}/review",
+        json={
+            "rating": "easy",
+            "action_id": "again-source-develop-1",
+            "expected_revision": cards["develop"]["revision"],
+        },
+    )
+    assert second.status_code == 200
+    _force_due(cards["develop"]["id"])
+    third = client.post(
+        f"/api/cards/{cards['develop']['id']}/review",
+        json={
+            "rating": "again",
+            "action_id": "again-source-develop-2",
+            "expected_revision": second.json()["card"]["revision"],
+        },
+    )
+    assert third.status_code == 200
     assert client.post(
-        f"/api/cards/{cards['run']}/review", json={"rating": "again"}
-    ).status_code == 200
-    assert client.post(
-        f"/api/cards/{cards['develop']}/review", json={"rating": "easy"}
-    ).status_code == 200
-    _force_due(cards["develop"])
-    assert client.post(
-        f"/api/cards/{cards['develop']}/review", json={"rating": "again"}
-    ).status_code == 200
-    assert client.post(
-        f"/api/cards/{cards['point']}/review", json={"rating": "easy"}
+        f"/api/cards/{cards['point']['id']}/review",
+        json={
+            "rating": "easy",
+            "action_id": "again-source-point",
+            "expected_revision": cards["point"]["revision"],
+        },
     ).status_code == 200
 
     captured = []
@@ -976,10 +1025,16 @@ def test_article_new_source_deduplicates_same_word(client, monkeypatch):
         ) - dt.timedelta(days=1)
         db.commit()
         reading_id = reading_run.id
+        reading_revision = int(reading_run.revision or 0)
     finally:
         db.close()
     assert client.post(
-        f"/api/cards/{reading_id}/review", json={"rating": "easy"}
+        f"/api/cards/{reading_id}/review",
+        json={
+            "rating": "easy",
+            "action_id": "article-priority-reading",
+            "expected_revision": reading_revision,
+        },
     ).status_code == 200
 
     calls = []

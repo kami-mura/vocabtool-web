@@ -117,6 +117,26 @@ def test_again_on_review_card_counts_lapse_and_needs_known():
     assert card.interval_days >= 1
 
 
+def test_again_on_new_card_twice_counts_no_lapse():
+    now = dt.datetime(2026, 8, 3, 12, 0)
+    card = _card()
+    apply_rating(card, "again", now=now)
+    apply_rating(card, "again", now=now + dt.timedelta(minutes=1))
+    assert card.state == "learning"
+    assert card.lapses == 0
+
+
+def test_again_on_graduated_card_counts_single_lapse():
+    now = dt.datetime(2026, 8, 3, 12, 0)
+    card = _card()
+    apply_rating(card, "easy", now=now)
+    assert card.state == "review"
+    apply_rating(card, "again", now=now + dt.timedelta(days=1))
+    assert card.lapses == 1
+    apply_rating(card, "again", now=now + dt.timedelta(days=1, minutes=1))
+    assert card.lapses == 1
+
+
 def test_apply_rating_with_log_returns_fsrs_json():
     now = dt.datetime(2026, 8, 3, 12, 0)
     card, log_json = apply_rating_with_log(_card(), "easy", now=now)

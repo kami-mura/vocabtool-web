@@ -158,7 +158,7 @@ def _sync_model_from_fsrs(
         card.session_reduce_day = ""
         card.session_reduce_used = 0
         card.reps = int(getattr(card, "reps", 0) or 0) + 1
-        if rating == "again" and previous_state != "new":
+        if rating == "again" and previous_state == "review":
             card.lapses = int(getattr(card, "lapses", 0) or 0) + 1
         return
 

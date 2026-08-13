@@ -1216,6 +1216,19 @@ def guest_ai_quota_reserve(db: Session, need: int = 1) -> str | None:
         return f"{_AI_QUOTA_EXCEEDED}（{used}/{limit}）"
 
 
+def guest_ai_quota_refund(db: Session, need: int = 1) -> None:
+    """退还游客 AI 日配额（AI 调用失败时调用）；计数不会减到 0 以下。"""
+    need = max(1, int(need))
+    day = _quota_day()
+    now = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
+    db.execute(
+        update(GuestAiQuota)
+        .where(GuestAiQuota.day == day, GuestAiQuota.count >= need)
+        .values(count=GuestAiQuota.count - need, updated_at=now)
+    )
+    db.commit()
+
+
 def _unique_card_words(words: list[str]) -> list[str]:
     """按词条身份去重（含括号注解），保持原始书写形式。"""
     unique_words: list[str] = []
@@ -1455,21 +1468,26 @@ def enrich_word(db: Session, user_id: int, word: str) -> tuple[WordEntry | None,
 
 
 def explain_lookup(
-    db: Session, user_id: int | None, text: str, query_type: str
+    db: Session,
+    user_id: int | None,
+    text: str,
+    query_type: str,
+    reserve_quota: bool = True,
 ) -> tuple[dict | None, str | None]:
     """用 AI查词格式解释单词、短语或中文释义。"""
     if query_type == "sentence":
         return None, "AI查词不能查询完整句子"
     if not ai_enabled():
         return None, "服务器尚未配置 DEEPSEEK_API_KEY"
-    if user_id is not None:
-        quota_error = ai_quota_reserve(db, user_id, need=1)
-        if quota_error:
-            return None, quota_error
-    else:
-        quota_error = guest_ai_quota_reserve(db, need=1)
-        if quota_error:
-            return None, quota_error
+    if reserve_quota:
+        if user_id is not None:
+            quota_error = ai_quota_reserve(db, user_id, need=1)
+            if quota_error:
+                return None, quota_error
+        else:
+            quota_error = guest_ai_quota_reserve(db, need=1)
+            if quota_error:
+                return None, quota_error
     try:
         client = _new_ai_client()
         last_error = "deepseek-v4-flash 查询暂时失败，请稍后重试"
@@ -1531,11 +1549,17 @@ def explain_lookup(
                 last_error = _safe_api_error(exc, "lookup")
                 status = getattr(exc, "status_code", None)
                 if status != 503 or attempt >= AI_CARD_NETWORK_RETRIES - 1:
+                    if user_id is None and reserve_quota:
+                        guest_ai_quota_refund(db)
                     return None, last_error
                 time.sleep(1 + attempt)
+        if user_id is None and reserve_quota:
+            guest_ai_quota_refund(db)
         return None, last_error
     except Exception as exc:
         db.rollback()
+        if user_id is None and reserve_quota:
+            guest_ai_quota_refund(db)
         return None, _safe_api_error(exc, "lookup")
 
 
@@ -1566,6 +1590,10 @@ def quick_lookup(
     # 未登录用户受游客体验额度限制，不占个人每日 AI 配额。
     if user_id is not None:
         quota_error = ai_quota_reserve(db, user_id, need=1)
+        if quota_error:
+            return None, quota_error
+    else:
+        quota_error = guest_ai_quota_reserve(db, need=1)
         if quota_error:
             return None, quota_error
     try:
@@ -1603,6 +1631,8 @@ def quick_lookup(
             )
             content = str(response.choices[0].message.content or "").replace("*", "")
         if not content.strip():
+            if user_id is None:
+                guest_ai_quota_refund(db)
             return None, "deepseek-v4-flash 没有返回内容，请重新查询"
         headword = _extract_lookup_headword(content)
         if not headword or headword.startswith(("🌱", "【")):
@@ -1615,6 +1645,8 @@ def quick_lookup(
         }, None
     except Exception as exc:
         db.rollback()
+        if user_id is None:
+            guest_ai_quota_refund(db)
         return None, _safe_api_error(exc, "quick lookup")
 
 
@@ -1649,6 +1681,10 @@ def answer_question(
         quota_error = ai_quota_reserve(db, user_id, need=1)
         if quota_error:
             return None, quota_error
+    else:
+        quota_error = guest_ai_quota_reserve(db, need=1)
+        if quota_error:
+            return None, quota_error
     try:
         client = _new_ai_client()
         response = _chat_completion(
@@ -1662,11 +1698,15 @@ def answer_question(
         )
         content = str(response.choices[0].message.content or "").strip()
         if not content:
+            if user_id is None:
+                guest_ai_quota_refund(db)
             return None, "deepseek-v4-flash 没有返回内容，请重新提问"
         db.commit()
         return content[:10_000], None
     except Exception as exc:
         db.rollback()
+        if user_id is None:
+            guest_ai_quota_refund(db)
         return None, _safe_api_error(exc, "question")
 
 

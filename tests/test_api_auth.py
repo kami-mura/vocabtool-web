@@ -3,8 +3,8 @@ import datetime as dt
 from app import config, email_verification
 from app.auth import hash_password
 from app.db import SessionLocal
-from app.models import LoginThrottle, Session as DbSession
-from app.models import User
+from app.models import LoginThrottle, User
+from app.models import Session as DbSession
 from tests.conftest import register
 
 
@@ -755,7 +755,7 @@ def test_check_request_rate_concurrent_writes_do_not_raise():
     assert sum(results) == 3
     db = SessionLocal()
     try:
-        key = hashlib.sha256("race:z".encode()).hexdigest()
+        key = hashlib.sha256(b"race:z").hexdigest()
         row = db.get(RequestThrottle, key)
         assert row is not None
         assert row.attempts == 3

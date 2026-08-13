@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 
 from fastapi import APIRouter
+from sqlalchemy import insert, update
 from sqlalchemy.exc import IntegrityError
 
 from ..api_support import (
@@ -55,6 +56,23 @@ def _strip_pos_suffix(text: str) -> str:
         text.strip(),
     )
     return m.group(1) if m else text
+
+
+def _pos_suffix(text: str) -> str:
+    """返回括号词性后缀（含前导空格），无词性标注时返回空串。"""
+    m = re.fullmatch(
+        r"(?:[A-Za-z]+['-]?[A-Za-z]*)(?: [A-Za-z]+['-]?[A-Za-z]*){0,3}"
+        r"(\s*\(\s*[A-Za-z .]{1,16}\s*\))",
+        text.strip(),
+    )
+    return m.group(1) if m else ""
+
+
+def _lookup_cache_storage_key(cache_key: str) -> str:
+    """LookupCache.query 上限 80 字符；超长键用 sha256 十六进制摘要作存储键。"""
+    if len(cache_key) <= 80:
+        return cache_key
+    return hashlib.sha256(cache_key.encode()).hexdigest()
 
 
 def _validate_lookup_query(raw_text: str) -> str:
@@ -143,23 +161,51 @@ def _guest_lookup_key(request: Request) -> str:
 
 
 def _reserve_guest_lookup(db: Session, request: Request) -> int:
-    """为未登录用户扣减一次体验额度，返回剩余次数。"""
+    """为未登录用户原子扣减一次体验额度，返回剩余次数。"""
     key = _guest_lookup_key(request)
     now = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
-    row = db.get(GuestLookupQuota, key)
-    if row is None:
-        db.add(GuestLookupQuota(key=key, count=1, created_at=now, updated_at=now))
+
+    def _try_increment() -> bool:
+        updated = db.execute(
+            update(GuestLookupQuota)
+            .where(
+                GuestLookupQuota.key == key,
+                GuestLookupQuota.count < GUEST_LOOKUP_LIMIT,
+            )
+            .values(count=GuestLookupQuota.count + 1, updated_at=now)
+        )
+        return bool(updated.rowcount)
+
+    if _try_increment():
+        db.commit()
+        count = db.query(GuestLookupQuota.count).filter(GuestLookupQuota.key == key).scalar()
+        return GUEST_LOOKUP_LIMIT - int(count)
+    try:
+        db.execute(
+            insert(GuestLookupQuota).values(key=key, count=1, created_at=now, updated_at=now)
+        )
         db.commit()
         return GUEST_LOOKUP_LIMIT - 1
-    if row.count >= GUEST_LOOKUP_LIMIT:
+    except IntegrityError:
+        db.rollback()
+        if _try_increment():
+            db.commit()
+            count = (
+                db.query(GuestLookupQuota.count)
+                .filter(GuestLookupQuota.key == key)
+                .scalar()
+            )
+            return GUEST_LOOKUP_LIMIT - int(count)
+        row = db.query(GuestLookupQuota.count).filter(GuestLookupQuota.key == key).first()
+        used = int(row[0]) if row else 0
+        if used < GUEST_LOOKUP_LIMIT:
+            raise HTTPException(
+                status_code=429, detail="查询请求过多，请稍后再试"
+            ) from None
         raise HTTPException(
             status_code=429,
             detail=f"{GUEST_LOOKUP_LIMIT} 次体验已用完，登录后可无限使用",
-        )
-    row.count += 1
-    row.updated_at = now
-    db.commit()
-    return GUEST_LOOKUP_LIMIT - row.count
+        ) from None
 
 
 @router.post("/lookups")
@@ -192,15 +238,16 @@ def create_lookup(body: LookupIn, request: Request, db: Session = Depends(get_db
             text = text.replace(head, identity, 1)
         elif identity != head:
             text = identity
-        cache_key = identity
+        # 缓存键区分词性（run (v.) 与 run (n.) 释义不同），内置词库与缓存命中仍按词头。
+        cache_key = identity + _pos_suffix(text)
     else:
         cache_key = text
 
     result = None
     ai_error = None
     lookup_source = "unavailable"
-    builtin_result = builtin_lookup.get(cache_key) if query_type == "word" else None
-    cached = db.get(LookupCache, cache_key)
+    builtin_result = builtin_lookup.get(identity) if query_type == "word" else None
+    cached = db.get(LookupCache, _lookup_cache_storage_key(cache_key))
     if builtin_result:
         card_front, card_back = ai_mod._card_fields_from_streamlit_result(
             builtin_result, text, query_type
@@ -242,7 +289,7 @@ def create_lookup(body: LookupIn, request: Request, db: Session = Depends(get_db
                     with db.begin_nested():
                         db.add(
                             LookupCache(
-                                query=cache_key,
+                                query=_lookup_cache_storage_key(cache_key),
                                 query_type=query_type,
                                 explanation=result["explanation"],
                                 card_front=result["card_front"],
@@ -254,6 +301,17 @@ def create_lookup(body: LookupIn, request: Request, db: Session = Depends(get_db
                 except IntegrityError:
                     # 并发请求已写入同一词条的缓存；保留对方的结果即可。
                     pass
+        elif query_type == "word" and not (result or {}).get("explanation", "").strip():
+            # AI 已启用但调用失败：若 WordEntry 已有该词释义则使用本地释义兜底。
+            entry = db.query(WordEntry).filter(WordEntry.word == text).first()
+            if entry and (entry.zh_def or entry.en_def):
+                explanation = card_builder.definition_text(entry)
+                result = {
+                    "explanation": explanation,
+                    "card_front": text,
+                    "card_back": explanation,
+                }
+                lookup_source = "word_cache"
     elif query_type == "word":
         entry = db.query(WordEntry).filter(WordEntry.word == text).first()
         if entry and (entry.zh_def or entry.en_def):
@@ -302,7 +360,9 @@ def create_lookup(body: LookupIn, request: Request, db: Session = Depends(get_db
                 }
                 corrected_source = "builtin"
             else:
-                cached_corrected = db.get(LookupCache, corrected_cache_key)
+                cached_corrected = db.get(
+                    LookupCache, _lookup_cache_storage_key(corrected_cache_key)
+                )
                 if (
                     cached_corrected
                     and cached_corrected.prompt_version == _LOOKUP_CACHE_VERSION
@@ -316,8 +376,10 @@ def create_lookup(body: LookupIn, request: Request, db: Session = Depends(get_db
                     }
                     corrected_source = "local_cache"
                 elif ai_mod.ai_enabled():
+                    # 同一请求的第二次 AI 查询复用第一次已预占的配额。
                     corrected, _ = ai_mod.explain_lookup(
-                        db, user.id if user else None, suggestion, query_type
+                        db, user.id if user else None, suggestion, query_type,
+                        reserve_quota=False,
                     )
                     if corrected:
                         corrected_source = "deepseek"

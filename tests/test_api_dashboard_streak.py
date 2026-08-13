@@ -3,7 +3,7 @@
 import datetime as dt
 
 from app.db import SessionLocal
-from app.models import ReviewLog, User
+from app.models import Card, ReviewLog, User
 from tests.conftest import register
 
 
@@ -44,7 +44,12 @@ def _review_new_card(client, word, card_type="general"):
     client.put("/api/cards/settings", json={"new_cards_per_day": 10})
     card = client.get("/api/cards").json()["new"][0]
     reviewed = client.post(
-        f"/api/cards/{card['id']}/review", json={"rating": "good"}
+        f"/api/cards/{card['id']}/review",
+        json={
+            "rating": "good",
+            "action_id": f"streak-{word}-{card_type}",
+            "expected_revision": card["revision"],
+        },
     )
     assert reviewed.status_code == 200
 
@@ -92,3 +97,90 @@ def test_streak_alive_when_today_not_studied_yet(client):
     user_id = _user_id("streak-alive@example.com")
     _set_review_dates(user_id, 2, 1)
     assert _streak(client) == 2
+
+
+def test_dashboard_due_today_excludes_buried_cards(client):
+    register(client, "buried-dashboard@example.com")
+    client.post(
+        "/api/card-studio/cards",
+        json={"words": ["run"], "card_type": "general"},
+    )
+    db = SessionLocal()
+    try:
+        user_id = _user_id("buried-dashboard@example.com")
+        row = db.query(Card).filter(Card.user_id == user_id).one()
+        row.state = "review"
+        row.due_at = dt.datetime.now(dt.timezone.utc).replace(
+            tzinfo=None
+        ) - dt.timedelta(days=1)
+        row.buried = True
+        db.commit()
+    finally:
+        db.close()
+    data = client.get("/api/dashboard").json()
+    assert data["due_today"] == 0
+
+
+def test_dashboard_again_pending_counts_learning_cards(client):
+    register(client, "again-dashboard@example.com")
+    client.post(
+        "/api/card-studio/cards",
+        json={"words": ["run"], "card_type": "general"},
+    )
+    client.put("/api/cards/settings", json={"new_cards_per_day": 1})
+    card = client.get("/api/cards").json()["new"][0]
+    again = client.post(
+        f"/api/cards/{card['id']}/review",
+        json={
+            "rating": "again",
+            "action_id": "again-dashboard-action",
+            "expected_revision": card["revision"],
+        },
+    )
+    assert again.status_code == 200
+    assert again.json()["card"]["is_learning"] is True
+    data = client.get("/api/dashboard").json()
+    assert data["again_pending"] >= 1
+
+
+def test_study_date_expr_compiles_per_dialect(monkeypatch):
+    from zoneinfo import ZoneInfo
+
+    from sqlalchemy import column
+    from sqlalchemy.dialects import postgresql, sqlite
+
+    from app import config as app_config
+    from app.routes.dashboard_routes import _study_date_expr
+
+    reviewed_at = column("reviewed_at")
+    tz = ZoneInfo("America/New_York")
+    offset_hours = tz.utcoffset(dt.datetime.now(dt.timezone.utc)).total_seconds() / 3600
+    monkeypatch.setattr(app_config, "APP_TIMEZONE", "America/New_York")
+    monkeypatch.setattr(app_config, "DATABASE_URL", "sqlite:///test.db")
+    sqlite_sql = str(
+        _study_date_expr(reviewed_at).compile(
+            dialect=sqlite.dialect(), compile_kwargs={"literal_binds": True}
+        )
+    )
+    monkeypatch.setattr(app_config, "DATABASE_URL", "postgresql://user:pass@localhost/db")
+    pg_sql = str(
+        _study_date_expr(reviewed_at).compile(
+            dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True}
+        )
+    )
+    assert f"{offset_hours:+g} hours" in sqlite_sql
+    assert "+-" not in sqlite_sql
+    assert "date(" in pg_sql.lower()
+    assert f"interval '{offset_hours:g} hours'" in pg_sql
+    assert "," not in pg_sql
+
+
+def test_dashboard_streak_works_in_negative_offset_timezone(client, monkeypatch):
+    from app import config as app_config
+
+    register(client, "streak-negative-offset@example.com")
+    monkeypatch.setattr(app_config, "APP_TIMEZONE", "America/New_York")
+    _review_new_card(client, "run")
+    response = client.get("/api/dashboard")
+    assert response.status_code == 200
+    assert response.json()["consecutive_study_days"] == 1

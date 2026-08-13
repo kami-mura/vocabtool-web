@@ -440,6 +440,178 @@ def test_guest_ai_quota_reserve_is_atomic_across_calls(monkeypatch):
         db.close()
 
 
+def test_guest_ai_quota_refund_restores_allowance(monkeypatch):
+    from app.db import SessionLocal
+    from app.models import GuestAiQuota
+
+    monkeypatch.setattr(config, "GUEST_AI_DAILY_LIMIT", 2)
+    db = SessionLocal()
+    try:
+        assert ai.guest_ai_quota_reserve(db) is None
+        assert ai.guest_ai_quota_reserve(db) is None
+        day = ai._quota_day()
+        row = db.get(GuestAiQuota, day)
+        assert row.count == 2
+        ai.guest_ai_quota_refund(db)
+        row = db.get(GuestAiQuota, day)
+        assert row.count == 1
+        assert ai.guest_ai_quota_reserve(db) is None
+        row = db.get(GuestAiQuota, day)
+        assert row.count == 2
+    finally:
+        db.close()
+
+
+def test_guest_ai_quota_refund_never_goes_negative(monkeypatch):
+    from app.db import SessionLocal
+    from app.models import GuestAiQuota
+
+    monkeypatch.setattr(config, "GUEST_AI_DAILY_LIMIT", 2)
+    db = SessionLocal()
+    try:
+        ai.guest_ai_quota_refund(db)
+        day = ai._quota_day()
+        assert db.get(GuestAiQuota, day) is None
+        assert ai.guest_ai_quota_reserve(db) is None
+        ai.guest_ai_quota_refund(db)
+        ai.guest_ai_quota_refund(db)
+        row = db.get(GuestAiQuota, day)
+        assert row.count == 0
+    finally:
+        db.close()
+
+
+def test_explain_lookup_guest_ai_failure_refunds_quota(monkeypatch):
+    from app.db import SessionLocal
+    from app.models import GuestAiQuota
+
+    monkeypatch.setattr(config, "GUEST_AI_DAILY_LIMIT", 5)
+    monkeypatch.setattr(ai, "ai_enabled", lambda: True)
+    monkeypatch.setattr(ai, "_new_ai_client", lambda: object())
+    monkeypatch.setattr(ai.time, "sleep", lambda _seconds: None)
+
+    def fake_chat(_client, **kwargs):
+        raise ConnectionError("network down")
+
+    monkeypatch.setattr(ai, "_chat_completion", fake_chat)
+    db = SessionLocal()
+    try:
+        result, error = ai.explain_lookup(db, None, "quasar", "word")
+        assert result is None
+        assert error
+        day = ai._quota_day()
+        row = db.get(GuestAiQuota, day)
+        assert row is None or row.count == 0
+        assert ai.guest_ai_quota_reserve(db) is None
+        row = db.get(GuestAiQuota, day)
+        assert row.count == 1
+    finally:
+        db.close()
+
+
+def test_explain_lookup_reserve_quota_false_skips_guest_quota(monkeypatch):
+    from app.db import SessionLocal
+    from app.models import GuestAiQuota
+
+    monkeypatch.setattr(config, "GUEST_AI_DAILY_LIMIT", 5)
+    monkeypatch.setattr(ai, "ai_enabled", lambda: True)
+    monkeypatch.setattr(ai, "_new_ai_client", lambda: object())
+
+    def fake_chat(_client, **kwargs):
+        return _fake_chat_response(
+            "environment /ɪnˈvaɪrənmənt/\n1. 环境 | The surroundings\n"
+            "• The environment needs our protection.\n环境需要我们的保护。"
+        )
+
+    monkeypatch.setattr(ai, "_chat_completion", fake_chat)
+    db = SessionLocal()
+    try:
+        result, error = ai.explain_lookup(
+            db, None, "environment", "word", reserve_quota=False
+        )
+        assert error is None
+        assert result["explanation"].startswith("environment")
+        day = ai._quota_day()
+        assert db.get(GuestAiQuota, day) is None
+    finally:
+        db.close()
+
+
+def test_quick_lookup_guest_charges_then_refunds_quota(monkeypatch):
+    from app.db import SessionLocal
+    from app.models import GuestAiQuota
+
+    monkeypatch.setattr(config, "GUEST_AI_DAILY_LIMIT", 5)
+    monkeypatch.setattr(ai, "ai_enabled", lambda: True)
+    monkeypatch.setattr(ai, "_new_ai_client", lambda: object())
+
+    def ok_chat(_client, **kwargs):
+        return _fake_chat_response(
+            "【释义】\n竞技场；活动场所\n\n【底层逻辑】\n沙地上的舞台。\n\n"
+            "【🌱 Etymology 词源史诗】\narena 来自拉丁语 harena，意思是沙子。"
+        )
+
+    def fail_chat(_client, **kwargs):
+        raise ConnectionError("network down")
+
+    db = SessionLocal()
+    try:
+        monkeypatch.setattr(ai, "_chat_completion", ok_chat)
+        result, error = ai.quick_lookup(db, None, "arena")
+        assert error is None
+        assert result["headword"] == "arena"
+        day = ai._quota_day()
+        row = db.get(GuestAiQuota, day)
+        assert row is not None
+        assert row.count == 1
+
+        monkeypatch.setattr(ai, "_chat_completion", fail_chat)
+        result, error = ai.quick_lookup(db, None, "arena")
+        assert result is None
+        assert error
+        row = db.get(GuestAiQuota, day)
+        assert row is not None
+        assert row.count == 1
+    finally:
+        db.close()
+
+
+def test_answer_question_guest_charges_then_refunds_quota(monkeypatch):
+    from app.db import SessionLocal
+    from app.models import GuestAiQuota
+
+    monkeypatch.setattr(config, "GUEST_AI_DAILY_LIMIT", 5)
+    monkeypatch.setattr(ai, "ai_enabled", lambda: True)
+    monkeypatch.setattr(ai, "_new_ai_client", lambda: object())
+
+    def ok_chat(_client, **kwargs):
+        return _fake_chat_response("lie 表示主动躺下，lay 表示放置或下蛋。")
+
+    def fail_chat(_client, **kwargs):
+        raise ConnectionError("network down")
+
+    db = SessionLocal()
+    try:
+        monkeypatch.setattr(ai, "_chat_completion", ok_chat)
+        result, error = ai.answer_question(db, None, "lie 和 lay 的区别？")
+        assert error is None
+        assert "lie" in result
+        day = ai._quota_day()
+        row = db.get(GuestAiQuota, day)
+        assert row is not None
+        assert row.count == 1
+
+        monkeypatch.setattr(ai, "_chat_completion", fail_chat)
+        result, error = ai.answer_question(db, None, "lie 和 lay 的区别？")
+        assert result is None
+        assert error
+        row = db.get(GuestAiQuota, day)
+        assert row is not None
+        assert row.count == 1
+    finally:
+        db.close()
+
+
 class _FakeDb:
     def __init__(self):
         self.added = []

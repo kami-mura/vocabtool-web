@@ -3,7 +3,7 @@ from __future__ import annotations
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter
-from sqlalchemy import func
+from sqlalchemy import func, text
 from sqlalchemy.orm import load_only
 
 from ..api_support import (
@@ -32,6 +32,24 @@ from ..api_support import (
 router = APIRouter()
 
 # ---------- 统计 ----------
+
+
+def _study_date_expr(col):
+    """把 UTC 裸时间按站点时区换算成本地日期的 SQL 表达式（方言差异）。
+
+    SQLite 用 date(col, modifier) 双参语法；PostgreSQL 没有该函数，
+    用 date(col + interval) 等价表达。
+    """
+    try:
+        tz = ZoneInfo(config.APP_TIMEZONE)
+    except ZoneInfoNotFoundError:
+        tz = ZoneInfo("Asia/Shanghai")
+    offset_hours = (
+        tz.utcoffset(dt.datetime.now(dt.timezone.utc)).total_seconds() / 3600
+    )
+    if config.DATABASE_URL.startswith("sqlite"):
+        return func.date(col, f"{offset_hours:+g} hours")
+    return func.date(col + text(f"interval '{offset_hours:g} hours'"))
 
 
 @router.get("/dashboard")
@@ -140,6 +158,7 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
         db.query(func.count(Card.id))
         .filter(
             Card.user_id == user.id,
+            Card.buried.is_(False),
             Card.due_at.isnot(None),
             Card.due_at < end_of_today,
         )
@@ -148,7 +167,7 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
     )
     again_pending = (
         db.query(func.count(Card.id))
-        .filter(Card.user_id == user.id, Card.learning_step > 0)
+        .filter(Card.user_id == user.id, Card.state == "learning")
         .scalar()
         or 0
     )
@@ -167,7 +186,11 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
                 Card.learning_step,
             )
         )
-        .filter(Card.user_id == user.id, Card.due_at.isnot(None))
+        .filter(
+            Card.user_id == user.id,
+            Card.buried.is_(False),
+            Card.due_at.isnot(None),
+        )
         .all()
     )
     total_reviews = (
@@ -178,23 +201,16 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
     )
     # 连续学习天数：有复习记录的连续本地日期（按站点时区，与 _learning_day 一致）。
     # 今天有记录则从今天往前数；今天还没学但昨天有记录，则从昨天往前数（连续未断）。
-    try:
-        tz = ZoneInfo(config.APP_TIMEZONE)
-    except ZoneInfoNotFoundError:
-        tz = ZoneInfo("Asia/Shanghai")
-    offset_hours = (
-        tz.utcoffset(dt.datetime.now(dt.timezone.utc)).total_seconds() / 3600
-    )
     study_date_rows = (
-        db.query(
-            func.distinct(
-                func.date(ReviewLog.reviewed_at, f"+{offset_hours:g} hours")
-            )
-        )
+        db.query(func.distinct(_study_date_expr(ReviewLog.reviewed_at)))
         .filter(ReviewLog.user_id == user.id)
         .all()
     )
     study_date_set = {row[0] for row in study_date_rows}
+    try:
+        tz = ZoneInfo(config.APP_TIMEZONE)
+    except ZoneInfoNotFoundError:
+        tz = ZoneInfo("Asia/Shanghai")
     cursor = dt.datetime.now(tz).date()
     if cursor.isoformat() not in study_date_set:
         cursor -= dt.timedelta(days=1)
