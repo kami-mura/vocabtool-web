@@ -1515,7 +1515,19 @@
     }
     // 连续点击时串行处理：先完成上一次评分，再处理下一次，
     // 避免多个响应乱序把已评过的卡重新顶回队首。
-    reviewActionChain = reviewActionChain.then(() => rateRealReviewCardNow(id, rating));
+    reviewActionChain = reviewActionChain
+      .catch(() => undefined)
+      .then(() => rateRealReviewCardNow(id, rating));
+  }
+
+  function shouldRepeatReviewToday(rating, card, now = Date.now()) {
+    // “良好/简单”都表示这次已经认识，绝不能因服务端的学习状态或
+    // 到期时间边界让同一张卡立刻重新出现。
+    if (!card || !card.is_learning || !["again", "hard"].includes(rating)) {
+      return false;
+    }
+    const due = card.due_at ? new Date(card.due_at).getTime() : NaN;
+    return Number.isFinite(due) && due - now < 24 * 3600 * 1000;
   }
 
   async function rateRealReviewCardNow(id, rating) {
@@ -1582,11 +1594,9 @@
         realTodayStats = cur;
       }
       const fresh = data.cards && data.cards[0] && data.cards[0].card;
-      // 用户规则：点击困难/良好/简单后，若下次复习时间 >= 1 天，
-      // 即使服务端仍标记 is_learning 也不再放回今天的学习队列。
-      const freshDue = fresh && fresh.due_at ? new Date(fresh.due_at).getTime() : null;
-      const relearnToday = freshDue !== null && freshDue - Date.now() < 24 * 3600 * 1000;
-      if (fresh && fresh.is_learning && relearnToday) {
+      // “良好/简单”已经认识，绝不回到今天；只有重来/困难且仍在
+      // 24 小时内学习步骤中的卡片才追加到队尾。
+      if (shouldRepeatReviewToday(rating, fresh)) {
         // FSRS 仍把它留在学习队列：无论本地是否已有副本，
         // 都移除后追加到队尾，保证刚评过的卡不会弹回队首。
         const repeatItem = {

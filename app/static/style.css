@@ -620,7 +620,13 @@ button.landing-login-btn { border: none; cursor: pointer; }
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
 }
-.demo-card-face.back { transform: rotateY(180deg); background: var(--panel); }
+.demo-card-face.back {
+  transform: rotateY(180deg);
+  background: var(--panel);
+  pointer-events: none;
+}
+.demo-card.flipped .demo-card-face.front { pointer-events: none; }
+.demo-card.flipped .demo-card-face.back { pointer-events: auto; }
 /* 复习卡内容过长时在卡内滚动，评分区保持可见，不溢出到卡片外 */
 #real-review .home-review-cards .demo-card-face.front {
   overflow-y: auto;
