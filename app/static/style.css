@@ -461,36 +461,36 @@ button.landing-login-btn { border: none; cursor: pointer; }
 }
 .landing-search button { border-radius: 999px; padding: 13px 24px; font-size: 16px; flex: none; }
 .landing-search .primary {
-  background: #4176e6;
+  background: var(--accent);
   background-image:
-    linear-gradient(135deg, #4176e6 0%, #679efe 100%),
+    linear-gradient(135deg, var(--accent) 0%, var(--logo-2) 100%),
     linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, .26) 50%, transparent 70%);
   background-size: 100% 100%, 220% 100%;
   background-position: 0 0, 130% 0;
-  border-color: #4176e6;
+  border-color: var(--accent);
   color: #ffffff;
   box-shadow: none;
 }
 /* 悬停/按下：纯色深蓝，扫光回位 */
 .landing-search .primary:hover,
 .landing-search .primary:active {
-  background: #4868b2;
+  background: #0a66de;
   background-image: none;
-  border-color: #4868b2;
+  border-color: #0a66de;
   color: #ffffff;
   box-shadow: none;
 }
 [data-theme="dark"] .landing-search .primary {
-  background: #679efe;
-  background-image: linear-gradient(135deg, #679efe 0%, #4176e6 100%);
-  border-color: #679efe;
+  background: var(--accent);
+  background-image: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+  border-color: var(--accent);
   color: #ffffff;
 }
 [data-theme="dark"] .landing-search .primary:hover,
 [data-theme="dark"] .landing-search .primary:active {
-  background: #4176e6;
+  background: #2f86f0;
   background-image: none;
-  border-color: #4176e6;
+  border-color: #2f86f0;
   color: #ffffff;
 }
 .landing-search .landing-clear-btn {
@@ -3369,15 +3369,6 @@ html.js-ui-polish button.primary:hover {
     background-position .45s ease,
     box-shadow .2s ease,
     filter .2s ease;
-}
-/* 首页搜索按钮用浅蓝（对齐 webui 工作区文件夹蓝），覆盖全局主按钮渐变 */
-html.js-ui-polish .landing-search .primary {
-  background-image:
-    linear-gradient(135deg, #4176e6 0%, #679efe 100%),
-    linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, .26) 50%, transparent 70%);
-}
-html.js-ui-polish [data-theme="dark"] .landing-search .primary {
-  background-image: linear-gradient(135deg, #679efe 0%, #4176e6 100%);
 }
 
 /* ---------- details 展开动效 ---------- */
