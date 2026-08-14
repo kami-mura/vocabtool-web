@@ -58,4 +58,20 @@ assert.match(
   "平板宽度（701-820px）：同样不被皮肤固定 24px 边距覆盖"
 );
 
+/* ---------- 查询结果框左右内边距一致 ---------- */
+
+// 结果框曾为关闭按钮预留右侧 44px 内边距，导致内容右侧空白（46px）明显
+// 大于左侧（22px）。关闭按钮是绝对定位的，不需要内容让位。
+const resultBoxRule = css.match(/\.landing-search-result\s*\{[\s\S]*?\n\}/);
+assert.ok(resultBoxRule, "找到 .landing-search-result 规则");
+assert.ok(
+  !/padding-right\s*:\s*44px/.test(resultBoxRule[0]),
+  "结果框不再为关闭按钮预留右侧 44px 内边距"
+);
+assert.match(
+  resultBoxRule[0],
+  /padding\s*:\s*16px\s+20px/,
+  "结果框左右内边距一致（16px 20px），内容不再右侧留白过多"
+);
+
 console.log("PASS: 学习队列跨设备一致，移动端标语单行与结果栏宽度符合预期");
