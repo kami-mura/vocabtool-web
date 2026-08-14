@@ -3649,11 +3649,6 @@
 
   /* ---------- 三种查询模式：查词 / 词源 / 问答 ---------- */
   let searchMode = "lookup";
-  const SEARCH_PLACEHOLDERS = {
-    lookup: "输入单词，短语或者简短中文（双击可查词）",
-    etymology: "输入英文单词，查词源，如 arena",
-    qa: "输入英语问题，如 lie 和 lay 的区别",
-  };
   function setSearchMode(mode) {
     searchMode = mode;
     document.querySelectorAll(".search-mode-btn").forEach((btn) => {
@@ -3661,10 +3656,6 @@
       btn.classList.toggle("active", active);
       btn.setAttribute("aria-pressed", active ? "true" : "false");
     });
-    const input = form.querySelector("input");
-    if (input) {
-      input.placeholder = SEARCH_PLACEHOLDERS[mode] || SEARCH_PLACEHOLDERS.lookup;
-    }
   }
 
   /* 释义中的英文例句（"• " 开头行）逐句加朗读按钮 */
