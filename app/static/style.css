@@ -3098,7 +3098,9 @@ button.ghost.small {
 
   /* 查词页去掉大 Logo，减少首屏占高 */
   .landing-hero .logo { display: none; }
-  .landing-main { padding: 16px 14px calc(92px + env(safe-area-inset-bottom)); }
+  /* body 前缀提升优先级：皮肤（style-liquid.css 等）后加载会覆盖移动端内边距，
+     导致搜索/词源/问答结果栏比设计窄一截。 */
+  body .landing-main { padding: 16px 14px calc(92px + env(safe-area-inset-bottom)); }
   /* 手机端：顶栏禁用背景模糊与进入动画——二者都会让内部 fixed 弹层
      以顶栏为定位基准，导致账户菜单渲染到屏幕外 */
   body .topbar {
@@ -3827,9 +3829,11 @@ svg {
   }
 }
 
-/* 首页标语：窄屏自动缩字号，保持单行 */
+/* 首页标语：窄屏自动缩字号，保持单行。
+   body 前缀提升优先级：皮肤样式表（style-liquid.css 等）后加载且同级选择器
+   会覆盖这里，导致 40px 固定字号把“查单词、记词汇，读文章”挤出屏幕。 */
 @media (max-width: 820px) {
-  .landing-hero h1 {
+  body .landing-hero h1 {
     font-size: clamp(17px, 5vw, 30px);
     white-space: nowrap;
   }
@@ -3837,7 +3841,7 @@ svg {
 
 /* ---------- 手机端留白增强：像社交 App 一样留出呼吸空间 ---------- */
 @media (max-width: 700px) {
-  .landing-main {
+  body .landing-main {
     padding: 20px 18px calc(92px + env(safe-area-inset-bottom));
   }
   .landing-section {

@@ -1,0 +1,61 @@
+const fs = require("fs");
+const path = require("path");
+const assert = require("assert");
+
+const ROOT = path.join(__dirname, "..");
+const source = fs.readFileSync(path.join(ROOT, "app", "static", "landing-v51.js"), "utf8");
+const css = fs.readFileSync(path.join(ROOT, "app", "static", "style.css"), "utf8");
+
+/* ---------- 手机端与电脑端学习队列一致性 ---------- */
+
+// 队列顺序必须完全以服务端为准：本地 sessionStorage 快照重排会让每个设备
+// 各自固定一份过期顺序（重来/困难卡在本地被追加到队尾，服务端却按
+// 到期时间放在重学区），导致手机端和电脑端看到不同的队列。
+assert.ok(
+  !source.includes("REVIEW_QUEUE_SNAPSHOT_KEY"),
+  "队列顺序快照机制（sessionStorage）已移除，避免各设备本地重排"
+);
+assert.ok(
+  !/sessionStorage\s*\.\s*(get|set|remove)Item\s*\(\s*["']vocabtool\.review\.queue/.test(source),
+  "不再读写 vocabtool.review.queue 队列快照"
+);
+assert.match(
+  source,
+  /realReviewQueue\s*=\s*Array\.isArray\(data\.queue\)\s*\?\s*data\.queue\s*:\s*\[\];/,
+  "加载时直接采用服务端返回的队列顺序"
+);
+assert.ok(
+  !source.includes("restoreReviewQueueSnapshot"),
+  "恢复快照的函数已删除"
+);
+
+// 评分后“重来/困难”的卡仍只在当前会话内追加到队尾（不弹回队首），
+// 刷新/换设备后由服务端统一排序——该行为必须保留。
+assert.match(
+  source,
+  /realReviewQueue\.push\(repeatItem\)/,
+  "会话内重来卡仍追加到队尾，避免刚评过的卡弹回队首"
+);
+
+/* ---------- 手机端首页标语与结果栏宽度 ---------- */
+
+// 皮肤样式表（style-liquid.css 等）在 style.css 之后加载，同级选择器会覆盖
+// 媒体查询里的移动端规则：标语固定 40px 会把“查单词、记词汇，读文章”
+// （9 个汉字 + 标点）挤出屏幕，并让整页横向溢出。必须用更高优先级选择器。
+assert.match(
+  css,
+  /@media\s*\(max-width:\s*820px\)\s*\{\s*body\s+\.landing-hero\s+h1\s*\{[\s\S]*?font-size:\s*clamp\(17px,\s*5vw,\s*30px\)[\s\S]*?white-space:\s*nowrap;/,
+  "移动端标语：body 前缀提升优先级，窄屏自动缩字号并保持单行"
+);
+assert.match(
+  css,
+  /@media\s*\(max-width:\s*700px\)\s*\{\s*body\s+\.landing-main\s*\{\s*padding:\s*20px\s+18px/,
+  "移动端主容器：body 前缀提升优先级，恢复 18px 侧边距（结果栏不再偏窄）"
+);
+assert.match(
+  css,
+  /@media\s*\(max-width:\s*820px\)\s*\{[\s\S]*?body\s+\.landing-main\s*\{\s*padding:\s*16px\s+14px/,
+  "平板宽度（701-820px）：同样不被皮肤固定 24px 边距覆盖"
+);
+
+console.log("PASS: 学习队列跨设备一致，移动端标语单行与结果栏宽度符合预期");

@@ -682,62 +682,6 @@
       loadRealReview();
     }
   }
-  // 整个剩余队列的顺序也要固定：刷新页面后恢复同一份队列，
-  // 不能按服务端 due_at/id 重排；服务端新增的卡只追加到末尾。
-  const REVIEW_QUEUE_SNAPSHOT_KEY = "vocabtool.review.queue";
-  function reviewQueueDayKey() {
-    const now = new Date();
-    return (
-      now.getFullYear() + "-" +
-      String(now.getMonth() + 1).padStart(2, "0") + "-" +
-      String(now.getDate()).padStart(2, "0")
-    );
-  }
-  function saveReviewQueueSnapshot() {
-    try {
-      if (realReviewQueue.length) {
-        sessionStorage.setItem(
-          REVIEW_QUEUE_SNAPSHOT_KEY,
-          JSON.stringify({
-            day: reviewQueueDayKey(),
-            ids: realReviewQueue.map((card) => card.id),
-          })
-        );
-      } else {
-        sessionStorage.removeItem(REVIEW_QUEUE_SNAPSHOT_KEY);
-      }
-    } catch (_) { /* 隐私模式等场景忽略 */ }
-  }
-  function restoreReviewQueueSnapshot(serverQueue) {
-    try {
-      const raw = sessionStorage.getItem(REVIEW_QUEUE_SNAPSHOT_KEY);
-      if (!raw) return serverQueue;
-      const snapshot = JSON.parse(raw);
-      if (
-        !snapshot ||
-        snapshot.day !== reviewQueueDayKey() ||
-        !Array.isArray(snapshot.ids) ||
-        !snapshot.ids.length
-      ) {
-        return serverQueue;
-      }
-      const byId = new Map(serverQueue.map((card) => [card.id, card]));
-      const restored = [];
-      for (const id of snapshot.ids) {
-        const card = byId.get(id);
-        if (card) {
-          restored.push(card);
-          byId.delete(id);
-        }
-      }
-      for (const card of serverQueue) {
-        if (byId.has(card.id)) restored.push(card);
-      }
-      return restored;
-    } catch (_) {
-      return serverQueue;
-    }
-  }
   let realUndoStatusTimer = null;
   const realReviewAgainCounts = new Map();
 
@@ -1197,7 +1141,6 @@
     recalcRealReviewRemaining();
     const maxCards = 1;
     const cards = realReviewQueue.slice(0, maxCards);
-    saveReviewQueueSnapshot();
     const placeholders = 0;
     // 队列清空且有卡片时，服务端允许继续学新卡（等价 can_extra_new）。
     if (realReviewQueue.length === 0 && realReviewTotalCards > 0) {
@@ -1318,9 +1261,10 @@
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.detail || "加载失败");
-      const queue = Array.isArray(data.queue) ? data.queue : [];
-      // 恢复上次保存的整个队列顺序；没有快照时用服务端队列。
-      realReviewQueue = restoreReviewQueueSnapshot(queue);
+      // 队列顺序以服务端为准：服务端按“重学 → 到期复习 → 今日新学”
+      // 固定排序，手机端与电脑端看到的是同一份队列。
+      // 不在本地按历史顺序重排，避免各设备本地缓存导致队列不一致。
+      realReviewQueue = Array.isArray(data.queue) ? data.queue : [];
       realReviewHadCards = realReviewQueue.length > 0;
       realReviewTotalCards = Number(data.total_cards) || 0;
       realReviewLoaded = true;
@@ -1759,7 +1703,6 @@
         if (data.conflicts) summary.push("跳过冲突 " + Number(data.conflicts) + " 张");
         setAnkiStatus("Anki 导入完成：" + summary.join("，"));
         realReviewQueue = [];
-        saveReviewQueueSnapshot();
         await loadRealReview();
       } catch (err) {
         setAnkiStatus("Anki 导入失败：" + err.message);
