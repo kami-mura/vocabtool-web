@@ -1613,9 +1613,10 @@ def daily_cards(
         }
         for card in pending_cards
     ]
-    # 队列固定顺序：重学卡 → 到期复习 → 今日新学；
-    # 旧卡没学完之前不会先出现新卡，刷新也不乱序。
-    unified_queue = [*repeat_items, *due_items, *new_items]
+    # 队列固定顺序：到期复习 → 今日新学 → 学习中的卡（重来/困难后排队尾）。
+    # 学习中的卡排最后：评分“重来/困难”后卡片留在会话队尾，刷新后仍在队尾，
+    # 页面显示与服务端队列一致（刷新前后、各设备顺序相同）。
+    unified_queue = [*due_items, *new_items, *repeat_items]
     return {
         "queue": unified_queue,
         "total_cards": db.query(Card).filter(Card.user_id == user.id).count(),

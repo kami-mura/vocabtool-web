@@ -343,6 +343,77 @@ def test_today_queue_mixes_reviews_and_new_cards(client, monkeypatch):
     assert {item["word"] for item in after["queue"]} == {"set"}
 
 
+def test_queue_orders_due_new_then_learning_last(client):
+    """队列固定顺序：到期复习 → 今日新学 → 学习中的卡（重来后排队尾）。
+
+    前端会话内把「重来/困难」卡追加到队尾，服务端也必须把学习中的卡排在
+    最后，否则刷新后队列会与页面显示不一致。
+    """
+    register(client, "queue-order@example.com")
+    for word in ("run", "set", "point"):
+        made = client.post(
+            "/api/card-studio/cards",
+            json={"words": [word], "card_type": "reading"},
+        )
+        assert made.json()["created"] == 1
+    client.put("/api/cards/settings", json={"new_cards_per_day": 2})
+    first = client.get("/api/cards").json()
+    new_cards = first["new"]
+    assert len(new_cards) == 2
+    again_card = new_cards[0]
+    remaining_new = new_cards[1]
+    db = SessionLocal()
+    try:
+        user_id = db.query(User.id).filter(
+            User.email == "queue-order@example.com"
+        ).scalar()
+        due_card = (
+            db.query(Card)
+            .filter(
+                Card.user_id == user_id,
+                Card.id.notin_([again_card["id"], remaining_new["id"]]),
+            )
+            .first()
+        )
+        due_card.state = "review"
+        due_card.due_at = (
+            dt.datetime.now(dt.timezone.utc).replace(tzinfo=None) - dt.timedelta(days=1)
+        )
+        db.commit()
+    finally:
+        db.close()
+    # 给其中一张今日新卡点“重来”：进入学习区，另一张仍留在今日新学。
+    again = client.post(
+        f"/api/cards/{again_card['id']}/review",
+        json={
+            "rating": "again",
+            "action_id": "queue-order-again",
+            "expected_revision": again_card["revision"],
+        },
+    )
+    assert again.status_code == 200
+    assert again.json()["card"]["session_repeat"] is True
+
+    queue = client.get("/api/cards").json()
+    kinds = [item["queue_kind"] for item in queue["queue"]]
+    # 学习中的卡必须排最后：到期复习 → 今日新学 → 重来卡。
+    assert kinds == ["due", "new", "again"]
+    assert [item["id"] for item in queue["queue"]][-1] == again_card["id"]
+    # 再次评分（认识）后毕业，队列不再包含它。
+    known = client.post(
+        f"/api/cards/{again_card['id']}/review",
+        json={
+            "rating": "easy",
+            "action_id": "queue-order-easy",
+            "expected_revision": again.json()["card"]["revision"],
+        },
+    )
+    assert known.status_code == 200
+    after = client.get("/api/cards").json()
+    assert [item["queue_kind"] for item in after["queue"]] == ["due", "new"]
+    assert again_card["id"] not in {item["id"] for item in after["queue"]}
+
+
 def test_future_review_card_does_not_enter_today_queue(client):
     register(client, "future-review@example.com")
     client.post(

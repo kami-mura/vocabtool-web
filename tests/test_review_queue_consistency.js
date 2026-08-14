@@ -30,11 +30,27 @@ assert.ok(
 );
 
 // 评分后“重来/困难”的卡仍只在当前会话内追加到队尾（不弹回队首），
-// 刷新/换设备后由服务端统一排序——该行为必须保留。
+// 服务端队列同步把学习中的卡排最后，因此刷新后仍在队尾——该行为必须保留。
 assert.match(
   source,
   /realReviewQueue\.push\(repeatItem\)/,
   "会话内重来卡仍追加到队尾，避免刚评过的卡弹回队首"
+);
+// 服务端队列顺序为「到期复习 → 今日新学 → 学习中的卡」：前端加载注释必须
+// 同步该顺序，且撤回的卡按分区插入（insertRestoredCard），刷新前后位置一致。
+assert.match(
+  source,
+  /队列顺序以服务端为准：服务端按“到期复习 → 今日新学 → 学习中的卡”/,
+  "加载时直接采用服务端返回的队列顺序（学习中的卡排最后）"
+);
+assert.match(
+  source,
+  /function insertRestoredCard\(queue, item\) \{[\s\S]*?queue\.splice\(i, 0, item\);\s*\}/,
+  "撤回的卡按服务端分区规则插入队列，不再无条件放到队首"
+);
+assert.ok(
+  !/realReviewQueue\.unshift\(item\)/.test(source),
+  "撤回不再用 unshift 放队首（服务端按到期时间分区排序）"
 );
 
 /* ---------- 手机端首页标语与结果栏宽度 ---------- */

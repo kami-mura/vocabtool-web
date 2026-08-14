@@ -1254,14 +1254,14 @@
     }
   }
 
-  async function loadRealReview() {
+  async function loadRealReview(preserveOnError = false) {
     try {
       const res = await fetch("/api/cards", {
         headers: { "Content-Type": "application/json" },
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.detail || "加载失败");
-      // 队列顺序以服务端为准：服务端按“重学 → 到期复习 → 今日新学”
+      // 队列顺序以服务端为准：服务端按“到期复习 → 今日新学 → 学习中的卡”
       // 固定排序，手机端与电脑端看到的是同一份队列。
       // 不在本地按历史顺序重排，避免各设备本地缓存导致队列不一致。
       realReviewQueue = Array.isArray(data.queue) ? data.queue : [];
@@ -1285,6 +1285,7 @@
       realTodayStats = stats;
       updateOilToday();
     } catch (err) {
+      if (preserveOnError) return;
       realReviewQueue = [];
       realReviewLoaded = false;
       const status = document.getElementById("real-review-status");
@@ -1422,11 +1423,17 @@
         if (status) status.textContent = "正在保存（自动重试 " + attempt + "/2）…";
         await waitForReviewRetry(reviewRetryDelays[attempt - 1]);
       }
+      // 评分请求必须带超时：网络/服务器长时间无响应时主动失败，
+      // 否则 reviewActionChain 串行链会被挂起请求永久卡住，
+      // 之后所有评分点击都会排队、看起来“点了没反应”。
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 15000);
       try {
         const res = await fetch("/api/cards/reviews/batch", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
+          signal: controller.signal,
         });
         const data = await res.json().catch(() => ({}));
         if (res.ok) {
@@ -1441,7 +1448,11 @@
         if (![502, 503, 504].includes(res.status)) throw error;
       } catch (error) {
         lastError = error;
+        // 超时（AbortError）没有 status，与 502/503/504 一样走自动重试；
+        // 服务端有 action_id 幂等，重试不会把同一次评分应用两遍。
         if (error.status && ![502, 503, 504].includes(error.status)) throw error;
+      } finally {
+        clearTimeout(timer);
       }
       if (attempt === reviewRetryDelays.length) throw lastError;
     }
@@ -1476,7 +1487,13 @@
 
   async function rateRealReviewCardNow(id, rating) {
     const index = realReviewQueue.findIndex((card) => card.id === id);
-    if (index < 0) return;
+    if (index < 0) {
+      // 按钮对应的卡已不在本地队列（可能已被其他操作/标签页处理过）：
+      // 不能静默忽略，否则点击看起来“没反应”；以服务端为准重拉队列对齐。
+      // 失败时保留现有队列，不把正常的学习界面清空。
+      await loadRealReview(true);
+      return;
+    }
     const card = realReviewQueue[index];
     // “重来”在任何状态下都会立即回队；学习/新卡点“困难”也会回队
     // （FSRS 学习步骤为 0 秒，与 docs/调度算法说明.md 一致）。
@@ -1620,6 +1637,28 @@
     }
   }
 
+  // 撤回的卡按恢复后的状态插入对应分区，与服务端队列排序一致
+  // （到期复习 → 今日新学 → 学习中的卡），刷新后位置不变。
+  function insertRestoredCard(queue, item) {
+    const kindRank = { due: 0, new: 1, again: 2 };
+    const rank = (q) =>
+      kindRank[q.queue_kind] !== undefined ? kindRank[q.queue_kind] : 2;
+    const r = rank(item);
+    let i = 0;
+    while (i < queue.length && rank(queue[i]) <= r) i += 1;
+    // 到期区内部按到期时间升序插入（与服务端 due_at, id 排序一致）。
+    if (r === 0) {
+      while (
+        i > 0 &&
+        rank(queue[i - 1]) === 0 &&
+        (item.due_at || "") < (queue[i - 1].due_at || "")
+      ) {
+        i -= 1;
+      }
+    }
+    queue.splice(i, 0, item);
+  }
+
   async function undoRealReview() {
     if (!realReviewHistory.length) return;
     const button = document.getElementById("real-review-undo");
@@ -1646,11 +1685,14 @@
           session_correct_streak: 0,
         };
         realReviewQueue = realReviewQueue.filter((q) => q.id !== restored.id);
-        realReviewQueue.unshift(item);
+        insertRestoredCard(realReviewQueue, item);
         realReviewRemainingTotal = (realReviewRemainingTotal || 0) + 1;
         renderRealReview();
+        // 后台与服务端对齐：若恢复的卡已不在今天队列（如到期时间在未来），
+        // 以服务端为准更新，保证刷新前后看到同一份队列。
+        loadRealReview(true);
       } else {
-        await loadRealReview();
+        await loadRealReview(true);
       }
       loadOilToday();
       if (status) status.textContent = "撤回成功";
