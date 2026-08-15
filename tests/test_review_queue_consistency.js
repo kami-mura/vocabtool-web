@@ -37,7 +37,9 @@ assert.match(
   "会话内重来卡仍追加到队尾，避免刚评过的卡弹回队首"
 );
 // 服务端队列顺序为「到期复习 → 今日新学 → 学习中的卡」：前端加载注释必须
-// 同步该顺序，且撤回的卡按分区插入（insertRestoredCard），刷新前后位置一致。
+// 同步该顺序。撤回是回到上一张卡：被撤回的卡必须放回队首作为当前卡展示，
+// 后台与服务端对齐时（preferredHeadId）也保持队首，否则用户撤回后看到的
+// 是队列里的下一张卡，而不是刚撤回的那张。
 assert.match(
   source,
   /队列顺序以服务端为准：服务端按“到期复习 → 今日新学 → 学习中的卡”/,
@@ -45,12 +47,13 @@ assert.match(
 );
 assert.match(
   source,
-  /function insertRestoredCard\(queue, item\) \{[\s\S]*?queue\.splice\(i, 0, item\);\s*\}/,
-  "撤回的卡按服务端分区规则插入队列，不再无条件放到队首"
+  /realReviewQueue = realReviewQueue\.filter\(\(q\) => q\.id !== restored\.id\);\s*realReviewQueue\.unshift\(item\);/,
+  "撤回的卡移除旧副本后放回队首，立即作为当前卡展示（上一张）"
 );
-assert.ok(
-  !/realReviewQueue\.unshift\(item\)/.test(source),
-  "撤回不再用 unshift 放队首（服务端按到期时间分区排序）"
+assert.match(
+  source,
+  /loadRealReview\(true, restored\.id\)/,
+  "撤回后与服务端对齐时，恢复的卡保持队首展示"
 );
 
 /* ---------- 手机端首页标语与结果栏宽度 ---------- */

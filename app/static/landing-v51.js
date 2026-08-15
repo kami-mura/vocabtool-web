@@ -1254,7 +1254,18 @@
     }
   }
 
-  async function loadRealReview(preserveOnError = false) {
+  // 撤回后与服务端对齐时，被撤回的卡保持队首展示：它是用户上一张评分的卡，
+  // 不能因为服务端按到期时间/卡片 id 重新排序而被顶走。
+  function moveCardToHead(queue, id) {
+    const index = queue.findIndex((q) => q.id === id);
+    if (index > 0) {
+      const [item] = queue.splice(index, 1);
+      queue.unshift(item);
+    }
+    return queue;
+  }
+
+  async function loadRealReview(preserveOnError = false, preferredHeadId = null) {
     try {
       const res = await fetch("/api/cards", {
         headers: { "Content-Type": "application/json" },
@@ -1265,6 +1276,9 @@
       // 固定排序，手机端与电脑端看到的是同一份队列。
       // 不在本地按历史顺序重排，避免各设备本地缓存导致队列不一致。
       realReviewQueue = Array.isArray(data.queue) ? data.queue : [];
+      if (preferredHeadId != null) {
+        moveCardToHead(realReviewQueue, preferredHeadId);
+      }
       realReviewHadCards = realReviewQueue.length > 0;
       realReviewTotalCards = Number(data.total_cards) || 0;
       realReviewLoaded = true;
@@ -1637,28 +1651,6 @@
     }
   }
 
-  // 撤回的卡按恢复后的状态插入对应分区，与服务端队列排序一致
-  // （到期复习 → 今日新学 → 学习中的卡），刷新后位置不变。
-  function insertRestoredCard(queue, item) {
-    const kindRank = { due: 0, new: 1, again: 2 };
-    const rank = (q) =>
-      kindRank[q.queue_kind] !== undefined ? kindRank[q.queue_kind] : 2;
-    const r = rank(item);
-    let i = 0;
-    while (i < queue.length && rank(queue[i]) <= r) i += 1;
-    // 到期区内部按到期时间升序插入（与服务端 due_at, id 排序一致）。
-    if (r === 0) {
-      while (
-        i > 0 &&
-        rank(queue[i - 1]) === 0 &&
-        (item.due_at || "") < (queue[i - 1].due_at || "")
-      ) {
-        i -= 1;
-      }
-    }
-    queue.splice(i, 0, item);
-  }
-
   async function undoRealReview() {
     if (!realReviewHistory.length) return;
     const button = document.getElementById("real-review-undo");
@@ -1684,13 +1676,16 @@
           session_repeat: Boolean(restored.is_learning),
           session_correct_streak: 0,
         };
+        // 撤回的卡放回队首立即展示：它正是用户上一张评分的卡，否则按
+        // 服务端分区排序插入后，页面上显示的是队列里的下一张卡。
         realReviewQueue = realReviewQueue.filter((q) => q.id !== restored.id);
-        insertRestoredCard(realReviewQueue, item);
+        realReviewQueue.unshift(item);
         realReviewRemainingTotal = (realReviewRemainingTotal || 0) + 1;
         renderRealReview();
         // 后台与服务端对齐：若恢复的卡已不在今天队列（如到期时间在未来），
-        // 以服务端为准更新，保证刷新前后看到同一份队列。
-        loadRealReview(true);
+        // 以服务端为准更新，保证刷新前后看到同一份队列；同步后撤回的卡
+        // 仍保持队首展示（preferredHeadId），不被服务端排序顶走。
+        loadRealReview(true, restored.id);
       } else {
         await loadRealReview(true);
       }

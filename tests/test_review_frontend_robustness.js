@@ -35,8 +35,8 @@ assert.match(
 );
 assert.match(
   source,
-  /async function loadRealReview\(preserveOnError = false\)/,
-  "loadRealReview 支持失败保留现有队列（后台对齐不清空学习界面）"
+  /async function loadRealReview\(preserveOnError = false, preferredHeadId = null\)/,
+  "loadRealReview 支持失败保留现有队列（后台对齐不清空学习界面），并支持首选队首卡"
 );
 assert.match(
   source,
@@ -44,38 +44,50 @@ assert.match(
   "后台对齐失败时保留现有队列"
 );
 
-/* ---------- 撤回卡分区插入 ---------- */
+/* ---------- 撤回显示上一张卡 ---------- */
 
-// 撤回的卡按恢复后的状态（due/new/again）插入对应分区，与服务端
-// 「到期复习 → 今日新学 → 学习中的卡」排序一致，刷新后位置不变。
-const insertMatch = source.match(
-  /function insertRestoredCard\(queue, item\) \{[\s\S]*?\n  \}/
+// 撤回必须把被撤回的卡放回队首立即展示（它是用户上一张评分的卡），
+// 而不是按分区排序插入后展示队列里的下一张卡。
+assert.match(
+  source,
+  /realReviewQueue = realReviewQueue\.filter\(\(q\) => q\.id !== restored\.id\);\s*realReviewQueue\.unshift\(item\);/,
+  "撤回的卡移除旧副本后放回队首，立即作为当前卡展示"
 );
-if (!insertMatch) throw new Error("insertRestoredCard 函数未找到");
-const insertRestoredCard = new Function(
-  `${insertMatch[0].replace(/^function /, "function ")}\nreturn insertRestoredCard;`
+
+// 后台与服务端对齐时保持撤回的卡在队首：loadRealReview 接受首选队首卡 id，
+// 服务端队列按「到期复习 → 今日新学 → 学习中的卡」重新排序后，
+// 仍把该卡放回队首，避免撤回的卡被排序顶走。
+const headMatch = source.match(
+  /function moveCardToHead\(queue, id\) \{[\s\S]*?\n  \}/
+);
+if (!headMatch) throw new Error("moveCardToHead 函数未找到");
+const moveCardToHead = new Function(
+  `${headMatch[0].replace(/^function /, "function ")}\nreturn moveCardToHead;`
 )();
 
-const q = (kind, id, due) => ({ id, queue_kind: kind, due_at: due });
-// 到期区按到期时间升序，新学区在中间，学习中的卡排最后。
-const queue = [q("due", 1, "2026-08-10T00:00:00"), q("due", 2, "2026-08-12T00:00:00"), q("new", 3)];
-insertRestoredCard(queue, q("due", 9, "2026-08-11T00:00:00"));
+const q = (id, kind) => ({ id, queue_kind: kind });
+// 服务端队列中撤回的卡（id=9）按新学区排序不在队首时，同步后仍移到队首。
+const queue = [q(1, "new"), q(9, "new"), q(3, "new")];
+moveCardToHead(queue, 9);
 assert.deepStrictEqual(
   queue.map((x) => x.id),
-  [1, 9, 2, 3],
-  "到期卡按到期时间升序插入到期区"
+  [9, 1, 3],
+  "同步后仍把撤回的卡保持在队首"
 );
-insertRestoredCard(queue, q("again", 7));
+// 首选卡已在队首或不在队列中时不改动队列。
+const queueAtHead = [q(1, "new"), q(2, "new")];
+moveCardToHead(queueAtHead, 1);
 assert.deepStrictEqual(
-  queue.map((x) => x.id),
-  [1, 9, 2, 3, 7],
-  "学习中的卡插入队尾"
+  queueAtHead.map((x) => x.id),
+  [1, 2],
+  "首选卡已在队首时保持原样"
 );
-insertRestoredCard(queue, q("new", 8));
+const queueMissing = [q(1, "new")];
+moveCardToHead(queueMissing, 99);
 assert.deepStrictEqual(
-  queue.map((x) => x.id),
-  [1, 9, 2, 3, 8, 7],
-  "今日新学插在到期区之后、学习中的卡之前"
+  queueMissing.map((x) => x.id),
+  [1],
+  "首选卡不在队列时不改动（如恢复的卡已不在今天队列）"
 );
 
-console.log("PASS: 评分请求超时、失效按钮对齐与撤回卡分区插入符合预期");
+console.log("PASS: 评分请求超时、失效按钮对齐与撤回显示上一张卡符合预期");
