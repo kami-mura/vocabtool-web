@@ -103,7 +103,8 @@ def test_review_action_id_is_idempotent(client):
         db.close()
 
 
-def test_review_writes_count_against_storage_quota(client, monkeypatch):
+def test_review_does_not_count_against_storage_quota(client, monkeypatch):
+    """复习日志是学习核心路径，不占用用户内容配额；配额满时评分仍应成功。"""
     from app import config
 
     register(client, "review-quota@example.com")
@@ -118,16 +119,20 @@ def test_review_writes_count_against_storage_quota(client, monkeypatch):
     monkeypatch.setattr(
         config, "USER_STORAGE_QUOTA_BYTES", usage["used_bytes"] + 50
     )
-    blocked = client.post(
+    reviewed = client.post(
         f"/api/cards/{card['id']}/review",
         json={
             "rating": "good",
-            "action_id": "quota-blocked-action",
+            "action_id": "quota-allowed-action",
             "expected_revision": card["revision"],
         },
     )
-    assert blocked.status_code == 413
-    assert "个人存储空间不足" in blocked.json()["detail"]
+    assert reviewed.status_code == 200
+    db = SessionLocal()
+    try:
+        assert db.query(ReviewLog).filter(ReviewLog.card_id == card["id"]).count() == 1
+    finally:
+        db.close()
 
 
 def test_review_endpoints_honor_rate_limit(client, monkeypatch):

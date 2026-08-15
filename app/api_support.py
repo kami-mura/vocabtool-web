@@ -44,7 +44,6 @@ from .auth import (
 )
 from .db import SessionLocal, get_db
 from .models import (
-    AnkiReviewLog,
     Card,
     Corpus,
     CorpusChapter,
@@ -231,20 +230,8 @@ def _user_storage_bytes(db: Session, user_id: int) -> int:
         LookupHistory.card_back,
         filters=[(LookupHistory.user_id, user_id)],
     )
-    total += _sum_storage_bytes(
-        db,
-        ReviewLog.rating,
-        ReviewLog.previous_state,
-        ReviewLog.previous_word_status,
-        extra_per_row=64,
-        filters=[(ReviewLog.user_id, user_id)],
-    )
-    total += _sum_storage_bytes(
-        db,
-        AnkiReviewLog.source_key,
-        extra_per_row=72,
-        filters=[(AnkiReviewLog.user_id, user_id)],
-    )
+    # 复习日志是系统生成的学习记录，不占用用户内容配额；
+    # 否则配额满时用户将无法继续评分（核心学习路径不能被阻断）。
     return total
 
 

@@ -1215,16 +1215,6 @@ def _scoped_action_key(user_id: int, action_id: str) -> str:
     return hashlib.sha256(f"{user_id}:{action_id}".encode()).hexdigest()
 
 
-def _review_log_bytes(rating: str, previous_state: str, previous_word_status: str) -> int:
-    """估算一条复习记录占用的存储字节数（字段 + 行开销）。"""
-    return (
-        _utf8_size(rating)
-        + _utf8_size(previous_state)
-        + _utf8_size(previous_word_status)
-        + 96
-    )
-
-
 @router.post("/cards/{card_id}/bury")
 def bury_card(card_id: int, request: Request, db: Session = Depends(get_db)):
     """掩埋卡片：今天起不再进入学习队列；可在卡片浏览器里恢复。"""
@@ -1860,11 +1850,6 @@ def review_card(
     card, fsrs_log_json = srs.apply_rating_with_log(card, rating, now=now)
     session_pending = card.state == "learning"
     session_correct_streak = 0
-    _require_storage_space(
-        db,
-        user.id,
-        _review_log_bytes(rating, previous_state, ""),
-    )
     review_log = ReviewLog(
         user_id=user.id,
         card_id=card.id,
@@ -2019,11 +2004,6 @@ def review_cards_batch(
                 )
                 session_pending = card.state == "learning"
                 session_correct_streak = 0
-                _require_storage_space(
-                    db,
-                    user.id,
-                    _review_log_bytes(rating, previous_state, ""),
-                )
                 review_log = ReviewLog(
                     user_id=user.id,
                     card_id=card.id,
