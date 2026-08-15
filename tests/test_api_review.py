@@ -398,6 +398,7 @@ def test_queue_orders_due_new_then_learning_last(client):
     )
     assert again.status_code == 200
     assert again.json()["card"]["session_repeat"] is True
+    assert again.json()["card"]["repeat_now"] is True
 
     queue = client.get("/api/cards").json()
     kinds = [item["queue_kind"] for item in queue["queue"]]
@@ -414,6 +415,7 @@ def test_queue_orders_due_new_then_learning_last(client):
         },
     )
     assert known.status_code == 200
+    assert known.json()["card"]["repeat_now"] is False
     after = client.get("/api/cards").json()
     assert [item["queue_kind"] for item in after["queue"]] == ["due", "new"]
     assert again_card["id"] not in {item["id"] for item in after["queue"]}

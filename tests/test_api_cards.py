@@ -789,6 +789,46 @@ def test_extra_new_cards_persist_until_finished(client):
     assert refreshed["can_extra_new"] is True
 
 
+def test_extra_new_response_counts_match_queue(client):
+    """加学响应必须与本次队列同口径：队列有几张，剩余新学就报几张。"""
+    register(client, "extra-counts@example.com")
+    client.put("/api/cards/settings", json={"new_cards_per_day": 0})
+    for word, card_type in (("run", "general"), ("set", "reading")):
+        made = client.post(
+            "/api/card-studio/cards",
+            json={"words": [word], "card_type": card_type},
+        )
+        assert made.status_code == 200
+        assert made.json()["created"] == 1
+
+    data = client.get("/api/cards", params={"extra_new": 2}).json()
+    assert len(data["queue"]) == 2
+    assert data["remaining_counts"] == {"due": 0, "new": 2, "again": 0}
+    assert data["can_extra_new"] is False
+
+
+def test_remaining_counts_follow_card_type_filter(client):
+    """按类型筛选时，剩余计数必须与过滤后的队列一致，不能报全局总数。"""
+    register(client, "type-counts@example.com")
+    client.put("/api/cards/settings", json={"new_cards_per_day": 10})
+    for word, card_type in (("run", "general"), ("set", "reading")):
+        made = client.post(
+            "/api/card-studio/cards",
+            json={"words": [word], "card_type": card_type},
+        )
+        assert made.status_code == 200
+        assert made.json()["created"] == 1
+
+    data = client.get("/api/cards", params={"card_type": "reading"}).json()
+    assert data["queue"]
+    assert data["remaining_counts"] == {
+        "due": len(data["due"]),
+        "new": len(data["new"]),
+        "again": len(data["again"]),
+    }
+    assert data["remaining_counts"]["new"] == len(data["new"])
+
+
 def test_refresh_highlights_legacy_reading_fronts_and_bolds_word_only_cards(client, monkeypatch):
     """旧版刷新写出的无高亮阅读卡正面，必须重新凸显目标词；
     找不到例句的裸单词正面退化为加粗单词。"""

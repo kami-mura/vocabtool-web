@@ -751,7 +751,10 @@ def _card_dict(
     *,
     session_repeat: bool = False,
     session_correct_streak: int = 0,
+    now: dt.datetime | None = None,
 ) -> dict:
+    if now is None:
+        now = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
     deck = (
         _json_context_field(card.context, "deck")
         if card.card_type == "anki"
@@ -776,6 +779,11 @@ def _card_dict(
         "revision": int(card.revision or 0),
         "state": "new" if card.due_at is None else "scheduled",
         "is_learning": str(getattr(card, "state", "") or "") == "learning",
+        "repeat_now": bool(
+            str(getattr(card, "state", "") or "") == "learning"
+            and card.due_at is not None
+            and card.due_at <= now
+        ),
         "learning_step": int(getattr(card, "learning_step", 0) or 0),
         "interval_days": card.interval_days,
         "ease": card.ease,

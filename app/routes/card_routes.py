@@ -1517,6 +1517,7 @@ def daily_cards(
         .order_by(Card.due_at, Card.id)
         .all()
     )
+    global_repeat_pending_total = len(pending_cards)
     if card_type != "all":
         pending_cards = [
             card for card in pending_cards if card.card_type == card_type
@@ -1547,7 +1548,7 @@ def daily_cards(
     can_extra_new = (
         regular_due_total == 0
         and required_new_remaining == 0
-        and repeat_pending_total == 0
+        and global_repeat_pending_total == 0
     )
     is_extra_request = extra_new > 0
     if is_extra_request and not can_extra_new:
@@ -1593,11 +1594,15 @@ def daily_cards(
         new_cards = assigned_new_cards
     if card_type != "all":
         new_cards = [card for card in new_cards if card.card_type == card_type]
-    due_items = [{**_card_dict(card), "queue_kind": "due"} for card in due]
-    new_items = [{**_card_dict(card), "queue_kind": "new"} for card in new_cards]
+    if is_extra_request and new_cards:
+        # 已把加学卡放入本次队列：本响应内不允许继续加学，
+        # 否则剩余数为 0 但队列非空，客户端会误判为“已学完”。
+        can_extra_new = False
+    due_items = [{**_card_dict(card, now=now), "queue_kind": "due"} for card in due]
+    new_items = [{**_card_dict(card, now=now), "queue_kind": "new"} for card in new_cards]
     repeat_items = [
         {
-            **_card_dict(card, session_repeat=True, session_correct_streak=0),
+            **_card_dict(card, session_repeat=True, session_correct_streak=0, now=now),
             "queue_kind": "again",
         }
         for card in pending_cards
@@ -1609,14 +1614,14 @@ def daily_cards(
     return {
         "queue": unified_queue,
         "total_cards": db.query(Card).filter(Card.user_id == user.id).count(),
-        "due": [_card_dict(c) for c in due],
-        "new": [_card_dict(c) for c in new_cards],
+        "due": [_card_dict(c, now=now) for c in due],
+        "new": [_card_dict(c, now=now) for c in new_cards],
         "again": [item for item in repeat_items],
         "practice": [],
         "remaining_counts": {
-            "due": regular_due_total,
-            "new": required_new_remaining,
-            "again": repeat_pending_total,
+            "due": len(due_items),
+            "new": len(new_items),
+            "again": len(repeat_items),
         },
         "due_total": regular_due_total,
         "hard_pending_total": repeat_pending_total,
@@ -1725,6 +1730,7 @@ def undo_last_review(request: Request, db: Session = Depends(get_db)):
             card,
             session_repeat=card.state == "learning",
             session_correct_streak=0,
+            now=now,
         ),
     }
 
@@ -1882,6 +1888,7 @@ def review_card(
             card,
             session_repeat=session_pending,
             session_correct_streak=session_correct_streak,
+            now=now,
         ),
         "today_stats": _today_stats(db, user.id, now),
     }
@@ -1963,6 +1970,7 @@ def review_cards_batch(
                                     card,
                                     session_repeat=card.state == "learning",
                                     session_correct_streak=0,
+                                    now=now,
                                 ),
                             }
                         )
@@ -2044,6 +2052,7 @@ def review_cards_batch(
                             card,
                             session_repeat=session_pending,
                             session_correct_streak=session_correct_streak,
+                            now=now,
                         ),
                     }
                 )
@@ -2088,6 +2097,7 @@ def review_cards_batch(
                         card,
                         session_repeat=card.state == "learning",
                         session_correct_streak=0,
+                        now=now,
                     ),
                 }
             )
