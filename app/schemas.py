@@ -83,12 +83,6 @@ class ReviewSettingsIn(BaseModel):
     new_cards_per_day: int = Field(ge=0, le=200)
 
 
-class ArticleIn(BaseModel):
-    """今日短文可使用今天新学或今天点过不认识的单词。"""
-
-    source: str = Field(default="new", max_length=16)
-
-
 class WordBatchDeleteIn(BaseModel):
     words: list[str] = Field(default=[], max_length=2000)
 
@@ -142,5 +136,5 @@ __all__ = [
     "LookupIn",
     "VocabularyProfileIn", "VocabularyTestSubmitIn",
     "QuickLookupIn", "QuestionIn", "TopicWordsIn",
-    "PriorityWordsIn", "ArticleIn",
+    "PriorityWordsIn",
 ]

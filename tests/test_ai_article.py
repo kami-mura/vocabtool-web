@@ -120,7 +120,7 @@ def _add_card(db, user_id, word, card_type="general"):
 
 
 def _prepare_article_user(client, email):
-    """注册并学完 run/develop，返回可生成文章的用户。"""
+    """注册并学完 run/develop，今天点过「重来」的 point，返回可生成文章的用户。"""
     _register(client, email)
     created = client.post(
         "/api/card-studio/cards",
@@ -130,6 +130,16 @@ def _prepare_article_user(client, email):
     queue = client.get("/api/cards").json()["queue"]
     for item in queue:
         if item["word"] == "point":
+            # 今天点「重来」：point 成为今日短文来源。
+            reviewed = client.post(
+                f"/api/cards/{item['id']}/review",
+                json={
+                    "rating": "again",
+                    "action_id": f"prepare-again-{item['id']}",
+                    "expected_revision": item["revision"],
+                },
+            )
+            assert reviewed.status_code == 200
             continue
         _graduate_known(client, item["id"], 2)
 
@@ -161,8 +171,8 @@ def _fake_generate_article(
     return result, None
 
 
-def _start_article_for_test(client, source="new", **extra):
-    response = client.post("/api/cards/article", json={"source": source, **extra})
+def _start_article_for_test(client, **extra):
+    response = client.post("/api/cards/article", json=extra or {})
     assert response.status_code == 200
     assert response.json()["state"] == "generating"
     latest_payload = client.get("/api/cards/article/latest").json()
@@ -452,7 +462,7 @@ def test_generate_article_rejects_a_rewrite_that_still_misses_targets(monkeypatc
 
 
 def test_article_available_without_completing_tasks(client, monkeypatch):
-    """随时可用：不需要完成今日学习任务，学了多少就输入多少。"""
+    """随时可用：不需要完成今日学习任务，今天点过「重来」的词即可生成。"""
     _register(client, "article-gate@example.com")
     created = client.post(
         "/api/card-studio/cards",
@@ -461,8 +471,17 @@ def test_article_available_without_completing_tasks(client, monkeypatch):
     assert created.status_code == 200
     queue = client.get("/api/cards").json()["queue"]
     assert len(queue) == 3
-    # 新学卡：需要两次“认识”（每次等到期后）完成两次复习。
-    _graduate_known(client, queue[0]["id"], 2)
+    # 只点「重来」，不完成学习任务。
+    first = queue[0]
+    reviewed = client.post(
+        f"/api/cards/{first['id']}/review",
+        json={
+            "rating": "again",
+            "action_id": "article-gate-again",
+            "expected_revision": first["revision"],
+        },
+    )
+    assert reviewed.status_code == 200
 
     monkeypatch.setattr(
         "app.routes.card_routes.ai_mod.generate_article", _fake_generate_article
@@ -569,8 +588,16 @@ def test_article_latest_returns_newest_article(client, monkeypatch):
     monkeypatch.setattr(
         "app.routes.card_routes.ai_mod.generate_article", _fake_generate_article
     )
-    _graduate_known(client, queue[0]["id"], 1)
-    assert client.post("/api/cards/article", json={"source": "new"}).status_code == 200
+    reviewed = client.post(
+        f"/api/cards/{queue[0]['id']}/review",
+        json={
+            "rating": "again",
+            "action_id": "article-latest-again",
+            "expected_revision": queue[0]["revision"],
+        },
+    )
+    assert reviewed.status_code == 200
+    assert client.post("/api/cards/article").status_code == 200
     latest = client.get("/api/cards/article/latest").json()["article"]
     assert latest is not None
     assert latest["book_title"].endswith("-test article")
@@ -596,12 +623,20 @@ def test_article_highlights_phrase_targets(client, monkeypatch):
     assert made.status_code == 200
     assert made.json()["created"] == 1
     card = client.get("/api/cards").json()["new"][0]
-    _graduate_known(client, card["id"], 1)
+    reviewed = client.post(
+        f"/api/cards/{card['id']}/review",
+        json={
+            "rating": "again",
+            "action_id": "article-phrase-again",
+            "expected_revision": card["revision"],
+        },
+    )
+    assert reviewed.status_code == 200
 
     monkeypatch.setattr(
         "app.routes.card_routes.ai_mod.generate_article", _fake_generate_article
     )
-    generated = client.post("/api/cards/article", json={"source": "new"})
+    generated = client.post("/api/cards/article")
     assert generated.status_code == 200
     latest = client.get("/api/cards/article/latest").json()["article"]
     assert "mull it over" in latest["target_words"]
@@ -620,7 +655,15 @@ def test_article_treats_case_variants_as_distinct_words(client, monkeypatch):
     queue = client.get("/api/cards").json()["queue"]
     assert sorted(item["word"] for item in queue) == ["March", "march"]
     for card in queue:
-        _graduate_known(client, card["id"], 1)
+        reviewed = client.post(
+            f"/api/cards/{card['id']}/review",
+            json={
+                "rating": "again",
+                "action_id": f"article-case-again-{card['id']}",
+                "expected_revision": card["revision"],
+            },
+        )
+        assert reviewed.status_code == 200
 
     captured = {}
 
@@ -638,7 +681,7 @@ def test_article_treats_case_variants_as_distinct_words(client, monkeypatch):
     monkeypatch.setattr(
         "app.routes.card_routes.ai_mod.generate_article", fake
     )
-    resp = client.post("/api/cards/article", json={"source": "new"})
+    resp = client.post("/api/cards/article")
     assert resp.status_code == 200
     assert set(captured["new_words"]) == {"march", "March"}
 
@@ -664,8 +707,26 @@ def test_article_splits_large_word_sets_into_a_balanced_reading_pack(client, mon
     finally:
         db.close()
     assert len(card_ids) == 45
+    db = SessionLocal()
+    try:
+        revisions = {
+            row[0]: int(row[1] or 0)
+            for row in db.query(Card.id, Card.revision)
+            .filter(Card.user_id == user_id)
+            .all()
+        }
+    finally:
+        db.close()
     for card_id in card_ids:
-        _graduate_known(client, card_id, 1)
+        reviewed = client.post(
+            f"/api/cards/{card_id}/review",
+            json={
+                "rating": "again",
+                "action_id": f"article-balance-again-{card_id}",
+                "expected_revision": revisions[card_id],
+            },
+        )
+        assert reviewed.status_code == 200
 
     calls = []
 
@@ -682,7 +743,7 @@ def test_article_splits_large_word_sets_into_a_balanced_reading_pack(client, mon
     monkeypatch.setattr(
         "app.routes.card_routes.ai_mod.generate_article", fake
     )
-    _resp, article = _start_article_for_test(client, source="new")
+    _resp, article = _start_article_for_test(client)
     assert [len(new) for new, _review in calls] == [12, 11, 11, 11]
     assert all(review == [] for _new, review in calls)
     assert {word for new, _review in calls for word in new} == set(words)
@@ -728,7 +789,7 @@ def test_article_includes_new_words_rated_again(client, monkeypatch):
     monkeypatch.setattr(
         "app.routes.card_routes.ai_mod.generate_article", fake
     )
-    _resp, article = _start_article_for_test(client, source="new")
+    _resp, article = _start_article_for_test(client)
     assert captured["new_words"] == ["quasar"]
     assert article["target_words"] == ["quasar"]
 
@@ -767,26 +828,19 @@ def test_article_highlights_only_today_targets(client, monkeypatch):
     monkeypatch.setattr(
         "app.routes.card_routes.ai_mod.generate_article", fake_with_extra
     )
-    resp = client.post("/api/cards/article", json={"source": "new"})
+    resp = client.post("/api/cards/article")
     assert resp.status_code == 200
     latest = client.get("/api/cards/article/latest").json()["article"]
     assert latest is not None
     paragraph = latest["paragraphs"][0]
-    # 今天的新学词被高亮，历史学习词 bonus 不高亮。
-    assert '<mark class="article-word">run</mark>' in paragraph
+    # 今天点过「重来」的词被高亮，历史学习词 bonus 不高亮。
+    assert '<mark class="article-word">point</mark>' in paragraph
     assert '<mark class="article-word">bonus</mark>' not in paragraph
     assert "bonus" not in latest["target_words"]
 
 
-def test_article_rejects_invalid_source(client):
-    _register(client, "article-source@example.com")
-    denied = client.post("/api/cards/article", json={"source": "tomorrow"})
-    assert denied.status_code == 400
-    assert denied.json()["detail"] == "无效单词范围"
-
-
 def test_article_always_uses_thinking_max(client, monkeypatch):
-    """短文固定用思考模式 max，调用方参数不能降级为快速模式。"""
+    """短文固定用思考模式 max，不提供降级参数。"""
     _prepare_article_user(client, "article-mode@example.com")
     calls = []
 
@@ -801,17 +855,15 @@ def test_article_always_uses_thinking_max(client, monkeypatch):
     monkeypatch.setattr(
         "app.routes.card_routes.ai_mod.generate_article", spy_generate
     )
-    first = client.post("/api/cards/article", json={"source": "new"})
+    first = client.post("/api/cards/article")
     assert first.status_code == 200
-    second = client.post(
-        "/api/cards/article",
-        json={"source": "new", "mode": "fast", "effort": "low"},
-    )
+    second = client.post("/api/cards/article")
     assert second.status_code == 200
     assert calls == [(True, "max"), (True, "max")]
 
 
-def test_article_uses_only_today_new_words(client, monkeypatch):
+def test_article_uses_only_today_again_cards(client, monkeypatch):
+    """今日短文只用今天点过「重来」的卡片：复习卡点重来进入，只点认识的排除。"""
     _register(client, "article-split@example.com")
     created = client.post(
         "/api/card-studio/cards",
@@ -820,11 +872,11 @@ def test_article_uses_only_today_new_words(client, monkeypatch):
     assert created.status_code == 200
     queue = client.get("/api/cards").json()["queue"]
     assert len(queue) == 4
-    # 今天先通过 3 张新卡。
+    # 今天先通过 3 张新卡（只点认识，不进入今日短文）。
     for item in queue:
         if item["word"] != "quasar":
             _graduate_known(client, item["id"], 1)
-    # quasar 改成昨天到期：今天复习并通过，作为“复习”来源。
+    # quasar 改成昨天到期：今天作为复习卡点「重来」，进入今日短文。
     db = SessionLocal()
     try:
         user_id = _user_id("article-split@example.com")
@@ -844,8 +896,8 @@ def test_article_uses_only_today_new_words(client, monkeypatch):
     assert client.post(
         f"/api/cards/{quasar_id}/review",
         json={
-            "rating": "easy",
-            "action_id": "article-split-quasar",
+            "rating": "again",
+            "action_id": "article-split-quasar-again",
             "expected_revision": quasar_revision,
         },
     ).status_code == 200
@@ -862,24 +914,14 @@ def test_article_uses_only_today_new_words(client, monkeypatch):
     monkeypatch.setattr(
         "app.routes.card_routes.ai_mod.generate_article", spy_generate
     )
-    new_only = client.post("/api/cards/article", json={"source": "new"})
-    assert new_only.status_code == 200
-    assert sorted(calls[-1][0]) == ["develop", "point", "run"]
+    resp = client.post("/api/cards/article")
+    assert resp.status_code == 200
+    assert sorted(calls[-1][0]) == ["quasar"]
     assert calls[-1][1] == []
 
-    review_only = client.post("/api/cards/article", json={"source": "review"})
-    assert review_only.status_code == 400
-    assert review_only.json()["detail"] == "无效单词范围"
 
-    mixed = client.post("/api/cards/article", json={"source": "mixed"})
-    assert mixed.status_code == 400
-    assert mixed.json()["detail"] == "无效单词范围"
-
-
-def test_article_again_source_includes_new_and_review_cards_rated_again(
-    client, monkeypatch
-):
-    """“今天点过不认识”包含新卡和复习卡，但排除只点过认识的卡。"""
+def test_article_includes_new_and_review_cards_rated_again(client, monkeypatch):
+    """“今天点过重来”包含新卡和复习卡，但排除只点过认识的卡。"""
     _register(client, "article-again-source@example.com")
     created = client.post(
         "/api/card-studio/cards",
@@ -942,14 +984,14 @@ def test_article_again_source_includes_new_and_review_cards_rated_again(
     monkeypatch.setattr(
         "app.routes.card_routes.ai_mod.generate_article", spy_generate
     )
-    response = client.post("/api/cards/article", json={"source": "again"})
+    response = client.post("/api/cards/article")
     assert response.status_code == 200
     assert set(captured) == {"run", "develop"}
     assert "point" not in captured
 
 
 def test_article_available_after_completing_today_tasks(client, monkeypatch):
-    """学完今日任务后，今天新学的词仍可生成今日短文。"""
+    """学完今日任务后，今天点过「重来」的词仍可生成今日短文。"""
     _register(client, "article-done@example.com")
     created = client.post(
         "/api/card-studio/cards",
@@ -958,6 +1000,7 @@ def test_article_available_after_completing_today_tasks(client, monkeypatch):
     assert created.status_code == 200
     queue = client.get("/api/cards").json()["queue"]
     assert len(queue) == 3
+    develop = next(item for item in queue if item["word"] == "develop")
     # 学完全部 3 张新卡（每次“认识”等到期后再复习），
     # 任务完成后卡片移出任务队列。
     for item in queue:
@@ -965,6 +1008,21 @@ def test_article_available_after_completing_today_tasks(client, monkeypatch):
     done_queue = client.get("/api/cards").json()
     assert done_queue["queue"] == []
     assert done_queue["can_extra_new"] is True
+    # 把 develop 提前到期并点「重来」，作为今日短文来源。
+    _force_due(develop["id"])
+    db = SessionLocal()
+    try:
+        develop_revision = int(db.get(Card, develop["id"]).revision or 0)
+    finally:
+        db.close()
+    assert client.post(
+        f"/api/cards/{develop['id']}/review",
+        json={
+            "rating": "again",
+            "action_id": "article-done-develop-again",
+            "expected_revision": develop_revision,
+        },
+    ).status_code == 200
 
     calls = []
     def spy_generate(
@@ -978,21 +1036,14 @@ def test_article_available_after_completing_today_tasks(client, monkeypatch):
     monkeypatch.setattr(
         "app.routes.card_routes.ai_mod.generate_article", spy_generate
     )
-    new_only = client.post("/api/cards/article", json={"source": "new"})
-    assert new_only.status_code == 200
-    assert calls[-1][0] == ["develop", "point", "run"]
+    resp = client.post("/api/cards/article")
+    assert resp.status_code == 200
+    assert calls[-1][0] == ["develop"]
     assert calls[-1][1] == []
 
-    review_only = client.post("/api/cards/article", json={"source": "review"})
-    assert review_only.status_code == 400
-    assert review_only.json()["detail"] == "无效单词范围"
 
-    mixed = client.post("/api/cards/article", json={"source": "mixed"})
-    assert mixed.status_code == 400
-
-
-def test_article_new_source_deduplicates_same_word(client, monkeypatch):
-    """同一单词有多张今日新卡时，在今日短文中只出现一次。"""
+def test_article_deduplicates_same_word(client, monkeypatch):
+    """同一单词有多张今天点过「重来」的卡时，在今日短文中只出现一次。"""
     _register(client, "article-priority@example.com")
     created = client.post(
         "/api/card-studio/cards",
@@ -1001,7 +1052,15 @@ def test_article_new_source_deduplicates_same_word(client, monkeypatch):
     assert created.status_code == 200
     queue = client.get("/api/cards").json()["queue"]
     assert len(queue) == 1
-    _graduate_known(client, queue[0]["id"], 1)
+    first = client.post(
+        f"/api/cards/{queue[0]['id']}/review",
+        json={
+            "rating": "again",
+            "action_id": "article-dedup-run-1",
+            "expected_revision": queue[0]["revision"],
+        },
+    )
+    assert first.status_code == 200
     # 再给 run 建一张 reading 卡并改成昨天到期：同词出现在复习队列。
     made = client.post(
         "/api/card-studio/cards",
@@ -1031,8 +1090,8 @@ def test_article_new_source_deduplicates_same_word(client, monkeypatch):
     assert client.post(
         f"/api/cards/{reading_id}/review",
         json={
-            "rating": "easy",
-            "action_id": "article-priority-reading",
+            "rating": "again",
+            "action_id": "article-dedup-reading",
             "expected_revision": reading_revision,
         },
     ).status_code == 200
@@ -1049,7 +1108,7 @@ def test_article_new_source_deduplicates_same_word(client, monkeypatch):
     monkeypatch.setattr(
         "app.routes.card_routes.ai_mod.generate_article", spy_generate
     )
-    generated = client.post("/api/cards/article", json={"source": "new"})
+    generated = client.post("/api/cards/article")
     assert generated.status_code == 200
     assert calls[-1][0] == ["run"]
     assert calls[-1][1] == []

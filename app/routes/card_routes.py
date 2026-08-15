@@ -64,7 +64,6 @@ from ..api_support import (
 from ..db import SessionLocal, is_sqlite_busy_error, reserve_sqlite_write
 from ..models import AnkiReviewLog
 from ..schemas import (
-    ArticleIn,
     CardsBatchDeleteIn,
     CardStudioCreateIn,
     CardTargetsIn,
@@ -2224,7 +2223,7 @@ def _generate_study_articles_in_background(
     day: str,
     word_groups: list[list[str]],
 ) -> None:
-    """在后台逐篇生成今天新学词的今日短文；全部成功后再原子保存。"""
+    """在后台逐篇生成今天点过「重来」的单词的今日短文；全部成功后再原子保存。"""
     db = SessionLocal()
     try:
         user = db.get(User, user_id)
@@ -2272,28 +2271,22 @@ def _generate_study_articles_in_background(
 
 @router.post("/cards/article")
 def generate_study_article(
-    body: ArticleIn,
     request: Request,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
-    """按所选范围生成今日短文；长任务在响应后后台执行。
+    """按今天点过「重来」的卡片生成今日短文；长任务在响应后后台执行。
 
-    可选择今天新学的单词，或今天所有点过“不认识”的单词。目标词
-    全部覆盖并均匀拆分为每篇最多 12 个，使用 DeepSeek 思考模式 `max`。
-
-    单词来源 = 今天 ReviewLog 中的卡片；新学 = 今天首次学习的卡片
-    （is_new=True，无论评分通过与否）；不认识 = 今天至少有一条
-    rating=again 的卡片，包含新卡和复习卡。同一卡片自动去重。
+    单词来源 = 今天 ReviewLog 中至少有一条 rating=again 的卡片（今天点过
+    「重来」的卡片），包含新卡和复习卡。目标词全部覆盖并均匀拆分为每篇
+    最多 12 个，使用 DeepSeek 思考模式 `max`。同一卡片自动去重。
     """
     user = _require_user(db, request)
-    if body.source not in {"new", "again"}:
-        raise HTTPException(status_code=400, detail="无效单词范围")
     now = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
     _day, start_of_day, end_of_day = _learning_day(now)
 
     today_logs = (
-        db.query(ReviewLog.card_id, ReviewLog.is_new, ReviewLog.rating)
+        db.query(ReviewLog.card_id, ReviewLog.rating)
         .filter(
             ReviewLog.user_id == user.id,
             ReviewLog.reviewed_at >= start_of_day,
@@ -2301,11 +2294,8 @@ def generate_study_article(
         )
         .all()
     )
-    new_card_ids = {
-        card_id for card_id, is_new, _rating in today_logs if is_new
-    }
     again_card_ids = {
-        card_id for card_id, _is_new, rating in today_logs if rating == "again"
+        card_id for card_id, rating in today_logs if rating == "again"
     }
     def _card_words(card_ids: set[int]) -> list[str]:
         """按卡片取单词并去重；Anki 卡去掉词头后的 [提示] 后缀。"""
@@ -2329,18 +2319,11 @@ def generate_study_article(
                 words.append(word)
         return words
 
-    selected_words = _card_words(
-        new_card_ids if body.source == "new" else again_card_ids
-    )
+    selected_words = _card_words(again_card_ids)
     if not selected_words:
-        detail = (
-            "今天还没有新学的单词，请先学习今天的新卡后再生成今日短文"
-            if body.source == "new"
-            else "今天还没有点过不认识的单词"
-        )
         raise HTTPException(
             status_code=400,
-            detail=detail,
+            detail="今天还没有点过「重来」的单词，请先学习今天的卡片后再生成今日短文",
         )
     word_groups = _article_word_groups(
         selected_words, ai_mod.AI_ARTICLE_TARGET_LIMIT

@@ -2191,11 +2191,8 @@
       const status = document.getElementById("real-article-status");
       const result = document.getElementById("real-article-result");
       const placeholder = document.getElementById("real-article-placeholder");
-      const sourceSelect = document.getElementById("real-article-source");
-      const source = sourceSelect ? sourceSelect.value : "new";
       articleGenerating = true;
       generateArticle.disabled = true;
-      if (sourceSelect) sourceSelect.disabled = true;
       status.hidden = false;
       status.textContent = "DeepSeek 正在生成今日短文…";
       result.hidden = true;
@@ -2204,7 +2201,6 @@
         const res = await fetch("/api/cards/article", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ source }),
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.detail || "无法启动今日短文生成");
@@ -2222,7 +2218,6 @@
       } finally {
         articleGenerating = false;
         generateArticle.disabled = false;
-        if (sourceSelect) sourceSelect.disabled = false;
       }
     };
   }
