@@ -7,26 +7,30 @@ const source = fs.readFileSync(path.join(ROOT, "app", "static", "landing-v51.js"
 const css = fs.readFileSync(path.join(ROOT, "app", "static", "style.css"), "utf8");
 
 const repeatMatch = source.match(
-  /function shouldRepeatReviewToday\(rating, card, now = Date\.now\(\)\) \{[\s\S]*?\n  \}/
+  /function shouldRepeatReviewToday\(rating, card\) \{[\s\S]*?\n  \}/
 );
 if (!repeatMatch) throw new Error("shouldRepeatReviewToday 函数未找到");
 const shouldRepeatReviewToday = new Function(
   `${repeatMatch[0].replace(/^function /, "function ")}\nreturn shouldRepeatReviewToday;`
 )();
 
-const soon = new Date(Date.now() + 60_000).toISOString();
-const learningCard = { is_learning: true, due_at: soon };
-assert.strictEqual(shouldRepeatReviewToday("again", learningCard), true);
-assert.strictEqual(shouldRepeatReviewToday("hard", learningCard), true);
+const learningRepeatNow = { repeat_now: true };
+assert.strictEqual(shouldRepeatReviewToday("again", learningRepeatNow), true);
+assert.strictEqual(shouldRepeatReviewToday("hard", learningRepeatNow), true);
 assert.strictEqual(
-  shouldRepeatReviewToday("good", learningCard),
+  shouldRepeatReviewToday("good", learningRepeatNow),
   false,
   "点良好后同一卡不能立刻重新出现"
 );
 assert.strictEqual(
-  shouldRepeatReviewToday("easy", learningCard),
+  shouldRepeatReviewToday("easy", learningRepeatNow),
   false,
   "点简单后同一卡不能立刻重新出现"
+);
+assert.strictEqual(
+  shouldRepeatReviewToday("again", { repeat_now: false }),
+  false,
+  "服务端判定今天不需要回队时，前端不得自行放回队列"
 );
 
 assert.match(

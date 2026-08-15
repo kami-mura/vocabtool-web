@@ -660,6 +660,7 @@
   let oilDashboardData = null;
   let oilTodayTimer = null;
   let realReviewHistory = [];
+  let realReviewLastRatingAt = 0;
   let realReviewCanUndo = false;
   // 制卡/生成文章/词库操作完成时想刷新复习队列，但如果用户正在复习，
   // 直接重拉队列会把“刚评过的学习卡”按服务端顺序顶回队首，造成乱跳。
@@ -1208,7 +1209,11 @@
   function updateRealUndoButton() {
     const button = document.getElementById("real-review-undo");
     if (button) {
-      button.disabled = realReviewHistory.length === 0 && !realReviewCanUndo;
+      // 本地历史必须还在 15 分钟窗口内才可撤回；服务端 can_undo 仍可作为兜底。
+      const recentLocalUndo =
+        realReviewHistory.length > 0 &&
+        Date.now() - realReviewLastRatingAt < 14 * 60 * 1000;
+      button.disabled = !(recentLocalUndo || realReviewCanUndo);
     }
   }
 
@@ -1489,14 +1494,12 @@
       .then(() => rateRealReviewCardNow(id, rating));
   }
 
-  function shouldRepeatReviewToday(rating, card, now = Date.now()) {
+  function shouldRepeatReviewToday(rating, card) {
     // “良好/简单”都表示这次已经认识，绝不能因服务端的学习状态或
     // 到期时间边界让同一张卡立刻重新出现。
-    if (!card || !card.is_learning || !["again", "hard"].includes(rating)) {
-      return false;
-    }
-    const due = card.due_at ? new Date(card.due_at).getTime() : NaN;
-    return Number.isFinite(due) && due - now < 24 * 3600 * 1000;
+    // 是否今天回队由服务端 repeat_now 决定，前端不再用 due_at 自行推断。
+    if (!card || !["again", "hard"].includes(rating)) return false;
+    return Boolean(card.repeat_now);
   }
 
   async function rateRealReviewCardNow(id, rating) {
@@ -1532,7 +1535,20 @@
       }
       // 先乐观更新本地队列，点击立即换卡，不等待网络。
       if (!holdCard) {
-        realReviewQueue.splice(index, 1);
+        if (willRelearn) {
+          // 重来/困难卡今天还要学：直接移到队尾，剩余数保持不变，
+          // 不会出现“N -> N-1 -> N”的跳动。
+          realReviewQueue.splice(index, 1);
+          realReviewQueue.push({
+            ...card,
+            queue_kind: "again",
+            session_repeat: true,
+            session_correct_streak: 0,
+            _againToday: false,
+          });
+        } else {
+          realReviewQueue.splice(index, 1);
+        }
         renderRealReview();
       }
       // 同一次点击的自动重试必须复用 action_id 与 revision，确保服务端幂等。
@@ -1559,6 +1575,7 @@
       // 保存成功后才记入撤回历史，避免失败时本地记录与服务器不一致。
       realReviewHistory.push({ card, index });
       if (realReviewHistory.length > 50) realReviewHistory.shift();
+      realReviewLastRatingAt = Date.now();
       updateRealUndoButton();
       syncReviewManageRow();
       if (data.today_stats) {
@@ -1569,8 +1586,7 @@
         realTodayStats = cur;
       }
       const fresh = data.cards && data.cards[0] && data.cards[0].card;
-      // “良好/简单”已经认识，绝不回到今天；只有重来/困难且仍在
-      // 24 小时内学习步骤中的卡片才追加到队尾。
+      // 是否今天回队由服务端 repeat_now 决定。
       if (shouldRepeatReviewToday(rating, fresh)) {
         // FSRS 仍把它留在学习队列：无论本地是否已有副本，
         // 都移除后追加到队尾，保证刚评过的卡不会弹回队首。
@@ -1585,9 +1601,9 @@
         const freshDupIndex = realReviewQueue.findIndex((item) => item.id === id);
         if (freshDupIndex >= 0) realReviewQueue.splice(freshDupIndex, 1);
         realReviewQueue.push(repeatItem);
-      } else if (holdCard) {
-        // 暂留的最后一张卡被服务器确认不再今天重学
-        // （毕业，或下次复习 >= 1 天）：从队列移除。
+      } else if (willRelearn) {
+        // 服务端认为它今天不再回队（例如毕业或下次复习 >= 1 天）：
+        // 移除本地暂留/乐观副本。
         const removeIndex = realReviewQueue.findIndex((item) => item.id === id);
         if (removeIndex >= 0) realReviewQueue.splice(removeIndex, 1);
       }
@@ -1611,8 +1627,15 @@
       }
       // 其余失败（网络/500 等）：把卡恢复回原位并保留（不重拉队列），
       // 避免"评分成功感却卡片又出现"的错觉；用户可直接重试。
-      if (!holdCard && index >= 0 && !realReviewQueue.some((item) => item.id === id)) {
-        realReviewQueue.splice(Math.min(index, realReviewQueue.length), 0, card);
+      if (!holdCard && index >= 0) {
+        const dupIndex = realReviewQueue.findIndex((item) => item.id === id);
+        if (willRelearn) {
+          // 移除“重来/困难”的队尾乐观副本，把原卡放回原位置。
+          if (dupIndex >= 0) realReviewQueue.splice(dupIndex, 1);
+          realReviewQueue.splice(Math.min(index, realReviewQueue.length), 0, card);
+        } else if (dupIndex < 0) {
+          realReviewQueue.splice(Math.min(index, realReviewQueue.length), 0, card);
+        }
         renderRealReview();
       }
       return;
@@ -1652,7 +1675,10 @@
   }
 
   async function undoRealReview() {
-    if (!realReviewHistory.length) return;
+    const recentLocalUndo =
+      realReviewHistory.length > 0 &&
+      Date.now() - realReviewLastRatingAt < 14 * 60 * 1000;
+    if (!recentLocalUndo && !realReviewCanUndo) return;
     const button = document.getElementById("real-review-undo");
     if (button) button.disabled = true;
     const status = document.getElementById("real-undo-status");
