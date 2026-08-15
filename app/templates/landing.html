@@ -7,20 +7,10 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <script>
-    (function () {
-      var saved = null;
-      try { saved = localStorage.getItem("vocabtool.theme"); } catch (e) {}
-      var dark = saved === "dark" ||
-        (saved !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-      var theme = dark ? "dark" : "light";
-      document.documentElement.dataset.theme = theme;
-      document.documentElement.style.backgroundColor = dark ? "#0f1420" : "#f7f9fd";
-      document.documentElement.style.colorScheme = theme;
-      var meta = document.querySelector('meta[name="theme-color"]');
-      if (meta) meta.setAttribute("content", dark ? "#0f1420" : "#007AFF");
-    })();
-  </script>
+  <meta name="color-scheme" content="dark light">
+  <!-- 主题初始化必须先用外部脚本（CSP script-src 'self' 拦截内联脚本），
+       且在样式表之前加载，否则夜间模式刷新会先闪一帧日间模式。 -->
+  <script src="{{ static_url('theme-head.js') }}"></script>
   <link rel="manifest" href="/manifest.webmanifest">
   <title>vocabtool - 查单词、记词汇，读文章</title>
   <link rel="icon" type="image/png" sizes="192x192" href="{{ static_url('icons/icon-192.png') }}">

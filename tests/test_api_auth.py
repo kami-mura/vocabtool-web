@@ -77,15 +77,26 @@ def test_home_page_has_guest_search_demo_and_login_link(client):
 
 
 def test_theme_is_applied_before_stylesheets_on_home_and_login(client):
+    """主题必须在首帧前生效：theme-head.js 先于样式表加载，且页面不能依赖
+    内联脚本（CSP script-src 'self' 会拦截内联脚本，夜间模式刷新会闪日间模式）。"""
     for path in ("/", "/login"):
-        html = client.get(path).text
-        initializer = html.index('localStorage.getItem("vocabtool.theme")')
+        response = client.get(path)
+        html = response.text
+        initializer = html.index("theme-head.js")
         first_stylesheet = html.index('<link rel="stylesheet"')
         assert initializer < first_stylesheet
-        assert 'window.matchMedia("(prefers-color-scheme: dark)").matches' in html
-        assert "document.documentElement.dataset.theme = theme" in html
+        assert '<meta name="color-scheme" content="dark light">' in html
+        # 内联 <script> 会被 CSP script-src 'self' 拦截；模板只能引用外部脚本。
+        assert "<script>" not in html
         assert "theme-flash-guard" not in html
         assert "visibility: hidden" not in html
+        policy = response.headers.get("content-security-policy", "")
+        script_src = next(
+            (part for part in policy.split(";") if part.strip().startswith("script-src")),
+            "",
+        )
+        assert "script-src 'self'" in script_src
+        assert "unsafe-inline" not in script_src
 
 
 def test_app_page_is_removed(client):
