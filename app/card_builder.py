@@ -91,12 +91,9 @@ def is_complete_sentence(sentence: str, word: str) -> bool:
 def sentence_front(sentence: str, word: str, cloze: bool = False) -> str:
     sentence = _complete_sentence(sentence)
     if not is_complete_sentence(sentence, word):
-        # 找不到包含目标词的完整句：阅读卡退化为加粗单词，正面仍凸显目标词；
-        # 不审核 AI 生成内容，也不因此拒绝这张卡。Cloze 卡保持原句即可。
-        if cloze:
-            return sentence
-        base = re.sub(r"[\(\（].*?[\)\）]", "", word, flags=re.IGNORECASE).strip()
-        return f"**{base}**"
+        # AI 例句原样使用：句中定位不到目标词时不改写、不替换正面，
+        # 阅读卡与 Cloze 卡都保留原句（定位得到时才加粗/挖空）。
+        return sentence
     return _sentence_front(sentence, word, cloze=cloze)
 
 

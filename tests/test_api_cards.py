@@ -958,7 +958,9 @@ def test_cloze_and_reading_fronts_use_word_not_hint(client, monkeypatch):
     assert "(verb)" not in reading_card["word"]
 
 
-def test_card_studio_rejects_invalid_ai_sentence_structure(client, monkeypatch):
+def test_card_studio_accepts_ai_sentence_without_target_word(client, monkeypatch):
+    """不再校验 AI 例句是否包含目标词：阅读卡降级为加粗单词正面，
+    仍然建卡（此前直接拒绝，见「AI 例句未包含目标词或合理词形」误报）。"""
     register(client, "invalid-ai-card@example.com")
 
     def fake_generate(_db, _user_id, words, _card_template="reading"):
@@ -984,16 +986,20 @@ def test_card_studio_rejects_invalid_ai_sentence_structure(client, monkeypatch):
         json={"words": ["quasar"], "card_type": "reading"},
     )
     assert reading.status_code == 200
-    assert reading.json()["created"] == 0
-    assert "未包含目标词" in reading.json()["failed"][0]
+    assert reading.json()["created"] == 1
+    assert reading.json()["failed"] == []
+    cards = client.get("/api/cards/browse", params={"q": "quasar"}).json()["cards"]
+    # AI 例句原样使用：句中没出现目标词时正面保留原句，不替换成加粗单词。
+    assert cards[0]["front"] == "The distant object was easy to see through the telescope."
 
     cloze = client.post(
         "/api/card-studio/cards",
         json={"words": ["run"], "card_type": "cloze"},
     )
     assert cloze.status_code == 200
-    assert cloze.json()["created"] == 0
-    assert "只挖空一次" in cloze.json()["failed"][0]
+    # 不校验挖空数量：目标词出现两次就挖两处，原样接受。
+    assert cloze.json()["created"] == 1
+    assert cloze.json()["failed"] == []
 
 
 def test_card_studio_batches_uncached_words_without_per_word_lookup(client, monkeypatch):
@@ -1433,3 +1439,20 @@ def test_expressions_targets_exclude_existing_same_type_fronts(client):
         },
     ).json()
     assert latin_only["words"] == []
+
+
+def test_cards_browse_returns_ngsl_rank_on_default_sort(client):
+    """默认时间排序也必须返回 ngsl_rank：此前只有 NGSL 排序分支带该字段，
+    默认视图全部显示「不在 NGSL 词表」。"""
+    register(client, "browse-rank@example.com")
+    made = client.post(
+        "/api/card-studio/cards", json={"words": ["run"], "card_type": "reading"}
+    )
+    assert made.status_code == 200 and made.json()["created"] == 1
+
+    default_sort = client.get("/api/cards/browse").json()
+    assert default_sort["cards"], "应当至少有一张卡"
+    assert default_sort["cards"][0]["ngsl_rank"] is not None
+
+    time_sort = client.get("/api/cards/browse", params={"sort": "time"}).json()
+    assert time_sort["cards"][0]["ngsl_rank"] is not None

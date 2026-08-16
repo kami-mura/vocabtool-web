@@ -910,14 +910,10 @@ def create_cards_from_studio(
                     # 例句卡正面必须是完整句子；AI 没返回例句就不建卡，避免空正面。
                     failed.append(f"{raw_word}：AI 没有返回可用的例句")
                     continue
-                if not card_builder.is_complete_sentence(sentence, base_word):
-                    failed.append(f"{raw_word}：AI 例句未包含目标词或合理词形")
-                    continue
+                # AI 例句原样使用：不做包含性校验，也不因挖空数量拒绝；
+                # 句中定位得到目标词才加粗/挖空，定位不到就保留原句。
                 if body.card_type == "cloze":
                     front = card_builder.sentence_front(sentence, base_word, cloze=True)
-                    if front.count("______") != 1:
-                        failed.append(f"{raw_word}：Cloze 例句必须只挖空一次目标词")
-                        continue
                     back = (
                         f"{card_builder.sentence_front(sentence, base_word, cloze=False)}\n\n"
                         f"{meaning}"
@@ -1253,8 +1249,16 @@ def browse_cards(
         ]
         return {"ids": ids, "total": total, "limit": limit, "offset": offset}
     rows = query.order_by(*sort_key).offset(offset).limit(limit).all()
+    # ngsl_rank 不能只在 NGSL 排序分支返回：默认按时间排序时字段缺失，
+    # 前端会把所有卡片显示成「不在 NGSL 词表」。
+    ranks = {
+        card.id: vocab.rank_of(str(card.word or "").split(" [", 1)[0])
+        for card in rows
+    }
     return {
-        "cards": [_card_dict(card) for card in rows],
+        "cards": [
+            {**_card_dict(card), "ngsl_rank": ranks[card.id]} for card in rows
+        ],
         "total": total,
         "limit": limit,
         "offset": offset,
