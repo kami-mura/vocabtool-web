@@ -2715,8 +2715,8 @@ button.ghost.small {
   font-size: 13px;
 }
 
-/* 今日概览已统一展示进度与完成状态，复习区不再重复显示统计与完成框 */
-#real-review-status,
+/* 今日概览已统一展示进度与完成状态，复习区不再重复显示统计与完成框；
+   #real-review-status 恕不在此列——它是加载/保存/删除失败的唯一反馈通道。 */
 #real-review-empty,
 #real-review-empty-none {
   display: none;

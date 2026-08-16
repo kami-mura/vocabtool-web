@@ -143,11 +143,11 @@ def test_dashboard_again_pending_counts_learning_cards(client):
     assert data["again_pending"] >= 1
 
 
-def test_study_date_expr_compiles_per_dialect(monkeypatch):
+def test_study_date_expr_compiles_sqlite_dialect(monkeypatch):
     from zoneinfo import ZoneInfo
 
     from sqlalchemy import column
-    from sqlalchemy.dialects import postgresql, sqlite
+    from sqlalchemy.dialects import sqlite
 
     from app import config as app_config
     from app.routes.dashboard_routes import _study_date_expr
@@ -162,17 +162,31 @@ def test_study_date_expr_compiles_per_dialect(monkeypatch):
             dialect=sqlite.dialect(), compile_kwargs={"literal_binds": True}
         )
     )
-    monkeypatch.setattr(app_config, "DATABASE_URL", "postgresql://user:pass@localhost/db")
-    pg_sql = str(
-        _study_date_expr(reviewed_at).compile(
-            dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True}
-        )
-    )
     assert f"{offset_hours:+g} hours" in sqlite_sql
     assert "+-" not in sqlite_sql
-    assert "date(" in pg_sql.lower()
-    assert f"interval '{offset_hours:g} hours'" in pg_sql
-    assert "," not in pg_sql
+
+
+def test_config_rejects_non_sqlite_database_url():
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    project_root = Path(__file__).resolve().parents[1]
+    env = {
+        **os.environ,
+        "DATABASE_URL": "postgresql://user:pass@localhost/db",
+        "VOCABFLOW_SKIP_DOTENV": "true",
+    }
+    result = subprocess.run(
+        [sys.executable, "-c", "from app import config"],
+        env=env,
+        cwd=project_root,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode != 0
+    assert "仅支持 SQLite" in result.stderr
 
 
 def test_dashboard_streak_works_in_negative_offset_timezone(client, monkeypatch):

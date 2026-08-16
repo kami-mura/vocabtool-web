@@ -303,3 +303,52 @@ def test_extract_docx_and_xlsx_with_named_sections():
         "Vocabulary",
         "Sentences",
     ]
+
+
+def test_epub_rejects_oversized_single_chapter_before_parsing():
+    """单章超过 4MB 绝对上限必须在 HTML 解析之前被拒：
+    之前单章可以吃满 max_chapter_bytes 并先完成整章解析才查字符预算，
+    一个压缩包就能在 Web 进程内放大出数百 MB 内存峰值。"""
+    big = b"a" * (4 * 1024 * 1024 + 1)
+    data = sample_epub(chapter_one=big)
+    # 总字符预算足够大（1000 万），拒绝只能来自单章绝对上限。
+    with pytest.raises(ImportFileError, match="解压后过大"):
+        extract_file_content("book.epub", data, 10_000_000)
+
+
+def test_epub_normal_chapters_still_import_within_budget():
+    """修复不应影响正常大小的书：预算内多章照常解析。"""
+    text, source_type, _chapters = extract_file_content(
+        "book.epub", sample_epub(), 10_000
+    )
+    assert source_type == "epub"
+    assert "Chapter One" in text and "Chapter Two" in text
+
+
+def test_xml_entity_rejection_catches_utf16_documents():
+    """UTF-16 编码的 DOCTYPE/ENTITY 不能绕过字节子串检测：
+    转码后必须同样被拒（见 docs/审查整改清单.md P2-13）。"""
+    malicious = (
+        '<?xml version="1.0" encoding="UTF-16"?>\n'
+        '<!DOCTYPE root [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>\n'
+        "<root>&xxe;</root>"
+    )
+    for encoding in ("utf-16", "utf-16-le", "utf-16-be"):
+        encoded = malicious.encode(encoding)
+        assert b"<!DOCTYPE" not in encoded  # 前置条件：ASCII 子串确实搜不到
+        with pytest.raises(ImportFileError, match="不安全的 XML 实体声明"):
+            _reject_xml_entity_declarations(encoded, "DOCX")
+
+    # 无 BOM 但声明了 UTF-16 的变体同样要拦下。
+    import codecs as _codecs
+
+    no_bom = malicious.encode("utf-16-le")  # utf-16-le 编码本身不产生 BOM
+    assert not no_bom.startswith(_codecs.BOM_UTF16_LE)
+    with pytest.raises(ImportFileError, match="不安全的 XML 实体声明"):
+        _reject_xml_entity_declarations(no_bom, "DOCX")
+
+    # 正常的 UTF-16 文档（无实体声明）不受影响。
+    clean = (
+        '<?xml version="1.0" encoding="UTF-16"?>\n<root><child>ok</child></root>'
+    ).encode("utf-16")
+    _reject_xml_entity_declarations(clean, "DOCX")  # 不应抛错

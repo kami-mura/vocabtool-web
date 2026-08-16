@@ -97,29 +97,40 @@ def _utf8_size(value: str | None) -> int:
 
 _SENTENCE_REFRESH_INTERVAL_SECONDS = 300
 def _sentence_refresh_due(db: Session, user_id: int) -> bool:
-    """旧卡修复最多每 5 分钟跑一次；状态存数据库，避免进程内字典无界增长。"""
+    """旧卡修复最多每 5 分钟跑一次；状态存数据库，避免进程内字典无界增长。
+
+    用条件 UPDATE 原子占用运行窗口：并发请求只有一个能把 last_run_at
+    推到当前时刻，其余直接返回 False，不会再出现两个请求同时放行、
+    重复执行整段修复的竞态。
+    """
     now = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
-    row = db.get(SentenceRefreshState, user_id)
-    if row and row.last_run_at:
-        elapsed = (now - row.last_run_at).total_seconds()
-        if elapsed < _SENTENCE_REFRESH_INTERVAL_SECONDS:
-            return False
-        row.last_run_at = now
-    else:
-        db.add(SentenceRefreshState(user_id=user_id, last_run_at=now))
-    try:
+    threshold = now - dt.timedelta(seconds=_SENTENCE_REFRESH_INTERVAL_SECONDS)
+    claimed = (
+        db.query(SentenceRefreshState)
+        .filter(
+            SentenceRefreshState.user_id == user_id,
+            or_(
+                SentenceRefreshState.last_run_at.is_(None),
+                SentenceRefreshState.last_run_at <= threshold,
+            ),
+        )
+        .update(
+            {SentenceRefreshState.last_run_at: now},
+            synchronize_session=False,
+        )
+    )
+    if claimed:
         db.commit()
-    except IntegrityError:
-        # 并发请求同时初始化该状态时，后插入的一方会撞唯一约束；回滚后改用更新。
-        db.rollback()
-        row = db.get(SentenceRefreshState, user_id)
-        if row:
-            row.last_run_at = now
-            db.commit()
-        else:
+        return True
+    try:
+        with db.begin_nested():
             db.add(SentenceRefreshState(user_id=user_id, last_run_at=now))
-            db.commit()
-    return True
+        db.commit()
+        return True
+    except IntegrityError:
+        # 行已被并发请求抢先创建（其 last_run_at 是新时刻）：本轮不跑。
+        db.rollback()
+        return False
 
 
 def _today_stats(db: Session, user_id: int, now: dt.datetime) -> dict:
@@ -156,13 +167,8 @@ def _today_stats(db: Session, user_id: int, now: dt.datetime) -> dict:
 
 def _text_bytes(db: Session, *columns) -> int:
     """返回各列 UTF-8 字节数之和的表达式；NULL 列按 0 字节计，
-    避免任一列为 NULL 时整行被 SUM 跳过。PostgreSQL 用 octet_length，
-    SQLite 转 BLOB。
+    避免任一列为 NULL 时整行被 SUM 跳过。SQLite 转 BLOB 后 length 计字节。
     """
-    if db.bind.dialect.name == "postgresql":
-        return sum(
-            (func.coalesce(func.octet_length(column), 0) for column in columns), 0
-        )
     return sum(
         (
             func.coalesce(func.length(cast(column, LargeBinary)), 0)
@@ -242,8 +248,8 @@ _HEAVY_IMPORT_SEMAPHORE = threading.BoundedSemaphore(2)
 
 
 def _storage_cache_enabled(db: Session) -> bool:
-    """SQLite 单写者模型下，独立连接写缓存会互相锁死；只用 PostgreSQL 缓存。"""
-    return db.bind.dialect.name != "sqlite"
+    """SQLite 单写者模型下，独立连接写缓存会互相锁死；不启用存储缓存。"""
+    return False
 
 
 def _set_storage_usage(db: Session, user_id: int, used_bytes: int) -> None:
@@ -837,11 +843,11 @@ def _set_auth_cookie(response: Response, token: str, request: Request) -> None:
 
 
 def _is_trusted_proxy_peer(host: str) -> bool:
-    """只信任本机/内网回源或显式配置的可信代理 IP，防止伪造代理头。
+    """只信任本机回环或显式配置的可信代理 IP，防止伪造代理头。
 
-    默认信任 loopback/私网地址；设置 TRUSTED_PROXY_IPS 后收紧为
-    白名单（具体 IP 或 token：loopback / private），可防止同内网
-    其他主机/容器伪造转发头轮换身份绕过按 IP 限流。
+    默认仅信任 loopback；设置 TRUSTED_PROXY_IPS 后按白名单判断
+    （具体 IP 或 token：loopback / private）。Docker 网络内需要信任
+    私网段时显式配置，避免默认放开给同网段任意对等方。
     """
     try:
         ip = ipaddress.ip_address(host)
@@ -853,7 +859,7 @@ def _is_trusted_proxy_peer(host: str) -> bool:
         if item.strip()
     ]
     if not configured:
-        return ip.is_loopback or ip.is_private
+        return ip.is_loopback
     for item in configured:
         if item == "loopback" and ip.is_loopback:
             return True
@@ -868,17 +874,19 @@ def _is_trusted_proxy_peer(host: str) -> bool:
 
 
 def _anonymous_request_identity(request: Request) -> str:
-    """Cloudflare Tunnel 会覆盖该头；仅当直接连接来自可信代理时信任，
-    否则任何人都能伪造转发头绕过限流。
-
-    反向代理（Caddy/Nginx）部署时使用 X-Forwarded-For 的原始客户端地址，
+    """反向代理（Caddy/Nginx）部署时使用 X-Forwarded-For 的原始客户端地址，
     代理会把真实 IP 追加到列表末尾，因此只取最后一项。
+
+    CF-Connecting-IP 只在 TRUST_CF_CONNECTING_IP=true 时读取：普通反代不会
+    剥离该头，任何人都能伪造它轮换身份绕过限流；只有确认入口是
+    Cloudflare（Tunnel 或回源）时才应开启。
     """
     peer = request.client.host if request.client else ""
     if _is_trusted_proxy_peer(peer):
-        forwarded = request.headers.get("cf-connecting-ip", "").strip()
-        if forwarded:
-            return forwarded[:64]
+        if config.TRUST_CF_CONNECTING_IP:
+            forwarded = request.headers.get("cf-connecting-ip", "").strip()
+            if forwarded:
+                return forwarded[:64]
         forwarded = request.headers.get("x-forwarded-for", "").strip()
         if forwarded:
             return forwarded.split(",")[-1].strip()[:64]

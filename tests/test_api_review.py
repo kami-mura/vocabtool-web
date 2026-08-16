@@ -1351,3 +1351,40 @@ def test_review_survives_concurrent_tts_prefetch(client, monkeypatch):
     finally:
         scorer.close()
         speaker.close()
+
+
+def test_due_queue_payload_is_capped_but_remaining_count_stays_true(client):
+    """到期队列载荷有上限（防 1 万卡导入后单响应数十 MB），
+    但剩余数必须反映真实总数，不能被截断成上限值。"""
+    register(client, "queue-cap@example.com")
+    user_id = (
+        SessionLocal()
+        .query(User.id)
+        .filter(User.email == "queue-cap@example.com")
+        .scalar()
+    )
+    past = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None) - dt.timedelta(days=1)
+    db = SessionLocal()
+    try:
+        db.add_all(
+            Card(
+                user_id=user_id,
+                word=f"capword{index}",
+                card_type="general",
+                front=f"capword{index}",
+                back="back",
+                state="review",
+                due_at=past,
+            )
+            for index in range(1003)
+        )
+        db.commit()
+    finally:
+        db.close()
+
+    data = client.get("/api/cards").json()
+    assert len(data["queue"]) == 1000
+    assert data["remaining_counts"]["due"] == 1003
+    assert data["due_total"] == 1003
+    # 未触上限的常规用户行为不变：队列与剩余数一致。
+    assert all(item["queue_kind"] == "due" for item in data["queue"])

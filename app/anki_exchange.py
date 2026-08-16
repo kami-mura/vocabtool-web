@@ -368,9 +368,16 @@ def parse_apkg(data: bytes, max_cards: int) -> dict[str, object]:
 def _import_schedule(
     *, creation_time: int, card_type: int, queue: int, due: int, interval: int
 ) -> tuple[str, dt.datetime | None, int]:
-    if card_type == 0 and queue == 0:
+    if card_type == 0 and queue <= 0:
+        # 暂停/掩埋的新卡（queue=-1/-2）仍是新卡：buried 已在解析层置位，
+        # 此前会落进 review 分支变成“创建起就到期”的复习卡。
         return "new", None, 0
     if card_type in {1, 3} or queue in {1, 3, 4}:
+        if queue == 3:
+            # 跨日学习/重学卡的 due 是「集合创建起算的天数」，不是 Unix 秒；
+            # 以前小数值被当成过期时间戳改成“导入时刻”，未来跨日卡立刻到期。
+            base = _naive_utc_from_timestamp(creation_time)
+            return "learning", base + dt.timedelta(days=max(0, due)), 0
         if due > 1_000_000_000:
             due_at = _naive_utc_from_timestamp(due)
         else:
@@ -474,8 +481,13 @@ def import_parsed(db: Session, user_id: int, parsed: dict[str, object]) -> dict[
                 (str(item["word"]), str(item["card_type"]))
             )
             if candidate is not None and candidate.anki_guid not in {None, guid}:
-                conflicts += 1
-                continue
+                if str(item["card_type"]) != "anki":
+                    conflicts += 1
+                    continue
+                # Anki 多模板 note（Basic+Reverse、多 Cloze ordinal）：同词
+                # 的第二张卡 guid 含 ordinal，允许新建；唯一性由
+                # (user_id, anki_guid) 约束保证。站内卡仍走冲突路径。
+                candidate = None
             card = candidate
         if card is None:
             card = Card(

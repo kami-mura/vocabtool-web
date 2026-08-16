@@ -19,7 +19,7 @@
 3. 用 FSRS-6 安排每天的新卡和到期复习；
 4. 再用当天学习的词生成短文，在新语境中重新遇见它们。
 
-应用可以完全自部署。账户、词库、卡片和复习记录保存在自己的 SQLite 或 PostgreSQL 数据库中；AI 默认连接 DeepSeek，也可以改用兼容 OpenAI 接口格式的服务。没有配置 AI Key 时，基础词典查询仍然可用。
+应用可以完全自部署。账户、词库、卡片和复习记录保存在自己的 SQLite 数据库中；AI 默认连接 DeepSeek，也可以改用兼容 OpenAI 接口格式的服务。没有配置 AI Key 时，基础词典查询仍然可用。
 
 ## 主要特色
 
@@ -83,7 +83,7 @@
 
 ## 快速开始
 
-### Docker + PostgreSQL
+### Docker + SQLite
 
 适合长期自部署：
 
@@ -91,7 +91,7 @@
 git clone https://github.com/kami-mura/vocabtool-web.git
 cd vocabtool-web
 cp .env.example .env
-# 编辑 .env，至少设置 POSTGRES_PASSWORD
+# 编辑 .env（数据库默认 SQLite，落在 ./data，无需额外配置）
 docker compose up -d --build
 ```
 
@@ -113,7 +113,7 @@ cp .env.example .env
 uvicorn app.main:app --reload --port 8000
 ```
 
-访问 <http://127.0.0.1:8000>。本地未设置 `DATABASE_URL` 时默认使用 SQLite。
+访问 <http://127.0.0.1:8000>。数据库默认使用 SQLite（`data/vocabflow.db`）。
 
 ## 配置
 
@@ -121,8 +121,6 @@ uvicorn app.main:app --reload --port 8000
 
 | 变量 | 用途 |
 | --- | --- |
-| `DATABASE_URL` | 数据库连接；本地可省略以使用 SQLite |
-| `POSTGRES_PASSWORD` | Docker PostgreSQL 密码 |
 | `DEEPSEEK_API_KEY` | AI 查词、问答、制卡和短文 |
 | `DEEPSEEK_BASE_URL`、`DEEPSEEK_MODEL` | 切换兼容 OpenAI 接口格式的服务和模型 |
 | `RESEND_API_KEY`、`EMAIL_FROM`、`VERIFICATION_SECRET` | 邮箱验证码和密码重置 |
@@ -138,7 +136,7 @@ uvicorn app.main:app --reload --port 8000
 
 - FastAPI、SQLAlchemy、Pydantic
 - 原生 JavaScript、Jinja2、Service Worker；前端无需构建步骤
-- SQLite / PostgreSQL
+- SQLite
 - [py-fsrs](https://github.com/open-spaced-repetition/py-fsrs)、DeepSeek / OpenAI 兼容接口、edge-tts
 - pytest（246 个测试）、Ruff、Python compileall 和 JavaScript 语法检查
 - GitHub Actions：Python 3.11 / 3.12、gitleaks 密钥扫描、pip-audit 依赖审计

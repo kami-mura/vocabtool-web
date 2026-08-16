@@ -35,8 +35,14 @@ def _env_float(name: str, default: float) -> float:
         raise RuntimeError(f"环境变量 {name} 不是有效数字：{raw!r}") from None
 
 
-# 默认 SQLite，适合本地/小规模；部署时用 DATABASE_URL 指向 PostgreSQL。
+# 仅支持 SQLite，默认落在 data/ 目录。配置了其他数据库直接报错，
+# 避免带着未经验证的 DATABASE_URL 静默启动。
 DATABASE_URL = os.environ.get("DATABASE_URL", f"sqlite:///{DATA_DIR / 'vocabflow.db'}")
+if not DATABASE_URL.startswith("sqlite"):
+    raise RuntimeError(
+        f"DATABASE_URL 仅支持 SQLite，当前值 {DATABASE_URL!r}；"
+        "本项目已移除 PostgreSQL 支持"
+    )
 
 COOKIE_NAME = os.environ.get("COOKIE_NAME", "vf_session")
 COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "false").strip().lower() in {
@@ -59,10 +65,16 @@ ALLOWED_HOSTS = [
     ).split(",")
     if host.strip()
 ]
-# 可信代理来源 IP 白名单（逗号分隔）；空表示沿用默认（信任本机与内网回源）。
+# 可信代理来源 IP 白名单（逗号分隔）；空表示默认只信任本机回环。
 # 可写具体 IP（127.0.0.1、10.0.0.5）或 token：loopback / private。
-# 公网入口会被 Cloudflare 直接回源时，收紧为具体 IP 可防止同内网对等方伪造转发头。
+# Docker 网络内互访需要信任私网段时显式配置 TRUSTED_PROXY_IPS=loopback,private。
 TRUSTED_PROXY_IPS = os.environ.get("TRUSTED_PROXY_IPS", "").strip()
+# 仅当公网入口是 Cloudflare（Tunnel 或回源）时开启：普通反代（如纯 Caddy）
+# 会原样转发客户端伪造的 CF-Connecting-IP，导致按 IP 的限流身份可被轮换绕过。
+# Cloudflare 同样会设置 X-Forwarded-For，关闭此开关不影响 CF 部署的限流准确性。
+TRUST_CF_CONNECTING_IP = os.environ.get(
+    "TRUST_CF_CONNECTING_IP", "false"
+).strip().lower() in {"1", "true", "yes", "on"}
 EMAIL_VERIFICATION_REQUIRED = os.environ.get(
     "EMAIL_VERIFICATION_REQUIRED", "true"
 ).strip().lower() in {"1", "true", "yes", "on"}

@@ -437,7 +437,54 @@ def test_correctly_spelled_word_has_no_suggestion(client):
     result = client.post("/api/lookups", json={"text": "environment"})
     assert result.status_code == 200
     assert result.json()["spelling_note"] is None
-    assert result.json()["lookup"]["query"] == "environment"
+
+
+def test_vocab_corrected_ai_result_is_cached(client, monkeypatch):
+    """拼写纠错路径的 AI 结果必须写入 LookupCache：同一拼写错误
+    第二次查询命中 local_cache，不再为正确词重复调用 AI。"""
+    register(client, "corrected-cache@example.com")
+    ai_calls: list[str] = []
+
+    def fake_lookup(db, user_id, text, query_type, reserve_quota=True):
+        ai_calls.append(text)
+        if text == "environemnt":
+            return (
+                {"explanation": "", "card_front": "environemnt", "card_back": ""},
+                None,
+                False,
+            )
+        return (
+            {
+                "explanation": "environment /ɪnˈvaɪrənmənt/\n1. 环境 | surroundings",
+                "card_front": "The environment needs protection.",
+                "card_back": "环境",
+            },
+            None,
+            True,
+        )
+
+    monkeypatch.setattr("app.routes.lookup_routes.ai_mod.ai_enabled", lambda: True)
+    monkeypatch.setattr("app.routes.lookup_routes.ai_mod.explain_lookup", fake_lookup)
+
+    first = client.post("/api/lookups", json={"text": "environemnt"})
+    assert first.status_code == 200
+    assert first.json()["spelling_note"] == {
+        "original": "environemnt",
+        "corrected": "environment",
+    }
+    assert first.json()["lookup_source"] == "deepseek"
+    assert ai_calls.count("environment") == 1
+
+    # 第二次同一拼写错误：正确词命中缓存，只为拼写本身再试一次 AI。
+    second = client.post("/api/lookups", json={"text": "environemnt"})
+    assert second.status_code == 200
+    assert second.json()["spelling_note"] == {
+        "original": "environemnt",
+        "corrected": "environment",
+    }
+    assert second.json()["lookup_source"] == "local_cache"
+    assert ai_calls.count("environment") == 1
+    assert second.json()["lookup"]["query"] == "environment"
 
 
 def test_vocab_suggest_correction_units():

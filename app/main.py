@@ -12,7 +12,6 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import text
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
@@ -98,6 +97,10 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
                     request._receive = counted_receive
         response = await call_next(request)
+        # SW 脚本在 /static/ 下但要控制整站：必须显式放宽允许作用域，
+        # 否则 register(..., {scope: "/"}) 会被浏览器拒绝。
+        if request.url.path == "/static/sw.js":
+            response.headers.setdefault("Service-Worker-Allowed", "/")
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
         response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
         response.headers.setdefault("Referrer-Policy", "same-origin")
@@ -123,10 +126,6 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    if not config.COOKIE_SECURE and not config.DATABASE_URL.startswith("sqlite"):
-        logger.warning(
-            "COOKIE_SECURE 未开启：生产环境应设为 true，并确保反向代理传递 HTTPS 协议头"
-        )
     if config.EMAIL_VERIFICATION_REQUIRED:
         if not config.VERIFICATION_SECRET:
             logger.warning(
@@ -191,47 +190,33 @@ def healthz():
 
     业务池饱和/写锁竞争时（previous 实现共用 SessionLocal 池），
     healthz 会跟着阻塞超过看门狗上限，连续失败被误判重启。
-    SQLite 用只读直连 + 1 秒超时；PostgreSQL 用无连接池的短连接。
+    SQLite 用只读直连 + 1 秒超时。返回体附部署 commit（REVISION 文件，
+    由 deploy.sh 写入），用于核对线上版本与回滚定位。
     """
     try:
-        if config.DATABASE_URL.startswith("sqlite"):
-            from sqlalchemy.engine import make_url
+        from sqlalchemy.engine import make_url
 
-            url = make_url(config.DATABASE_URL)
-            import sqlite3
+        url = make_url(config.DATABASE_URL)
+        import sqlite3
 
-            conn = sqlite3.connect(
-                f"file:{url.database}?mode=ro", uri=True, timeout=1
-            )
-            try:
-                conn.execute("SELECT 1")
-            finally:
-                conn.close()
-        else:
-            engine = _healthz_engine()
-            with engine.connect() as connection:
-                connection.execute(text("SELECT 1"))
+        conn = sqlite3.connect(
+            f"file:{url.database}?mode=ro", uri=True, timeout=1
+        )
+        try:
+            conn.execute("SELECT 1")
+        finally:
+            conn.close()
     except Exception:  # 健康接口不暴露数据库错误细节
         return JSONResponse({"ok": False}, status_code=503)
-    return {"ok": True}
-
-
-_healthz_engine_instance = None
-
-
-def _healthz_engine():
-    """为 PostgreSQL 模式准备的无连接池短连接 engine，复用实例不建池。"""
-    global _healthz_engine_instance
-    if _healthz_engine_instance is None:
-        from sqlalchemy import create_engine
-        from sqlalchemy.pool import NullPool
-
-        _healthz_engine_instance = create_engine(
-            config.DATABASE_URL,
-            poolclass=NullPool,
-            connect_args={"connect_timeout": 2},
-        )
-    return _healthz_engine_instance
+    payload: dict = {"ok": True}
+    revision_file = APP_DIR.parent / "REVISION"
+    try:
+        revision = revision_file.read_text(encoding="utf-8").strip()
+        if revision:
+            payload["revision"] = revision[:64]
+    except OSError:
+        pass
+    return payload
 
 
 def _logged_in(request: Request) -> bool:

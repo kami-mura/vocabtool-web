@@ -14,7 +14,7 @@ if [[ -z "${backup_dir}" || ! -d "${backup_dir}" ]]; then
 fi
 
 pruned=0
-for pattern in 'vocabflow-db-*.dump' 'vocabflow-sqlite-*.db' 'vocabflow-data-*.tar.gz'; do
+for pattern in 'vocabflow-sqlite-*.db' 'vocabflow-data-*.tar.gz'; do
   index=0
   while IFS= read -r -d '' file; do
     index=$((index + 1))

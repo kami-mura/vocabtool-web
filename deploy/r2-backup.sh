@@ -45,7 +45,6 @@ if [[ ! -d "${backup_dir}" ]]; then
 fi
 
 include_args=(
-  --include 'vocabflow-db-*.dump'
   --include 'vocabflow-sqlite-*.db'
   --include 'vocabflow-data-*.tar.gz'
   --exclude '*'

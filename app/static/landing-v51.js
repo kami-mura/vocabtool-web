@@ -621,10 +621,17 @@
       if (event.target === vocabularyTestModal) closeVocabularyTest();
     });
   }
+  function setReviewStatus(message) {
+    const status = document.getElementById("real-review-status");
+    if (status) {
+      status.textContent = message;
+      status.hidden = !message;
+    }
+  }
+
   async function saveRealDailyNewLimit(value) {
     if (!Number.isInteger(value) || value < 0 || value > 200) {
-      const status = document.getElementById("real-review-status");
-      if (status) status.textContent = "每日新卡数量必须是 0–200 的整数";
+      setReviewStatus("每日新卡数量必须是 0–200 的整数");
       return false;
     }
     try {
@@ -637,12 +644,10 @@
       if (!res.ok) throw new Error(data.detail || "保存失败");
       const reviewInput = document.getElementById("real-review-daily-new-limit");
       if (reviewInput) reviewInput.value = value;
-      const status = document.getElementById("real-review-status");
-      if (status) status.textContent = "每日新学习数量已保存";
+      setReviewStatus("每日新学习数量已保存");
       return true;
     } catch (err) {
-      const status = document.getElementById("real-review-status");
-      if (status) status.textContent = "保存失败：" + err.message;
+      setReviewStatus("保存失败：" + err.message);
       return false;
     }
   }
@@ -1311,12 +1316,12 @@
       const stats = data.today_stats || {};
       realTodayStats = stats;
       updateOilToday();
+      setReviewStatus("");
     } catch (err) {
       if (preserveOnError) return;
       realReviewQueue = [];
       realReviewLoaded = false;
-      const status = document.getElementById("real-review-status");
-      if (status) status.textContent = "加载失败：" + err.message;
+      setReviewStatus("加载失败：" + err.message);
     }
     renderRealReview();
   }
@@ -1871,8 +1876,7 @@
         requestReviewRefresh();
         loadRealBrowser();
       } catch (err) {
-        const status = document.getElementById("real-review-status");
-        if (status) status.textContent = "删除失败：" + err.message;
+        setReviewStatus("删除失败：" + err.message);
       }
     };
   }
@@ -2324,21 +2328,27 @@
   const realProfileSave = document.getElementById("real-profile-save");
   if (realProfileSave) realProfileSave.onclick = saveRealProfile;
 
+  // 请求序号守卫 + 搜索防抖：输入快时慢响应不能覆盖新结果，
+  // 也不能每个按键都发一次请求（照抄复习队列 realReviewQueueVersion 的模式）。
+  let realWordsLoadVersion = 0;
   async function loadRealWords() {
     const search = document.getElementById("real-library-search");
     const query = search ? search.value.trim() : "";
     const params = new URLSearchParams({ limit: "120", status: realWordFilter });
     if (query) params.set("q", query);
+    const loadVersion = ++realWordsLoadVersion;
     try {
       const res = await fetch("/api/words?" + params.toString(), {
         headers: { "Content-Type": "application/json" },
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.detail || "加载失败");
+      if (loadVersion !== realWordsLoadVersion) return;
       const total = document.getElementById("real-word-total");
       if (total) total.textContent = "共 " + (Number(data.count) || 0) + " 个词";
       renderRealWords(data.words || []);
     } catch (err) {
+      if (loadVersion !== realWordsLoadVersion) return;
       const box = document.getElementById("real-word-results");
       if (box) box.innerHTML = '<div class="empty-state">' + escapeHtml(err.message) + "</div>";
     }
@@ -2396,7 +2406,11 @@
 
   const realLibrarySearch = document.getElementById("real-library-search");
   if (realLibrarySearch) {
-    realLibrarySearch.addEventListener("input", () => loadRealWords());
+    let searchDebounceTimer = 0;
+    realLibrarySearch.addEventListener("input", () => {
+      clearTimeout(searchDebounceTimer);
+      searchDebounceTimer = setTimeout(() => loadRealWords(), 250);
+    });
   }
   const realWordResults = document.getElementById("real-word-results");
   if (realWordResults) {
@@ -4096,7 +4110,12 @@
 
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
-      navigator.serviceWorker.register("/static/sw.js").catch(() => {});
+      // 必须显式指定 scope：SW 默认作用域是脚本所在目录 /static/，
+      // 控制不了 / 下的页面；同时依赖服务端对 /static/sw.js 返回
+      // Service-Worker-Allowed: / 头（见 main.py），二者缺一离线兜底失效。
+      navigator.serviceWorker
+        .register("/static/sw.js", { scope: "/" })
+        .catch(() => {});
     });
   }
 })();

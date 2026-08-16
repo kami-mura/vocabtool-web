@@ -58,7 +58,7 @@ jobs:
         run: python -m pytest tests -q
 
   javascript:
-    name: JavaScript syntax
+    name: JavaScript syntax and behavior
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -67,8 +67,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-      - name: Check JavaScript files
+      - name: Check all static JavaScript files
         run: |
-          node --check app/static/landing-v51.js
-          node --check app/static/auth.js
-          node --check app/static/ui-polish.js
+          for f in app/static/*.js; do
+            node --check "$f"
+          done
+      - name: Run JavaScript behavior tests
+        run: |
+          for f in tests/test_*.js; do
+            node "$f"
+          done

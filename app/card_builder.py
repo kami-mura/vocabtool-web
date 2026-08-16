@@ -13,11 +13,15 @@ _WORD_RE = re.compile(r"[A-Za-z]+(?:['’][A-Za-z]+)?", re.IGNORECASE)
 # 避免卡多书大的用户每次复习都全量扫描全部语料。
 _SENTENCE_CORPUS_SCAN_CHARS = 2_000_000
 _SENTENCE_CORPUS_PER_BOOK_CHARS = 500_000
+# 单轮旧卡修复的卡片数上限：修复在后台渐进执行，超出部分下一轮继续。
+_SENTENCE_REFRESH_MAX_CARDS = 2000
 
 
 def definition_text(entry: WordEntry | None) -> str:
     if not entry or not (entry.en_def or entry.zh_def):
-        return "暂无释义（可在卡片页点击“deepseek-v4-flash 释义”）"
+        from .ai import _active_model
+
+        return f"暂无释义（可在卡片页点击 {_active_model()} 释义）"
     parts = []
     if entry.zh_def:
         parts.append(f"释义：{entry.zh_def}")
@@ -109,7 +113,11 @@ def _remove_standalone_word(back: str, word: str) -> str:
 
 
 def refresh_sentence_cards(db: Session, user_id: int) -> int:
-    """把旧语料卡升级为完整句子格式；并把历史 bug 写成句子的通用卡正面恢复为单词。"""
+    """把旧语料卡升级为完整句子格式；并把历史 bug 写成句子的通用卡正面恢复为单词。
+
+    单轮修复的卡片数有上限：修复是渐进式的，超出部分等下一轮（5 分钟节流）
+    继续，避免老用户首屏被一次性全量修复阻塞。
+    """
     changed = 0
     # 历史 bug：通用卡正面曾被写成阅读材料里的完整句子。这里只修复
     # 正面“包含”单词（被句子污染）的卡；带括号注解的合法正面不受影响。
@@ -120,6 +128,8 @@ def refresh_sentence_cards(db: Session, user_id: int) -> int:
             Card.card_type == "general",
             func.lower(func.trim(Card.front)) != func.lower(func.trim(Card.word)),
         )
+        .order_by(Card.id)
+        .limit(_SENTENCE_REFRESH_MAX_CARDS)
         .all()
     ):
         if str(card.word or "").strip().lower() in str(card.front or "").lower():
@@ -143,6 +153,8 @@ def refresh_sentence_cards(db: Session, user_id: int) -> int:
                 == func.lower(func.trim(Card.word)),
             ),
         )
+        .order_by(Card.id)
+        .limit(_SENTENCE_REFRESH_MAX_CARDS)
         .all()
     )
     if not cards:
@@ -275,6 +287,19 @@ def build_cards(
             Card.user_id == user_id, Card.card_type == card_type
         )
     }
+    # WordEntry 一次预取（分块防 SQLite 绑定参数上限），
+    # 不再循环内逐词单查（500 词 = 500 次查询）。
+    pending_words = [
+        word for word in words if (word, card_type) not in existing
+    ]
+    entries: dict[str, WordEntry] = {}
+    for index in range(0, len(pending_words), 500):
+        for row in (
+            db.query(WordEntry)
+            .filter(WordEntry.word.in_(pending_words[index : index + 500]))
+            .all()
+        ):
+            entries.setdefault(row.word, row)
     created = 0
     created_words: list[str] = []
     for word in words:
@@ -282,7 +307,7 @@ def build_cards(
             continue
         if created >= limit:
             break
-        entry = db.query(WordEntry).filter(WordEntry.word == word).first()
+        entry = entries.get(word)
         rank = vocab.rank_of(word)
         rank_line = f"NGSL 排名：{rank}" if rank else "NGSL 排名：—"
         sentence = _complete_sentence(vocab.sentence_for_word(corpus.raw_text, word))

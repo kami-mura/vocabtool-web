@@ -391,3 +391,200 @@ def test_import_error_after_insert_rolls_back_entire_batch(client, monkeypatch):
         assert db.query(AnkiReviewLog).count() == 0
     finally:
         db.close()
+
+
+def test_import_schedule_decodes_anki_queue_matrix():
+    """导入排程映射矩阵：queue=3 是天数（不是 Unix 秒），暂停新卡保持新卡。"""
+    import datetime as dt
+
+    from app.anki_exchange import _import_schedule
+
+    creation = int(dt.datetime(2024, 1, 1, tzinfo=dt.timezone.utc).timestamp())
+    crt_date = dt.datetime(2024, 1, 1, tzinfo=dt.timezone.utc)
+
+    # 新卡（queue=0）与暂停/掩埋的新卡（queue=-1/-2）都保持新卡语义。
+    assert _import_schedule(
+        creation_time=creation, card_type=0, queue=0, due=7, interval=0
+    ) == ("new", None, 0)
+    for negative in (-1, -2):
+        assert _import_schedule(
+            creation_time=creation, card_type=0, queue=negative, due=3, interval=0
+        ) == ("new", None, 0)
+
+    # queue=1 学习卡：due 是 Unix 秒时间戳。
+    future_ts = int(
+        (dt.datetime.now(dt.timezone.utc) + dt.timedelta(hours=10)).timestamp()
+    )
+    state, due_at, _ = _import_schedule(
+        creation_time=creation, card_type=1, queue=1, due=future_ts, interval=0
+    )
+    assert state == "learning"
+    assert abs((due_at.replace(tzinfo=dt.timezone.utc) - (
+        dt.datetime.now(dt.timezone.utc) + dt.timedelta(hours=10)
+    )).total_seconds()) < 60
+
+    # queue=3 跨日学习卡：due 是「集合创建起算的天数」，
+    # 未来第 5 天到期必须换算到 crt+5 天，而不是导入时刻。
+    state, due_at, _ = _import_schedule(
+        creation_time=creation, card_type=1, queue=3, due=5, interval=0
+    )
+    assert state == "learning"
+    assert due_at is not None
+    expected = crt_date + dt.timedelta(days=5)
+    assert abs((due_at.replace(tzinfo=dt.timezone.utc) - expected).total_seconds()) < 1
+
+    # queue=2 复习卡：due 是天数，基于集合创建日。
+    state, due_at, _ = _import_schedule(
+        creation_time=creation, card_type=2, queue=2, due=30, interval=30
+    )
+    assert state == "review"
+    assert due_at is not None
+    expected = crt_date + dt.timedelta(days=30)
+    assert abs((due_at.replace(tzinfo=dt.timezone.utc) - expected).total_seconds()) < 1
+
+
+def test_multi_template_note_imports_every_ordinal_with_history(client):
+    """一个 note 的多模板（guid 含 ordinal）必须导入每一张卡和它的历史，
+    不再把第二张起判成冲突丢掉（见 docs/审查整改清单.md P1-3）。"""
+    register(client, email="multi-template@example.com")
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.email == "multi-template@example.com").one()
+
+        def anki_card(guid: str, front: str) -> dict:
+            card = _parsed_card(guid, front)
+            card["card_type"] = "anki"
+            card["reviews"] = [
+                {
+                    "id": 1770000000000 + len(guid),
+                    "ease": 3,
+                    "interval_days": 4,
+                    "last_interval_days": 1,
+                    "factor": 2500,
+                    "type": 1,
+                }
+            ]
+            return card
+
+        parsed = {
+            "cards": [
+                anki_card("note-abc:0", "durable"),
+                anki_card("note-abc:1", "able to last a long time"),
+            ]
+        }
+        result = import_parsed(db, user.id, parsed)
+        db.commit()
+        assert result == {
+            "created": 2,
+            "updated": 0,
+            "progress_kept": 0,
+            "conflicts": 0,
+            "histories": 2,
+        }
+        cards = (
+            db.query(Card)
+            .filter(Card.user_id == user.id)
+            .order_by(Card.id)
+            .all()
+        )
+        assert [card.anki_guid for card in cards] == ["note-abc:0", "note-abc:1"]
+        assert [card.front for card in cards] == [
+            "durable",
+            "able to last a long time",
+        ]
+
+        # 重复导入幂等：两张卡都按 guid 命中更新，历史不重复。
+        repeat = import_parsed(db, user.id, parsed)
+        db.commit()
+        assert repeat["created"] == 0
+        assert repeat["conflicts"] == 0
+        assert repeat["histories"] == 0
+        assert db.query(Card).filter(Card.user_id == user.id).count() == 2
+        logs = db.query(AnkiReviewLog).filter(AnkiReviewLog.user_id == user.id).count()
+        assert logs == 2
+    finally:
+        db.close()
+
+
+def test_site_card_word_type_dedup_still_enforced(client):
+    """放开约束只针对 anki 类型：站内生成卡的 (user, word, type) 去重不变。"""
+    register(client, email="site-dedup@example.com")
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.email == "site-dedup@example.com").one()
+        parsed = {
+            "cards": [
+                _parsed_card("site-guid-a:0", "first front"),
+                _parsed_card("site-guid-b:0", "second front"),
+            ]
+        }
+        result = import_parsed(db, user.id, parsed)
+        db.commit()
+        assert result["created"] == 1
+        assert result["conflicts"] == 1
+        assert db.query(Card).filter(Card.user_id == user.id).count() == 1
+    finally:
+        db.close()
+
+
+def test_migration_replaces_word_type_constraint_with_partial_index(tmp_path, monkeypatch):
+    """旧库的 uq_user_word_type 约束被替换为部分唯一索引：行数不变、
+    非 anki 卡去重仍在、同词多张 anki 卡可以共存。"""
+    from sqlalchemy import create_engine as sa_create_engine
+
+    from app import db as db_mod
+    from app.db import _migrate_anki_multi_template_cards
+
+    path = str(tmp_path / "old-cards.db")
+    engine = sa_create_engine(f"sqlite:///{path}")
+    with engine.begin() as connection:
+        connection.execute(db_mod.text(
+            "CREATE TABLE cards ("
+            "id INTEGER PRIMARY KEY, "
+            "user_id INTEGER NOT NULL, "
+            "word VARCHAR(100) NOT NULL, "
+            "card_type VARCHAR(20) NOT NULL, "
+            "front TEXT NOT NULL, "
+            "back TEXT NOT NULL, "
+            "anki_guid VARCHAR(64), "
+            "due_at DATETIME, "
+            "CONSTRAINT uq_user_word_type UNIQUE (user_id, word, card_type), "
+            "CONSTRAINT uq_cards_user_anki_guid UNIQUE (user_id, anki_guid))"
+        ))
+        connection.execute(db_mod.text(
+            "INSERT INTO cards (id, user_id, word, card_type, front, back, anki_guid, due_at) "
+            "VALUES (1, 1, 'durable', 'reading', 'f1', 'b1', NULL, '2026-01-01'), "
+            "(2, 1, 'run', 'general', 'f2', 'b2', NULL, NULL), "
+            "(3, 1, 'durable', 'anki', 'f3', 'b3', 'g:0', '2026-01-02')"
+        ))
+    monkeypatch.setattr(db_mod, "engine", engine)
+    _migrate_anki_multi_template_cards()
+
+    import sqlalchemy as sa
+
+    inspector = sa.inspect(engine)
+    uniques = {u.get("name") for u in inspector.get_unique_constraints("cards")}
+    indexes = {i["name"] for i in inspector.get_indexes("cards")}
+    assert "uq_user_word_type" not in uniques
+    assert "uq_cards_user_anki_guid" in uniques
+    assert "uq_cards_word_type_non_anki" in indexes
+
+    with engine.begin() as connection:
+        count = connection.execute(db_mod.text("SELECT COUNT(*) FROM cards")).scalar()
+        assert count == 3
+        # 同词第二张 anki 卡（不同 guid）现在可以插入。
+        connection.execute(db_mod.text(
+            "INSERT INTO cards (user_id, word, card_type, front, back, anki_guid, due_at) "
+            "VALUES (1, 'durable', 'anki', 'f4', 'b4', 'g:1', NULL)"
+        ))
+        # 非 anki 卡的同 (user, word, type) 仍被拒绝。
+        try:
+            connection.execute(db_mod.text(
+                "INSERT INTO cards (user_id, word, card_type, front, back, anki_guid, due_at) "
+                "VALUES (1, 'run', 'general', 'f5', 'b5', NULL, NULL)"
+            ))
+            raised = False
+        except Exception:
+            raised = True
+        assert raised, "非 anki 卡的 (user, word, type) 唯一性仍必须生效"
+    engine.dispose()

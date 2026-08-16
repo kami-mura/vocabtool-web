@@ -679,6 +679,9 @@ def test_ai_reading_card_is_a_sentence_and_repairs_legacy_front(client, monkeypa
     finally:
         db.close()
 
+    # 修复已改为响应后执行（BackgroundTasks）：先触发一次，
+    # TestClient 会等后台任务完成，再取修复后的结果。
+    client.get("/api/cards/browse", params={"q": "run", "card_type": "reading"})
     repaired = client.get(
         "/api/cards/browse", params={"q": "run", "card_type": "reading"}
     ).json()["cards"][0]
@@ -705,6 +708,8 @@ def test_refresh_repairs_general_cards_with_sentence_fronts(client, monkeypatch)
     finally:
         db.close()
 
+    # 修复已改为响应后执行（BackgroundTasks）：先触发，再取修复后的结果。
+    client.get("/api/cards/browse", params={"q": "run", "card_type": "general"})
     browsed = client.get(
         "/api/cards/browse", params={"q": "run", "card_type": "general"}
     ).json()
@@ -859,6 +864,8 @@ def test_refresh_highlights_legacy_reading_fronts_and_bolds_word_only_cards(clie
     finally:
         db.close()
 
+    # 修复已改为响应后执行（BackgroundTasks）：先触发，再取修复后的结果。
+    client.get("/api/cards/browse")
     browsed = client.get("/api/cards/browse").json()
     cards = {item["word"]: item for item in browsed["cards"]}
     assert "**runs**" in cards["run"]["front"]

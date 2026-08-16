@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import codecs
 import csv
 import html
 import io
@@ -23,6 +24,10 @@ class ImportFileError(ValueError):
 _ARCHIVE_UNCOMPRESSED_LIMIT = 64 * 1024 * 1024
 _MAX_ARCHIVE_MEMBERS = 5000
 _MAX_PDF_PAGES = 5000
+# 单章 HTML 的绝对读取上限。章节解析发生在 Web 进程内（无 PDF 那样的
+# 子进程隔离），单章过大时解码 + HTMLParser 的内存放大足以打爆小内存
+# 主机；出版 EPUB 单章通常远小于该值。
+_SINGLE_EPUB_CHAPTER_BYTES = 4 * 1024 * 1024
 
 
 class _ArchiveReader:
@@ -55,8 +60,64 @@ class _ArchiveReader:
 
 
 def _reject_xml_entity_declarations(data: bytes, label: str) -> None:
-    """拒绝 DOCTYPE/ENTITY 声明，防止标准库 XML 解析器做实体扩展放大。"""
-    if b"<!DOCTYPE" in data or b"<!ENTITY" in data:
+    """拒绝 DOCTYPE/ENTITY 声明，防止标准库 XML 解析器做实体扩展放大。
+
+    UTF-16/32 编码的字节流不含 ASCII 子串，直接搜 b"<!DOCTYPE" 会漏检
+    （2026-08-13 审查用最小样例确认标准库会继续展开其中的内部实体），
+    因此先按 BOM / XML 声明统一转码成 UTF-8 再检查。
+    """
+    probe = data
+    bom_map = (
+        (codecs.BOM_UTF32_LE, "utf-32-le"),
+        (codecs.BOM_UTF32_BE, "utf-32-be"),
+        (codecs.BOM_UTF8, "utf-8-sig"),
+        (codecs.BOM_UTF16_LE, "utf-16-le"),
+        (codecs.BOM_UTF16_BE, "utf-16-be"),
+    )
+    for bom, encoding in bom_map:
+        if data.startswith(bom):
+            try:
+                probe = data.decode(encoding).encode("utf-8")
+            except UnicodeDecodeError:
+                # 无法按声明解码：保留原始字节，交给后续 XML 解析器报错。
+                pass
+            break
+    else:
+        # 无 BOM：XML 声明本身是 ASCII 子集，可从原始前缀嗅探 encoding。
+        head = data[:512]
+        match = re.search(rb'encoding\s*=\s*["\']([A-Za-z0-9._-]+)["\']', head)
+        if match:
+            encoding = match.group(1).decode("ascii", "ignore").lower()
+            if encoding not in {"utf-8", "utf8", "us-ascii", "ascii"}:
+                try:
+                    probe = data.decode(encoding).encode("utf-8")
+                except (UnicodeDecodeError, LookupError):
+                    pass
+        elif b"\x00" in head:
+            # 无 BOM 的 UTF-16：声明里的 ASCII 字符与 \x00 交错，
+            # 去零字节后嗅探声明，再按显式字节序解码兜底。
+            squashed = head.replace(b"\x00", b"")
+            declared = re.search(
+                rb'encoding\s*=\s*["\']([A-Za-z0-9._-]+)["\']', squashed
+            )
+            candidates: list[str] = []
+            if declared:
+                name = declared.group(1).decode("ascii", "ignore").lower()
+                if name not in {"utf-8", "utf8", "us-ascii", "ascii"}:
+                    candidates.append(name)
+            candidates.extend(["utf-16-le", "utf-16-be"])
+            for candidate in candidates:
+                try:
+                    decoded = data.decode(candidate)
+                except (UnicodeDecodeError, LookupError):
+                    continue
+                if not decoded.lstrip("\ufeff \t\r\n").startswith("<"):
+                    # 按错误字节序解码会“成功”但产物是乱码（如 Python 的
+                    # utf-16 无 BOM 时默认小端），不像 XML 就换下一个候选。
+                    continue
+                probe = decoded.encode("utf-8")
+                break
+    if b"<!DOCTYPE" in probe or b"<!ENTITY" in probe:
         raise ImportFileError(f"{label} 包含不安全的 XML 实体声明")
 
 
@@ -381,8 +442,17 @@ def extract_epub_chapters(
             raise ImportFileError("EPUB 正文章节解压后过大")
         chapters = []
         total_chars = 0
-        chapter_reader = _ArchiveReader(archive, max_chapter_bytes)
         for index, path in enumerate(chapter_paths, start=1):
+            # 每章读取上限 = min(绝对单章上限, 与剩余字符预算挂钩的动态上限)。
+            # 4 字节/字符是 UTF-8/16/32 的最坏编码密度，超过该上限的章节
+            # 必然也超字符预算，因此不会误拒原本可导入的书；
+            # 关键是把拒绝点挪到 HTML 解析之前，不再先付出解析成本。
+            chapter_limit = min(max_chapter_bytes, _SINGLE_EPUB_CHAPTER_BYTES)
+            if max_chars is not None:
+                chapter_limit = min(
+                    chapter_limit, (max_chars - total_chars) * 4 + 1024 * 1024
+                )
+            chapter_reader = _ArchiveReader(archive, chapter_limit)
             try:
                 raw = chapter_reader.read(names[path])
             except zipfile.BadZipFile as exc:

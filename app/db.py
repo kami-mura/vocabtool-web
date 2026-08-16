@@ -19,10 +19,7 @@ sqlite3.register_adapter(
 
 _engine_kwargs: dict = {}
 _engine_kwargs["pool_pre_ping"] = True
-if config.DATABASE_URL.startswith("sqlite"):
-    _engine_kwargs["connect_args"] = {"check_same_thread": False}
-else:
-    _engine_kwargs["pool_recycle"] = 1800
+_engine_kwargs["connect_args"] = {"check_same_thread": False}
 
 engine = create_engine(config.DATABASE_URL, **_engine_kwargs)
 
@@ -623,15 +620,6 @@ def _migrate_card_due_nullable() -> None:
                 text("UPDATE cards SET due_at = NULL WHERE state = 'new' AND reps = 0")
             )
         return
-    if engine.dialect.name == "postgresql":
-        with engine.begin() as connection:
-            connection.execute(text("ALTER TABLE cards ALTER COLUMN due_at DROP NOT NULL"))
-            connection.execute(
-                text("UPDATE cards SET due_at = NULL WHERE state = 'new' AND reps = 0")
-            )
-        return
-    if engine.dialect.name != "sqlite":
-        return
 
     # 重建表时列清单、外键、唯一约束全部取自当前真实表结构，任何新增列
     # 都不会被静默丢弃；复制完成后校验行数一致才允许删旧表。
@@ -733,6 +721,132 @@ def _migrate_card_due_nullable() -> None:
         raw.close()
 
 
+def _migrate_anki_multi_template_cards() -> None:
+    """放开 Anki 卡的 (user, word, type) 唯一约束，支持一个 note 多模板。
+
+    Basic+Reverse / 多 Cloze ordinal 会解析出同词多张卡，旧约束会把第二张
+    起判为冲突丢弃。站内生成卡的去重规则不变（部分唯一索引继续约束非
+    anki 类型）；Anki 卡身份由 (user_id, anki_guid) 唯一约束保证。
+    """
+    inspector = inspect(engine)
+    if "cards" not in inspector.get_table_names():
+        return
+    uniques = {
+        unique.get("name")
+        for unique in inspector.get_unique_constraints("cards")
+    }
+    index_names = {index["name"] for index in inspector.get_indexes("cards")}
+    partial_index_sql = (
+        'CREATE UNIQUE INDEX IF NOT EXISTS uq_cards_word_type_non_anki '
+        'ON cards ("user_id", "word", "card_type") '
+        "WHERE card_type <> 'anki'"
+    )
+    if "uq_user_word_type" not in uniques:
+        if "uq_cards_word_type_non_anki" not in index_names:
+            with engine.begin() as connection:
+                connection.execute(text(partial_index_sql))
+        return
+
+    # 重建表：列清单、外键、唯一约束全部取自当前真实表结构（框架与
+    # 009_card_due_nullable 相同），仅丢弃 uq_user_word_type 并补部分唯一
+    # 索引；复制完成后校验行数一致才允许删旧表。
+    def _quoted(name: object) -> str:
+        return f'"{name}"'
+
+    def _render_type(column: dict) -> str:
+        col_type = column.get("type")
+        if col_type is None:
+            return "TEXT"
+        if hasattr(col_type, "compile"):
+            return str(col_type.compile(dialect=engine.dialect))
+        return str(col_type)
+
+    columns = inspector.get_columns("cards")
+    column_defs: list[str] = []
+    for column in columns:
+        pieces = [_quoted(column["name"]), _render_type(column)]
+        if not column.get("nullable"):
+            pieces.append("NOT NULL")
+        if column.get("default") is not None:
+            pieces.append(f"DEFAULT {column['default']}")
+        if column.get("primary_key"):
+            pieces.append("PRIMARY KEY")
+        column_defs.append(" ".join(pieces))
+
+    constraint_lines: list[str] = []
+    for fk in inspector.get_foreign_keys("cards"):
+        constrained = ",".join(
+            _quoted(item) for item in (fk.get("constrained_columns") or [])
+        )
+        referred = ",".join(
+            _quoted(item) for item in (fk.get("referred_columns") or [])
+        )
+        options = fk.get("options") or {}
+        ondelete = (
+            f" ON DELETE {options['ondelete']}" if options.get("ondelete") else ""
+        )
+        constraint_lines.append(
+            f'CONSTRAINT "{fk.get("name") or "fk"}" FOREIGN KEY ({constrained}) '
+            f'REFERENCES "{fk.get("referred_table")}" ({referred}){ondelete}'
+        )
+    for unique in inspector.get_unique_constraints("cards"):
+        if unique.get("name") == "uq_user_word_type":
+            continue
+        unique_cols = ",".join(
+            _quoted(item) for item in (unique.get("column_names") or [])
+        )
+        if not unique_cols:
+            continue
+        constraint_lines.append(
+            f'CONSTRAINT "{unique.get("name") or "uq"}" UNIQUE ({unique_cols})'
+        )
+
+    create_sql = "CREATE TABLE cards_new (\n" + ",\n".join(
+        column_defs + constraint_lines
+    ) + "\n)"
+    insert_columns = ",".join(_quoted(column["name"]) for column in columns)
+    copy_sql = f"INSERT INTO cards_new ({insert_columns}) SELECT {insert_columns} FROM cards"
+
+    # 动态记录现有具名索引并在重建后原样恢复（跳过约束自动生成的索引）。
+    index_sqls = [
+        f'CREATE INDEX IF NOT EXISTS "{index["name"]}" ON cards '
+        f'({",".join(_quoted(column) for column in index["column_names"])})'
+        for index in inspector.get_indexes("cards")
+        if index.get("name") and not str(index["name"]).startswith("sqlite_autoindex")
+    ]
+
+    raw = engine.raw_connection()
+    try:
+        raw.commit()
+        raw.execute("PRAGMA foreign_keys=OFF")
+        raw.execute("BEGIN IMMEDIATE")
+        row_count_before = int(raw.execute("SELECT COUNT(*) FROM cards").fetchone()[0])
+        raw.execute(create_sql)
+        raw.execute(copy_sql)
+        row_count_after = int(
+            raw.execute("SELECT COUNT(*) FROM cards_new").fetchone()[0]
+        )
+        if row_count_after != row_count_before:
+            raise RuntimeError(
+                f"Anki 多模板迁移行数不一致：{row_count_before} -> {row_count_after}"
+            )
+        raw.execute("DROP TABLE cards")
+        raw.execute("ALTER TABLE cards_new RENAME TO cards")
+        for index_sql in index_sqls:
+            raw.execute(index_sql)
+        raw.execute(partial_index_sql)
+        violations = list(raw.execute("PRAGMA foreign_key_check"))
+        if violations:
+            raise RuntimeError("Anki 多模板迁移后的外键检查失败")
+        raw.commit()
+    except Exception:
+        raw.rollback()
+        raise
+    finally:
+        raw.execute("PRAGMA foreign_keys=ON")
+        raw.close()
+
+
 def _migrate_lookup_history_mode() -> None:
     """为查询历史补齐来源模式列（normal/quick/qa），旧记录默认归入简洁查词。"""
     inspector = inspect(engine)
@@ -760,7 +874,7 @@ def _migrate_card_buried() -> None:
             connection.execute(
                 text(
                     "ALTER TABLE cards ADD COLUMN buried "
-                    "BOOLEAN NOT NULL DEFAULT 0"
+                    "BOOLEAN NOT NULL DEFAULT FALSE"
                 )
             )
 
@@ -855,7 +969,7 @@ def _migrate_daily_new_assignment_extra() -> None:
             connection.execute(
                 text(
                     "ALTER TABLE daily_new_assignments "
-                    "ADD COLUMN is_extra BOOLEAN NOT NULL DEFAULT 0"
+                    "ADD COLUMN is_extra BOOLEAN NOT NULL DEFAULT FALSE"
                 )
             )
 
@@ -873,7 +987,7 @@ def _migrate_corpus_word_target_column() -> None:
             connection.execute(
                 text(
                     "ALTER TABLE corpus_words ADD COLUMN "
-                    "is_target BOOLEAN NOT NULL DEFAULT 0"
+                    "is_target BOOLEAN NOT NULL DEFAULT FALSE"
                 )
             )
 
@@ -995,7 +1109,6 @@ def reserve_sqlite_write(db: Session) -> None:
 
     只允许在业务写入开始前调用；已有事务只包含认证/限流前置读取，
     先提交结束旧快照，再用 BEGIN IMMEDIATE 等待当前短写事务完成。
-    PostgreSQL 由行锁处理并发，不需要这一层。
     """
     if not config.DATABASE_URL.startswith("sqlite"):
         return
@@ -1045,6 +1158,7 @@ _SCHEMA_MIGRATIONS: list[tuple[str, Callable[[], None]]] = [
     ("024_saved_words", _migrate_saved_words),
     ("025_saved_word_status", _migrate_saved_word_status),
     ("026_anki_exchange", _migrate_anki_exchange),
+    ("027_anki_multi_template_cards", _migrate_anki_multi_template_cards),
 ]
 
 

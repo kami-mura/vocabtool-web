@@ -238,25 +238,34 @@ def _retrievability(stability_days: float, elapsed_days: float) -> float:
 def memory_curve(cards, days: int = 30, now: dt.datetime | None = None) -> list[dict]:
     """用 FSRS retrievability 估算未来 days 天的平均可回忆率。"""
     start = _aware(now)
+    # 先逐卡解析一次 FSRS 状态：此前每天重复 from_json 反序列化，
+    # 30 天 × N 张卡是 O(30N) 次 JSON 解析。
+    prepared: list[tuple] = []
+    for card in cards:
+        due = getattr(card, "due_at", None)
+        if due is None:
+            continue
+        fsrs_card = None
+        try:
+            candidate = _fsrs_card_from_model(card, now=start)
+            if candidate.last_review is not None and candidate.stability is not None:
+                fsrs_card = candidate
+        except (TypeError, ValueError, KeyError):
+            pass
+        prepared.append(
+            (fsrs_card, due, float(getattr(card, "interval_days", 0) or 0))
+        )
     points: list[dict] = []
     for day_index in range(days):
         target = start + dt.timedelta(days=day_index)
         values: list[float] = []
-        for card in cards:
-            due = getattr(card, "due_at", None)
-            if due is None:
+        for fsrs_card, due, interval in prepared:
+            if fsrs_card is not None:
+                recall = _FSRS.get_card_retrievability(
+                    fsrs_card, current_datetime=target
+                )
+                values.append(max(0.0, min(1.0, recall)))
                 continue
-            try:
-                fsrs_card = _fsrs_card_from_model(card, now=start)
-                if fsrs_card.last_review is not None and fsrs_card.stability is not None:
-                    recall = _FSRS.get_card_retrievability(
-                        fsrs_card, current_datetime=target
-                    )
-                    values.append(max(0.0, min(1.0, recall)))
-                    continue
-            except (TypeError, ValueError, KeyError):
-                pass
-            interval = float(getattr(card, "interval_days", 0) or 0)
             if interval <= 0:
                 continue
             elapsed = interval + (target - _aware(due, start)).total_seconds() / 86_400
@@ -295,6 +304,10 @@ def forecast_due_counts(cards, days: int = 30, now: dt.datetime | None = None) -
                 updated, _ = _FSRS.review_card(
                     fsrs_card, Rating.Good, review_datetime=review_time
                 )
+                # 与真实写入路径（_sync_model_from_fsrs）一致：间隔 ≥1 天的
+                # 到期对齐到站点午夜，否则预测与实际队列有 1-2 天系统性偏差。
+                if updated.state not in (State.Learning, State.Relearning):
+                    updated.due = _align_due(updated.due, review_time)
                 next_round.append((updated, updated.due.astimezone(tz).date()))
             else:
                 next_round.append((fsrs_card, due))

@@ -6,6 +6,7 @@ import logging
 import math
 import threading
 
+import anyio
 from fastapi import APIRouter, BackgroundTasks, Response
 
 from .. import anki_exchange, speaking_needs, wordlists
@@ -75,6 +76,9 @@ from ..schemas import (
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+# progress 轮询的专用执行器容量：与制卡占用的默认线程池彻底分开。
+_PROGRESS_ROUTE_LIMITER = anyio.CapacityLimiter(4)
+
 _ARTICLE_GENERATION: dict[int, dict[str, object]] = {}
 _ARTICLE_GENERATION_GUARD = threading.Lock()
 
@@ -130,6 +134,20 @@ def _finish_article_generation(user_id: int, *, error: str = "") -> None:
             entry["completed"] = entry.get("total", 0)
         entry["finished_at"] = time.monotonic()
 
+
+def _refresh_sentences_task(user_id: int) -> None:
+    """响应返回后在独立会话中修复旧卡例句（经 BackgroundTasks 调度）。
+
+    修复是无副作用的渐进式维护，失败只记日志；此前它同步跑在
+    GET /cards 主路径里，老用户的复习首屏会被数秒的全量修复阻塞。
+    """
+    db = SessionLocal()
+    try:
+        card_builder.refresh_sentence_cards(db, user_id)
+    except Exception:
+        logger.exception("后台句子修复失败（5 分钟后到期重试）")
+    finally:
+        db.close()
 
 def _reserve_review_write(db: Session, user_id: int, endpoint: str):
     """SQLite 评分在读取卡片前先取得写锁；繁忙时返回可重试响应。"""
@@ -461,10 +479,24 @@ async def card_studio_targets_file(
 
 
 @router.get("/card-studio/progress")
-def card_studio_progress(request: Request, db: Session = Depends(get_db)):
-    """轮询当前用户的 AI 制卡进度（已制成 X / N 张卡）。"""
-    user = _require_user(db, request)
-    return {"progress": ai_mod.card_generation_progress(user.id)}
+async def card_studio_progress(request: Request):
+    """轮询当前用户的 AI 制卡进度（已制成 X / N 张卡）。
+
+    制卡是同步长任务，会占住默认线程池 worker 最长 300 秒；本路由若也走
+    默认线程池，40 个并发制卡即可把轮询饿死（前端进度条假死）。因此鉴权
+    与读数都放到独立小容量执行器里，不与制卡竞争默认线程池。
+    """
+    def _auth_and_read_progress() -> dict:
+        db = SessionLocal()
+        try:
+            user = _require_user(db, request)
+            return {"progress": ai_mod.card_generation_progress(user.id)}
+        finally:
+            db.close()
+
+    return await anyio.to_thread.run_sync(
+        _auth_and_read_progress, limiter=_PROGRESS_ROUTE_LIMITER
+    )
 
 
 @router.get("/wordlists")
@@ -1117,6 +1149,7 @@ def update_review_settings(
 @router.get("/cards/browse")
 def browse_cards(
     request: Request,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     q: str = "",
     state: str = "all",
@@ -1128,7 +1161,7 @@ def browse_cards(
 ):
     user = _require_user(db, request)
     if _sentence_refresh_due(db, user.id):
-        card_builder.refresh_sentence_cards(db, user.id)
+        background_tasks.add_task(_refresh_sentences_task, user.id)
     # ids_only 用于“全选所有卡片”：一次最多取 2000 个 id（批量删除上限）。
     limit = min(2000 if ids_only else 100, max(1, limit))
     offset = max(0, offset)
@@ -1449,6 +1482,7 @@ def delete_cards_batch(
 @router.get("/cards")
 def daily_cards(
     request: Request,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     card_type: str = "all",
     extra_new: int = 0,
@@ -1459,7 +1493,7 @@ def daily_cards(
         raise HTTPException(status_code=410, detail="不能提前复习未到期卡片")
     preference = _review_preference(db, user)
     if _sentence_refresh_due(db, user.id):
-        card_builder.refresh_sentence_cards(db, user.id)
+        background_tasks.add_task(_refresh_sentences_task, user.id)
     now = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
     today_stats = _today_stats(db, user.id, now)
     can_undo = (
@@ -1481,6 +1515,12 @@ def daily_cards(
             raise HTTPException(status_code=400, detail="无效卡片类型")
         base = base.filter(Card.card_type == card_type)
 
+    # 队列载荷上限：叠加 Anki 单次最多导入 1 万张卡，积压数千张到期卡时
+    # 全量返回会让单次响应达到数十 MB。剩余数始终用真实计数，客户端
+    # 学完本地队列后的既有刷新机制会拉取后续批次。
+    _DUE_QUEUE_LIMIT = 1000
+    _REPEAT_QUEUE_LIMIT = 500
+
     learning_day, _start_of_day, end_of_day = _learning_day(now)
     # 复习卡按日期进入当天任务；学习步骤中的卡必须等到精确到期时间，
     # 否则未来的卡片会进队列却在评分时被 409 拒绝。
@@ -1494,7 +1534,12 @@ def daily_cards(
     due = (
         regular_due_query
         .order_by(Card.due_at, Card.id)
+        .limit(_DUE_QUEUE_LIMIT)
         .all()
+    )
+    # 触到上限时用真实计数补齐剩余数，避免「学完 1000 张却显示还有 0 张」。
+    due_remaining = (
+        regular_due_query.count() if len(due) >= _DUE_QUEUE_LIMIT else len(due)
     )
 
     global_regular_due = global_base.filter(
@@ -1506,18 +1551,21 @@ def daily_cards(
     regular_due_total = global_regular_due.count()
     # FSRS 学习/重学步骤为 0 秒，所有卡片严格按到期时间进出队列：
     # 未到期的卡片（包括选“重来”后明天才复习的卡）不进入当前队列。
+    repeat_pending_query = db.query(Card).filter(
+        Card.user_id == user.id,
+        Card.state == "learning",
+        Card.buried.is_(False),
+        Card.due_at <= now,
+    )
     pending_cards = (
-        db.query(Card)
-        .filter(
-            Card.user_id == user.id,
-            Card.state == "learning",
-            Card.buried.is_(False),
-            Card.due_at <= now,
-        )
+        repeat_pending_query
         .order_by(Card.due_at, Card.id)
+        .limit(_REPEAT_QUEUE_LIMIT)
         .all()
     )
     global_repeat_pending_total = len(pending_cards)
+    if len(pending_cards) >= _REPEAT_QUEUE_LIMIT:
+        global_repeat_pending_total = repeat_pending_query.count()
     if card_type != "all":
         pending_cards = [
             card for card in pending_cards if card.card_type == card_type
@@ -1598,15 +1646,17 @@ def daily_cards(
         # 已把加学卡放入本次队列：本响应内不允许继续加学，
         # 否则剩余数为 0 但队列非空，客户端会误判为“已学完”。
         can_extra_new = False
-    due_items = [{**_card_dict(card, now=now), "queue_kind": "due"} for card in due]
-    new_items = [{**_card_dict(card, now=now), "queue_kind": "new"} for card in new_cards]
-    repeat_items = [
-        {
-            **_card_dict(card, session_repeat=True, session_correct_streak=0, now=now),
-            "queue_kind": "again",
-        }
+    # 序列化一次、多处复用：queue 与 due/new/again 的载荷内容相同，
+    # 拆开各建一份会让同一张卡的字段串行化两遍。
+    due_dicts = [_card_dict(card, now=now) for card in due]
+    new_dicts = [_card_dict(card, now=now) for card in new_cards]
+    repeat_dicts = [
+        _card_dict(card, session_repeat=True, session_correct_streak=0, now=now)
         for card in pending_cards
     ]
+    due_items = [{**item, "queue_kind": "due"} for item in due_dicts]
+    new_items = [{**item, "queue_kind": "new"} for item in new_dicts]
+    repeat_items = [{**item, "queue_kind": "again"} for item in repeat_dicts]
     # 队列固定顺序：到期复习 → 今日新学 → 学习中的卡（重来/困难后排队尾）。
     # 学习中的卡排最后：评分“重来/困难”后卡片留在会话队尾，刷新后仍在队尾，
     # 页面显示与服务端队列一致（刷新前后、各设备顺序相同）。
@@ -1614,12 +1664,12 @@ def daily_cards(
     return {
         "queue": unified_queue,
         "total_cards": db.query(Card).filter(Card.user_id == user.id).count(),
-        "due": [_card_dict(c, now=now) for c in due],
-        "new": [_card_dict(c, now=now) for c in new_cards],
-        "again": [item for item in repeat_items],
+        "due": due_dicts,
+        "new": new_dicts,
+        "again": repeat_dicts,
         "practice": [],
         "remaining_counts": {
-            "due": len(due_items),
+            "due": due_remaining,
             "new": len(new_items),
             "again": len(repeat_items),
         },
@@ -1735,6 +1785,71 @@ def undo_last_review(request: Request, db: Session = Depends(get_db)):
     }
 
 
+def _idempotent_review_payload(card: Card, now: dt.datetime | None = None) -> dict:
+    """命中已提交幂等键时的统一响应（单条/批量共用）。"""
+    return {
+        "ok": True,
+        "idempotent": True,
+        "card": _card_dict(
+            card,
+            session_repeat=card.state == "learning",
+            session_correct_streak=0,
+            now=now,
+        ),
+    }
+
+
+def _apply_review_and_build_log(
+    db: Session, user: User, card: Card, rating: str, now: dt.datetime
+) -> tuple[ReviewLog, dict]:
+    """单条与批量评分共用的核心：评分前快照 → FSRS 应用 → ReviewLog → 响应卡片。
+
+    任何调度字段的增减都只改这里，单条/批量行为不会分叉。
+    返回 (已 add 的 ReviewLog, 响应卡片 dict)。
+    """
+    was_new = card.due_at is None
+    old_interval = card.interval_days
+    old_ease = card.ease
+    previous_state = card.state
+    previous_due_at = card.due_at
+    previous_reps = card.reps
+    previous_lapses = card.lapses
+    previous_learning_step = int(card.learning_step or 0)
+    previous_fsrs_state = card.fsrs_state
+    card, fsrs_log_json = srs.apply_rating_with_log(card, rating, now=now)
+    session_pending = card.state == "learning"
+    session_correct_streak = 0
+    review_log = ReviewLog(
+        user_id=user.id,
+        card_id=card.id,
+        rating=rating,
+        is_new=was_new,
+        interval_days=old_interval,
+        ease=old_ease,
+        previous_state=previous_state,
+        previous_due_at=previous_due_at,
+        previous_reps=previous_reps,
+        previous_lapses=previous_lapses,
+        previous_word_status="",
+        session_pending=session_pending,
+        session_correct_streak=session_correct_streak,
+        previous_session_pending=previous_learning_step > 0,
+        previous_session_correct_streak=max(0, previous_learning_step - 1),
+        previous_session_rating="again" if previous_learning_step > 0 else "",
+        previous_learning_step=previous_learning_step,
+        previous_fsrs_state=previous_fsrs_state,
+        fsrs_review_log=fsrs_log_json,
+    )
+    db.add(review_log)
+    card_payload = _card_dict(
+        card,
+        session_repeat=session_pending,
+        session_correct_streak=session_correct_streak,
+        now=now,
+    )
+    return review_log, card_payload
+
+
 @router.post("/cards/{card_id}/review")
 def review_card(
     card_id: int, body: ReviewIn, request: Request, db: Session = Depends(get_db)
@@ -1777,19 +1892,8 @@ def review_card(
         if existing_request:
             if existing_request.user_id != user.id or existing_request.card_id != card.id:
                 raise HTTPException(status_code=409, detail="评分动作标识冲突")
-            (
-                db.get(ReviewLog, existing_request.review_log_id)
-                if existing_request.review_log_id
-                else None
-            )
             return {
-                "ok": True,
-                "idempotent": True,
-                "card": _card_dict(
-                    card,
-                    session_repeat=card.state == "learning",
-                    session_correct_streak=0,
-                ),
+                **_idempotent_review_payload(card),
                 "today_stats": _today_stats(db, user.id, dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)),
             }
         review_request = ReviewRequest(
@@ -1809,19 +1913,8 @@ def review_card(
             ).first()
             if not existing_request or not card:
                 raise HTTPException(status_code=409, detail="评分动作冲突，请刷新重试") from None
-            (
-                db.get(ReviewLog, existing_request.review_log_id)
-                if existing_request.review_log_id
-                else None
-            )
             return {
-                "ok": True,
-                "idempotent": True,
-                "card": _card_dict(
-                    card,
-                    session_repeat=card.state == "learning",
-                    session_correct_streak=0,
-                ),
+                **_idempotent_review_payload(card),
                 "today_stats": _today_stats(db, user.id, dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)),
             }
     if body.expected_revision is not None:
@@ -1844,52 +1937,14 @@ def review_card(
     now = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
     if card.due_at and card.due_at > now:
         raise HTTPException(status_code=409, detail="这张卡片尚未到期，不能提前复习")
-    was_new = card.due_at is None
-    old_interval = card.interval_days
-    old_ease = card.ease
-    previous_state = card.state
-    previous_due_at = card.due_at
-    previous_reps = card.reps
-    previous_lapses = card.lapses
-    previous_learning_step = int(card.learning_step or 0)
-    previous_fsrs_state = card.fsrs_state
-    card, fsrs_log_json = srs.apply_rating_with_log(card, rating, now=now)
-    session_pending = card.state == "learning"
-    session_correct_streak = 0
-    review_log = ReviewLog(
-        user_id=user.id,
-        card_id=card.id,
-        rating=rating,
-        is_new=was_new,
-        interval_days=old_interval,
-        ease=old_ease,
-        previous_state=previous_state,
-        previous_due_at=previous_due_at,
-        previous_reps=previous_reps,
-        previous_lapses=previous_lapses,
-        previous_word_status="",
-        session_pending=session_pending,
-        session_correct_streak=session_correct_streak,
-        previous_session_pending=previous_learning_step > 0,
-        previous_session_correct_streak=max(0, previous_learning_step - 1),
-        previous_session_rating="again" if previous_learning_step > 0 else "",
-        previous_learning_step=previous_learning_step,
-        previous_fsrs_state=previous_fsrs_state,
-        fsrs_review_log=fsrs_log_json,
-    )
-    db.add(review_log)
+    review_log, card_payload = _apply_review_and_build_log(db, user, card, rating, now)
     if review_request:
         db.flush()
         review_request.review_log_id = review_log.id
     db.commit()
     return {
         "ok": True,
-        "card": _card_dict(
-            card,
-            session_repeat=session_pending,
-            session_correct_streak=session_correct_streak,
-            now=now,
-        ),
+        "card": card_payload,
         "today_stats": _today_stats(db, user.id, now),
     }
 
@@ -1957,23 +2012,7 @@ def review_cards_batch(
                             raise HTTPException(
                                 status_code=409, detail="评分动作标识冲突"
                             )
-                        (
-                            db.get(ReviewLog, existing_request.review_log_id)
-                            if existing_request.review_log_id
-                            else None
-                        )
-                        results.append(
-                            {
-                                "ok": True,
-                                "idempotent": True,
-                                "card": _card_dict(
-                                    card,
-                                    session_repeat=card.state == "learning",
-                                    session_correct_streak=0,
-                                    now=now,
-                                ),
-                            }
-                        )
+                        results.append(_idempotent_review_payload(card, now=now))
                         continue
                 if item.expected_revision is not None:
                     claimed = (
@@ -1998,42 +2037,9 @@ def review_cards_batch(
                     raise HTTPException(
                         status_code=409, detail="这张卡片尚未到期，不能提前复习"
                     )
-                was_new = card.due_at is None
-                old_interval = card.interval_days
-                old_ease = card.ease
-                previous_state = card.state
-                previous_due_at = card.due_at
-                previous_reps = card.reps
-                previous_lapses = card.lapses
-                previous_learning_step = int(card.learning_step or 0)
-                previous_fsrs_state = card.fsrs_state
-                card, fsrs_log_json = srs.apply_rating_with_log(
-                    card, rating, now=now
+                review_log, card_payload = _apply_review_and_build_log(
+                    db, user, card, rating, now
                 )
-                session_pending = card.state == "learning"
-                session_correct_streak = 0
-                review_log = ReviewLog(
-                    user_id=user.id,
-                    card_id=card.id,
-                    rating=rating,
-                    is_new=was_new,
-                    interval_days=old_interval,
-                    ease=old_ease,
-                    previous_state=previous_state,
-                    previous_due_at=previous_due_at,
-                    previous_reps=previous_reps,
-                    previous_lapses=previous_lapses,
-                    previous_word_status="",
-                    session_pending=session_pending,
-                    session_correct_streak=session_correct_streak,
-                    previous_session_pending=previous_learning_step > 0,
-                    previous_session_correct_streak=max(0, previous_learning_step - 1),
-                    previous_session_rating="again" if previous_learning_step > 0 else "",
-                    previous_learning_step=previous_learning_step,
-                    previous_fsrs_state=previous_fsrs_state,
-                    fsrs_review_log=fsrs_log_json,
-                )
-                db.add(review_log)
                 review_request = None
                 if action_id:
                     review_request = ReviewRequest(
@@ -2045,17 +2051,7 @@ def review_cards_batch(
                 db.flush()
                 if review_request:
                     review_request.review_log_id = review_log.id
-                results.append(
-                    {
-                        "ok": True,
-                        "card": _card_dict(
-                            card,
-                            session_repeat=session_pending,
-                            session_correct_streak=session_correct_streak,
-                            now=now,
-                        ),
-                    }
-                )
+                results.append({"ok": True, "card": card_payload})
         except IntegrityError:
             # 并发的网络重试可能同时插入同一 action_id；唯一键只允许一个成功。
             # 外层 savepoint 已回滚，这里改读对方已提交的幂等记录，不丢整批。
@@ -2089,18 +2085,7 @@ def review_cards_batch(
                     }
                 )
                 continue
-            results.append(
-                {
-                    "ok": True,
-                    "idempotent": True,
-                    "card": _card_dict(
-                        card,
-                        session_repeat=card.state == "learning",
-                        session_correct_streak=0,
-                        now=now,
-                    ),
-                }
-            )
+            results.append(_idempotent_review_payload(card, now=now))
         except HTTPException as exc:
             errors.append(
                 {

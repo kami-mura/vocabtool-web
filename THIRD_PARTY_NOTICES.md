@@ -46,7 +46,6 @@
 | pwdlib | MIT |
 | pytest | MIT |
 | chardet | LGPL |
-| psycopg2-binary | LGPL with exceptions |
 | edge-tts | LGPLv3 |
 
 ## MIT License 全文

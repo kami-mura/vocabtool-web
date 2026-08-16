@@ -774,11 +774,12 @@ def test_check_request_rate_concurrent_writes_do_not_raise():
         db.close()
 
 
-def test_anonymous_identity_trusts_x_forwarded_for_from_trusted_proxy():
+def test_anonymous_identity_trusts_x_forwarded_for_from_trusted_proxy(monkeypatch):
     from types import SimpleNamespace
 
     from starlette.datastructures import Headers
 
+    from app import config as app_config
     from app.api_support import _anonymous_request_identity
 
     direct = SimpleNamespace(
@@ -791,7 +792,11 @@ def test_anonymous_identity_trusts_x_forwarded_for_from_trusted_proxy():
         client=SimpleNamespace(host="10.0.0.7"),
         headers=Headers({"X-Forwarded-For": "1.2.3.4, 10.0.0.5"}),
     )
+    # 私网对等方默认不再是可信代理：直接用 peer，不采信可伪造的转发头。
+    assert _anonymous_request_identity(chained) == "10.0.0.7"
+    monkeypatch.setattr(app_config, "TRUSTED_PROXY_IPS", "loopback,private")
     assert _anonymous_request_identity(chained) == "10.0.0.5"
+    monkeypatch.setattr(app_config, "TRUSTED_PROXY_IPS", "")
 
     cloudflare = SimpleNamespace(
         client=SimpleNamespace(host="127.0.0.1"),
@@ -799,7 +804,11 @@ def test_anonymous_identity_trusts_x_forwarded_for_from_trusted_proxy():
             {"CF-Connecting-IP": "203.0.113.9", "X-Forwarded-For": "1.2.3.4, 10.0.0.5"}
         ),
     )
+    # CF-Connecting-IP 默认不读：普通反代会原样转发客户端伪造的该头。
+    assert _anonymous_request_identity(cloudflare) == "10.0.0.5"
+    monkeypatch.setattr(app_config, "TRUST_CF_CONNECTING_IP", True)
     assert _anonymous_request_identity(cloudflare) == "203.0.113.9"
+    monkeypatch.setattr(app_config, "TRUST_CF_CONNECTING_IP", False)
 
 
 def test_anonymous_identity_ignores_forwarded_headers_from_untrusted_peer():

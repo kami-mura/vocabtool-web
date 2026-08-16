@@ -9,10 +9,12 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
     UniqueConstraint,
+    text,
 )
 
 from .db import Base
@@ -281,7 +283,17 @@ class SavedWord(Base):
 class Card(Base):
     __tablename__ = "cards"
     __table_args__ = (
-        UniqueConstraint("user_id", "word", "card_type", name="uq_user_word_type"),
+        # 站内生成卡仍按 (user, word, type) 去重；Anki 卡例外：一个 note 的
+        # 多模板（Basic+Reverse、多 Cloze ordinal）会解析出同词多卡，
+        # 其身份由 (user_id, anki_guid) 唯一约束保证。
+        Index(
+            "uq_cards_word_type_non_anki",
+            "user_id",
+            "word",
+            "card_type",
+            unique=True,
+            sqlite_where=text("card_type <> 'anki'"),
+        ),
         UniqueConstraint("user_id", "anki_guid", name="uq_cards_user_anki_guid"),
     )
 

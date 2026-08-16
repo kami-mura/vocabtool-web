@@ -3,7 +3,7 @@ from __future__ import annotations
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter
-from sqlalchemy import func, text
+from sqlalchemy import func
 from sqlalchemy.orm import load_only
 
 from ..api_support import (
@@ -35,10 +35,9 @@ router = APIRouter()
 
 
 def _study_date_expr(col):
-    """把 UTC 裸时间按站点时区换算成本地日期的 SQL 表达式（方言差异）。
+    """把 UTC 裸时间按站点时区换算成本地日期的 SQL 表达式。
 
-    SQLite 用 date(col, modifier) 双参语法；PostgreSQL 没有该函数，
-    用 date(col + interval) 等价表达。
+    SQLite 用 date(col, modifier) 双参语法。
     """
     try:
         tz = ZoneInfo(config.APP_TIMEZONE)
@@ -47,9 +46,7 @@ def _study_date_expr(col):
     offset_hours = (
         tz.utcoffset(dt.datetime.now(dt.timezone.utc)).total_seconds() / 3600
     )
-    if config.DATABASE_URL.startswith("sqlite"):
-        return func.date(col, f"{offset_hours:+g} hours")
-    return func.date(col + text(f"interval '{offset_hours:g} hours'"))
+    return func.date(col, f"{offset_hours:+g} hours")
 
 
 @router.get("/dashboard")
@@ -184,6 +181,8 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
                 Card.reps,
                 Card.lapses,
                 Card.learning_step,
+                # 记忆曲线/到期预测都要读 FSRS 状态；漏掉会退化为逐卡懒加载 N+1。
+                Card.fsrs_state,
             )
         )
         .filter(

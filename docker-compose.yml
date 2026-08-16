@@ -1,20 +1,4 @@
 services:
-  db:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_USER: vocabflow
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?请在 .env 中设置 POSTGRES_PASSWORD}
-      POSTGRES_DB: vocabflow
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U vocabflow -d vocabflow"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 10s
-    restart: unless-stopped
-
   web:
     build: .
     init: true
@@ -28,7 +12,6 @@ services:
       - --proxy-headers
       - --forwarded-allow-ips=127.0.0.1,172.16.0.0/12
     environment:
-      DATABASE_URL: postgresql+psycopg2://vocabflow:${POSTGRES_PASSWORD}@db:5432/vocabflow
       NEW_CARDS_PER_DAY: ${NEW_CARDS_PER_DAY:-20}
       DEFAULT_KNOWN_RANK: ${DEFAULT_KNOWN_RANK:-3000}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
@@ -49,10 +32,8 @@ services:
       MAX_APKG_UPLOAD_BYTES: ${MAX_APKG_UPLOAD_BYTES:-52428800}
       USER_STORAGE_QUOTA_BYTES: ${USER_STORAGE_QUOTA_BYTES:-52428800}
     volumes:
+      # SQLite 数据库、TTS 缓存与上传临时文件都落在宿主 ./data
       - ./data:/app/data
-    depends_on:
-      db:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=3)"]
       interval: 30s
@@ -73,6 +54,3 @@ services:
       web:
         condition: service_healthy
     restart: unless-stopped
-
-volumes:
-  pgdata:

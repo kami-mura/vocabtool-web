@@ -37,7 +37,7 @@ from ..schemas import LookupIn, QuestionIn, QuickLookupIn
 
 router = APIRouter()
 
-# ---------- 查询记录 / deepseek-v4-flash ----------
+# ---------- 查询记录 / AI 释义 ----------
 
 
 def _lookup_type(text: str) -> str:
@@ -324,9 +324,9 @@ def create_lookup(body: LookupIn, request: Request, db: Session = Depends(get_db
             }
             lookup_source = "word_cache"
         else:
-            ai_error = "服务器尚未配置 deepseek-v4-flash，查询已记录"
+            ai_error = "服务器尚未配置 AI API Key，查询已记录"
     else:
-        ai_error = "服务器尚未配置 deepseek-v4-flash，查询已记录"
+        ai_error = "服务器尚未配置 AI API Key，查询已记录"
 
     # 以 AI 为准：AI 对拼写错误的词会返回正确词的释义，
     # 从释义词头提取 AI 使用的正确拼写，与用户输入比较后提示。
@@ -386,6 +386,37 @@ def create_lookup(body: LookupIn, request: Request, db: Session = Depends(get_db
                     )
                     if corrected:
                         corrected_source = "deepseek"
+                        # 与主路径一致写入缓存：否则同一个拼写错误每次
+                        # 都重新调 AI 并扣一次配额。
+                        if cached_corrected:
+                            cached_corrected.query_type = query_type
+                            cached_corrected.explanation = corrected["explanation"]
+                            cached_corrected.card_front = corrected["card_front"]
+                            cached_corrected.card_back = corrected["card_back"]
+                            cached_corrected.prompt_version = _LOOKUP_CACHE_VERSION
+                            cached_corrected.source = "deepseek"
+                            cached_corrected.updated_at = (
+                                dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
+                            )
+                        else:
+                            try:
+                                with db.begin_nested():
+                                    db.add(
+                                        LookupCache(
+                                            query=_lookup_cache_storage_key(
+                                                corrected_cache_key
+                                            ),
+                                            query_type=query_type,
+                                            explanation=corrected["explanation"],
+                                            card_front=corrected["card_front"],
+                                            card_back=corrected["card_back"],
+                                            prompt_version=_LOOKUP_CACHE_VERSION,
+                                            source="deepseek",
+                                        )
+                                    )
+                            except IntegrityError:
+                                # 并发请求已写入同一词条的缓存；保留对方的结果即可。
+                                pass
             if corrected and corrected.get("explanation", "").strip():
                 result = corrected
                 if corrected_source:
@@ -580,7 +611,7 @@ def save_lookup_word(
     return {"ok": True, "created": True, "word": word}
 
 
-# ---------- deepseek-v4-flash 释义 ----------
+# ---------- AI 释义 ----------
 
 
 @router.post("/lookups/quick")
