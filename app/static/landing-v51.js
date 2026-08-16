@@ -662,6 +662,10 @@
   let realReviewHistory = [];
   let realReviewLastRatingAt = 0;
   let realReviewCanUndo = false;
+  // 队列本地版本号：每次评分/撤回/掩埋/加学等本地改动都递增。
+  // loadRealReview 发起时记录版本，返回时若版本已变化则丢弃，
+  // 防止“撤回后的旧服务端快照”覆盖用户刚评完分的新队列。
+  let realReviewQueueVersion = 0;
   // 制卡/生成文章/词库操作完成时想刷新复习队列，但如果用户正在复习，
   // 直接重拉队列会把“刚评过的学习卡”按服务端顺序顶回队首，造成乱跳。
   // 这里挂起刷新，等队列学完后再拉取。
@@ -1271,12 +1275,16 @@
   }
 
   async function loadRealReview(preserveOnError = false, preferredHeadId = null) {
+    const loadVersion = realReviewQueueVersion;
     try {
       const res = await fetch("/api/cards", {
         headers: { "Content-Type": "application/json" },
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.detail || "加载失败");
+      // 如果等待期间用户已经评分/撤回/加学，本地队列已更新，
+      // 这次服务端快照可能已过期，直接丢弃，避免旧快照顶回旧卡/旧 revision。
+      if (loadVersion !== realReviewQueueVersion) return;
       // 队列顺序以服务端为准：服务端按“到期复习 → 今日新学 → 学习中的卡”
       // 固定排序，手机端与电脑端看到的是同一份队列。
       // 不在本地按历史顺序重排，避免各设备本地缓存导致队列不一致。
@@ -1529,6 +1537,7 @@
       if (heldEl) heldEl.classList.remove("flipped");
     }
     realReviewInFlight += 1;
+    realReviewQueueVersion += 1;
     try {
       if (rating === "again") {
         realReviewAgainCounts.set(card.id, (realReviewAgainCounts.get(card.id) || 0) + 1);
@@ -1666,6 +1675,7 @@
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.detail || "操作失败");
+      realReviewQueueVersion += 1;
       realReviewQueue.splice(index, 1);
       renderRealReview();
     } catch (err) {
@@ -1693,6 +1703,9 @@
       realReviewCanUndo = Boolean(data.can_undo);
       const restored = data.card;
       if (restored) {
+        // 撤回本身也是本地队列改动：让在途的旧 loadRealReview 失效，
+        // 避免它把撤回前/评分后的旧快照再覆盖回来。
+        realReviewQueueVersion += 1;
         const queueKind = restored.due_at == null
           ? "new"
           : restored.is_learning ? "again" : "due";
@@ -2001,6 +2014,7 @@
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.detail || "暂时不能继续学新卡");
+        realReviewQueueVersion += 1;
         realReviewQueue = Array.isArray(data.queue) ? data.queue : [];
         realReviewHadCards = realReviewQueue.length > 0;
         realReviewTotalCards = Number(data.total_cards) || realReviewTotalCards;
