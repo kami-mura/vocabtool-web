@@ -334,6 +334,25 @@ def card_studio_targets(
             .all()
         )
         candidates = [(row.word, vocab.rank_of(row.word), 0) for row in rows]
+    elif body.source == "expressions":
+        # 口语表达需求列表：每行一个中文需求。口语卡的 word 是 need-id、
+        # front 才是需求原文，去重时与同类型卡的 front 比对。
+        fronts = _parse_expression_needs(body.text)
+        if body.card_type in GENERATABLE_CARD_TYPES:
+            existing_fronts = {
+                str(row[0] or "")
+                for row in db.query(Card.front).filter(
+                    Card.user_id == user.id,
+                    Card.card_type == body.card_type,
+                )
+            }
+        else:
+            existing_fronts = set()
+        candidates = [
+            (front, None, 0)
+            for front in fronts
+            if front not in existing_fronts
+        ]
     else:
         raise HTTPException(status_code=400, detail="无效目标词来源")
     if body.ngsl_filter and body.source in {"wordlist", "saved"}:

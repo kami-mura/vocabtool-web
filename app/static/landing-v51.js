@@ -3176,25 +3176,45 @@
     };
   }
 
-  async function applyRealCardNgslFilter(words, source) {
+  // 提取结果统一送后端处理：既做 NGSL 筛选（勾选时），也把已有同类型
+  // 卡片的词去重。此前仅在勾选 NGSL 筛选时才走后端，未勾选时粘贴词表
+  // 和 AI 主题词会原样保留已有同类型卡的词。
+  async function refineRealCardTargets(words, source) {
     const options = realCardNgslOptions(source);
-    if (!options.enabled) return words;
     const res = await fetch("/api/card-studio/targets", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         source: "wordlist",
         text: words.join("\n"),
-        from_rank: options.fromRank,
-        to_rank: options.toRank,
+        from_rank: options.enabled ? options.fromRank : 1,
+        to_rank: options.enabled ? options.toRank : 31000,
         count: 5000,
-        include_unknown: false,
-        ngsl_filter: true,
+        include_unknown: !options.enabled,
+        ngsl_filter: options.enabled,
         card_type: realCardType,
       }),
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.detail || "NGSL 筛选失败");
+    if (!res.ok) throw new Error(data.detail || "目标词筛选失败");
+    return (data.words || []).map((item) => item.word);
+  }
+
+  // 口语表达需求去重：口语卡的 word 是 need-id、front 才是需求原文，
+  // 因此走 expressions 来源与已有同类型卡的 front 比对。
+  async function refineRealCardExpressions(fronts) {
+    const res = await fetch("/api/card-studio/targets", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        source: "expressions",
+        text: fronts.join("\n"),
+        count: 5000,
+        card_type: realCardType,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || "表达需求去重失败");
     return (data.words || []).map((item) => item.word);
   }
 
@@ -3462,10 +3482,11 @@
           words = (realCardSourceText.value || "")
             .split("\n").map((s) => s.trim()).filter(Boolean);
           if (!words.length) throw new Error("请先输入单词");
-          words = await applyRealCardNgslFilter(words, source);
+          words = await refineRealCardTargets(words, source);
         } else if (source === "needs") {
           words = selectedRealSpeakingFronts();
           if (!words.length) throw new Error("请先勾选表达需求");
+          words = await refineRealCardExpressions(words);
         } else if (source === "topic") {
           const topic = document.getElementById("real-card-topic").value.trim();
           const count = Number(document.getElementById("real-card-topic-count").value) || 20;
@@ -3478,7 +3499,7 @@
           const data = await res.json().catch(() => ({}));
           if (!res.ok) throw new Error(data.detail || "生成失败");
           words = data.words || [];
-          words = await applyRealCardNgslFilter(words, source);
+          words = await refineRealCardTargets(words, source);
         } else if (source === "builtin") {
           const listInput = document.getElementById("real-card-list-id");
           if (!listInput || !listInput.value) throw new Error("请选择词表");

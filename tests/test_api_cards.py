@@ -1385,3 +1385,51 @@ def test_anki_import_gzip_uses_apkg_decompress_limit(client, monkeypatch):
     )
     assert response.status_code == 400
     assert "模拟解析失败" in response.json()["detail"]
+
+
+def test_expressions_targets_exclude_existing_same_type_fronts(client):
+    """口语表达需求提取：已有同类型卡的需求（按 front 比对）被去重，
+    未制卡的需求保留；换类型提取不去重。"""
+    register(client, "expressions-dedup@example.com")
+    existing_need = "对朋友说：婉拒邀请（不想去又不扫兴）"
+    created = client.post(
+        "/api/card-studio/cards",
+        json={"card_type": "speaking", "words": [existing_need]},
+    )
+    assert created.status_code == 200
+    assert created.json()["created"] == 1
+
+    targets = client.post(
+        "/api/card-studio/targets",
+        json={
+            "source": "expressions",
+            "text": existing_need + "\n对路人说：礼貌地问路",
+            "card_type": "speaking",
+        },
+    ).json()
+    words = [item["word"] for item in targets["words"]]
+    assert existing_need not in words  # 已有 speaking 卡 → 去重
+    assert "对路人说：礼貌地问路" in words
+
+    # 换一种卡片类型：同一需求不去重（目标卡类型不同）。
+    other = client.post(
+        "/api/card-studio/targets",
+        json={
+            "source": "expressions",
+            "text": existing_need,
+            "card_type": "general",
+        },
+    ).json()
+    assert [item["word"] for item in other["words"]] == [existing_need]
+
+    # 纯英文/无中文的行不是合法表达需求，被解析器过滤；
+    # existing_need 已有 speaking 卡，同样被去重 → 结果为空。
+    latin_only = client.post(
+        "/api/card-studio/targets",
+        json={
+            "source": "expressions",
+            "text": "just english words\n" + existing_need,
+            "card_type": "speaking",
+        },
+    ).json()
+    assert latin_only["words"] == []
