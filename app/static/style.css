@@ -3119,6 +3119,18 @@ button.ghost.small {
   /* 手机端无翻转按钮：点击卡片本身翻面 */
   #real-review .home-review-cards .demo-flip { display: none; }
   #real-review .home-review-cards .demo-card { cursor: pointer; }
+  /* 3D 翻面过渡期间，按钮虽已可见但浏览器的触摸命中层仍可能停在
+     正面/卡片容器，快速点评分只会把卡片翻回去。手机端改为瞬时换面，
+     保证评分按钮一出现就能收到触摸。 */
+  #real-review .home-review-cards .demo-card-inner,
+  #real-review .home-review-cards .demo-card.flipped .demo-card-inner {
+    transform: none;
+    transition: none;
+  }
+  #real-review .home-review-cards .demo-card-face { transform: none; }
+  #real-review .home-review-cards .demo-card-face.back { display: none; }
+  #real-review .home-review-cards .demo-card.flipped .demo-card-face.front { display: none; }
+  #real-review .home-review-cards .demo-card.flipped .demo-card-face.back { display: flex; }
   /* 手机端卡片管理菜单：屏幕底部弹层，避免从按钮向左溢出被裁掉 */
   #real-review-manage-toggle { width: 100%; justify-content: center; }
   .review-manage-menu {

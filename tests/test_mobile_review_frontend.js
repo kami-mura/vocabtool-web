@@ -48,6 +48,21 @@ assert.match(
   /\.demo-card\.flipped \.demo-card-face\.back\s*\{\s*pointer-events:\s*auto;/,
   "翻面后评分按钮所在的背面必须可点击"
 );
+assert.match(
+  css,
+  /@media \(max-width: 820px\)[\s\S]*?#real-review \.home-review-cards \.demo-card-inner,[\s\S]*?transition:\s*none;/,
+  "手机端真实复习卡不能保留导致触摸命中错层的 3D 翻面过渡"
+);
+assert.match(
+  css,
+  /#real-review \.home-review-cards \.demo-card-face\.back\s*\{\s*display:\s*none;\s*\}/,
+  "手机端未翻面时背面必须彻底退出触摸命中"
+);
+assert.match(
+  css,
+  /#real-review \.home-review-cards \.demo-card\.flipped \.demo-card-face\.back\s*\{\s*display:\s*flex;\s*\}/,
+  "手机端翻面后评分面必须立即显示"
+);
 
 assert.match(
   source,
