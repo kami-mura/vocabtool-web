@@ -112,34 +112,19 @@ assert.match(
   /card\.card_type === "reading"[\s\S]*?reading-word-row[\s\S]*?reading-sentence-wrap[\s\S]*?demo-front-text[\s\S]*?frontInner/,
   "阅读卡正面直接渲染例句内容（目标词行 + 例句 + 发音按钮）"
 );
-// 阅读卡反面：释义之后追加例句区块。
-assert.match(
-  source,
-  /card\.card_type === "reading" && sentence && sentence !== target[\s\S]*?reading-back-sentence[\s\S]*?frontInner[\s\S]*?escapeHtml\(sentence\)/,
-  "阅读卡反面在释义后追加例句（含高亮与发音按钮）"
+// 阅读卡反面不显示例句：反面只保留释义（card.back），不得再有例句区块。
+assert.ok(
+  !source.includes("reading-back-sentence"),
+  "阅读卡反面不再展示例句区块"
 );
 const css = fs.readFileSync(path.join(ROOT, "app", "static", "style.css"), "utf8");
-assert.match(
-  css,
-  /\.reading-back-sentence\s*\{/,
-  "反面例句有独立样式（与释义分隔）"
+assert.ok(
+  !css.includes("reading-back-sentence"),
+  "已删除反面例句的样式规则"
 );
 assert.ok(
   !css.includes(".reading-sentence-hidden") && !css.includes(".reading-reveal-sentence"),
   "已删除不再使用的例句隐藏/展开按钮样式"
-);
-// 反面例句字体必须与正面完全一致：.demo-card-face.back p 会把反面所有 p
-// 染成 muted/13px，必须有一条 ID 前缀规则把反面例句拉回正面样式。
-assert.match(
-  css,
-  /#real-review \.reading-back-sentence \.demo-front-text\s*\{[\s\S]*?color:\s*var\(--text\);[\s\S]*?font-size:\s*17px;[\s\S]*?font-weight:\s*700;/,
-  "反面例句颜色/字号/字重与正面 demo-front-text 完全一致"
-);
-const backPIdx = css.indexOf(".demo-card-face.back p");
-const backSentenceIdx = css.indexOf("#real-review .reading-back-sentence .demo-front-text");
-assert.ok(
-  backPIdx !== -1 && backSentenceIdx !== -1 && backSentenceIdx > backPIdx,
-  "反面例句覆盖规则必须定义在 .demo-card-face.back p 之后（特异性更高）"
 );
 
 console.log("PASS: 评分请求超时、失效按钮对齐、撤回显示上一张卡与阅读卡例句直显符合预期");

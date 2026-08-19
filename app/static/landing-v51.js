@@ -1102,16 +1102,6 @@
             '<button class="demo-audio" data-real-audio="' + escapeHtml(sentence) +       '" type="button">▶</button>';
         }
         backInner += "</div>";
-      } else if (card.card_type === "reading" && sentence && sentence !== target) {
-        // 阅读卡反面：释义之后也展示例句（含目标词高亮与发音），
-        // 翻面复习时例句直接可见，与正面保持一致。
-        backInner +=
-          '<div class="reading-sentence-wrap reading-back-sentence">' +
-          '<div class="reading-sentence-content">' +
-          '<p class="demo-front-text">' + frontInner + "</p>" +
-          '<div class="demo-audio-row"><button class="demo-audio" data-real-audio="' +
-          escapeHtml(sentence) + '" type="button">▶</button></div>' +
-          "</div></div>";
       }
     }
     const showBury = (realReviewAgainCounts.get(card.id) || 0) >= 3;
