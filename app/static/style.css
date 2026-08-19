@@ -137,10 +137,10 @@
 [data-theme="dark"] .queue-tab-new { color: #8fb4ff; border-color: #2c4a82; background: #14243f; }
 [data-theme="dark"] .queue-tab-due { color: #5fd6a0; border-color: #1e5c42; background: #12261c; }
 [data-theme="dark"] .queue-tab-again { color: #ff8a8a; border-color: #7a3232; background: #2b1515; }
-[data-theme="dark"] .rating.again { border-color: rgba(255, 255, 255, .28); color: #fff; background: linear-gradient(145deg, rgba(214, 54, 65, .94), rgba(174, 34, 46, .96)); }
-[data-theme="dark"] .rating.hard { border-color: rgba(255, 255, 255, .28); color: #fff; background: linear-gradient(145deg, rgba(230, 139, 16, .94), rgba(194, 99, 0, .96)); }
-[data-theme="dark"] .rating.good { border-color: rgba(255, 255, 255, .28); color: #fff; background: linear-gradient(145deg, rgba(25, 187, 43, .94), rgba(8, 139, 24, .96)); }
-[data-theme="dark"] .rating.easy { border-color: rgba(255, 255, 255, .28); color: #fff; background: linear-gradient(145deg, rgba(28, 128, 240, .94), rgba(7, 91, 196, .96)); }
+[data-theme="dark"] .rating.again { border-color: rgba(255, 255, 255, .3); color: #fff; background: linear-gradient(145deg, rgba(220, 78, 87, .88), rgba(190, 52, 62, .92)); }
+[data-theme="dark"] .rating.hard { border-color: rgba(255, 255, 255, .3); color: #fff; background: linear-gradient(145deg, rgba(235, 157, 43, .88), rgba(204, 112, 10, .92)); }
+[data-theme="dark"] .rating.good { border-color: rgba(255, 255, 255, .3); color: #fff; background: linear-gradient(145deg, rgba(54, 190, 72, .88), rgba(22, 145, 40, .92)); }
+[data-theme="dark"] .rating.easy { border-color: rgba(255, 255, 255, .3); color: #fff; background: linear-gradient(145deg, rgba(58, 143, 238, .88), rgba(22, 100, 200, .92)); }
 [data-theme="dark"] .file-button { border-color: #3a4a6e; background: #1c2433; }
 [data-theme="dark"] .auth-body {
   background:
@@ -1756,20 +1756,20 @@ button.landing-login-btn { border: none; cursor: pointer; }
 #show-answer { margin: 0 auto 14px; display: block; }
 #rating-row { display: flex; gap: 10px; justify-content: center; margin-top: 14px; }
 .rating {
-  display: flex; flex: 1; flex-direction: column-reverse; align-items: center; justify-content: center;
+  display: flex; flex: 1; flex-direction: column; align-items: center; justify-content: center;
   max-width: 140px; padding: 12px 8px; font-weight: 650; border-radius: 14px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .38), 0 6px 16px rgba(24, 32, 48, .16);
-  backdrop-filter: blur(10px) saturate(145%); -webkit-backdrop-filter: blur(10px) saturate(145%);
+  backdrop-filter: blur(10px) saturate(125%); -webkit-backdrop-filter: blur(10px) saturate(125%);
   text-shadow: 0 1px 1px rgba(0, 0, 0, .2);
 }
 .rating b, .rating small { display: block; }
-.rating small { font-size: 10px; margin-bottom: 2px; opacity: .9; font-weight: 500; }
+.rating small { font-size: 10px; margin-top: 2px; opacity: .9; font-weight: 500; }
 .rating small:empty { display: none; }
-.rating.again { border-color: rgba(255, 255, 255, .5); color: #fff; background: linear-gradient(145deg, rgba(214, 54, 65, .92), rgba(174, 34, 46, .94)); }
-.rating.hard { border-color: rgba(255, 255, 255, .5); color: #fff; background: linear-gradient(145deg, rgba(230, 139, 16, .92), rgba(194, 99, 0, .94)); }
-.rating.good { border-color: rgba(255, 255, 255, .5); color: #fff; background: linear-gradient(145deg, rgba(25, 187, 43, .92), rgba(8, 139, 24, .94)); }
-.rating.easy { border-color: rgba(255, 255, 255, .5); color: #fff; background: linear-gradient(145deg, rgba(28, 128, 240, .92), rgba(7, 91, 196, .94)); }
-.rating:hover { transform: translateY(-1px); filter: brightness(1.06) saturate(1.05); }
+.rating.again { border-color: rgba(255, 255, 255, .55); color: #fff; background: linear-gradient(145deg, rgba(220, 78, 87, .82), rgba(190, 52, 62, .88)); }
+.rating.hard { border-color: rgba(255, 255, 255, .55); color: #fff; background: linear-gradient(145deg, rgba(235, 157, 43, .82), rgba(204, 112, 10, .88)); }
+.rating.good { border-color: rgba(255, 255, 255, .55); color: #fff; background: linear-gradient(145deg, rgba(54, 190, 72, .82), rgba(22, 145, 40, .88)); }
+.rating.easy { border-color: rgba(255, 255, 255, .55); color: #fff; background: linear-gradient(145deg, rgba(58, 143, 238, .82), rgba(22, 100, 200, .88)); }
+.rating:hover { transform: translateY(-1px); filter: brightness(1.06) saturate(1.02); }
 /* ---------- 制作新卡 / Anki 队列 ---------- */
 .studio-type, .studio-grid { margin-bottom: 14px; }
 .studio-type { padding: 16px 20px; }

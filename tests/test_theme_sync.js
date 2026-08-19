@@ -152,21 +152,21 @@ assert.match(
 /* ---------- Anki 评分按钮：浓郁红、橙、绿、蓝 + 玻璃质感 ---------- */
 
 const lightRatingColors = {
-  again: "rgba(214, 54, 65, .92)",
-  hard: "rgba(230, 139, 16, .92)",
-  good: "rgba(25, 187, 43, .92)",
-  easy: "rgba(28, 128, 240, .92)",
+  again: "rgba(220, 78, 87, .82)",
+  hard: "rgba(235, 157, 43, .82)",
+  good: "rgba(54, 190, 72, .82)",
+  easy: "rgba(58, 143, 238, .82)",
 };
 const darkRatingColors = {
-  again: "rgba(214, 54, 65, .94)",
-  hard: "rgba(230, 139, 16, .94)",
-  good: "rgba(25, 187, 43, .94)",
-  easy: "rgba(28, 128, 240, .94)",
+  again: "rgba(220, 78, 87, .88)",
+  hard: "rgba(235, 157, 43, .88)",
+  good: "rgba(54, 190, 72, .88)",
+  easy: "rgba(58, 143, 238, .88)",
 };
 
 const ratingBaseRule = styleSource.match(/(?:^|\n)\.rating\s*\{[^}]*\}/);
 assert.ok(ratingBaseRule, "存在评分按钮基础样式");
-assert.match(ratingBaseRule[0], /flex-direction\s*:\s*column-reverse/, "时间显示在评分名称上方");
+assert.match(ratingBaseRule[0], /flex-direction\s*:\s*column(?:;|\s)/, "时间显示在评分名称下方");
 assert.match(ratingBaseRule[0], /backdrop-filter\s*:\s*blur\(10px\)/, "评分按钮使用玻璃模糊");
 assert.match(ratingBaseRule[0], /box-shadow\s*:\s*inset/, "评分按钮使用内高光和柔和阴影");
 
@@ -175,7 +175,7 @@ for (const [rating, color] of Object.entries(lightRatingColors)) {
     new RegExp(`(?:^|\\n)\\.rating\\.${rating}\\s*\\{[^}]*\\}`)
   );
   assert.ok(rule, `存在日间模式 ${rating} 评分按钮样式`);
-  assert.ok(rule[0].includes(color), `${rating} 使用浓郁的 Anki 色彩`);
+  assert.ok(rule[0].includes(color), `${rating} 使用柔和的 Anki 色彩`);
   assert.ok(rule[0].includes("color: #fff"), `${rating} 使用白色文字`);
   assert.ok(rule[0].includes("linear-gradient"), `${rating} 使用渐变玻璃效果`);
 }
@@ -197,8 +197,8 @@ const landingSource = fs.readFileSync(
 for (const label of ["Again", "Hard", "Good", "Easy"]) {
   assert.ok(landingSource.includes(`<b>${label}</b>`), `真实评分按钮使用英文名称 ${label}`);
 }
-assert.ok(landingSource.includes("<b>Again</b><small>1m</small>"), "Again 上方显示 1m");
-assert.ok(landingSource.includes("<b>Hard</b><small>1m</small>"), "Hard 上方显示 1m");
+assert.ok(landingSource.includes("<b>Again</b><small>1m</small>"), "Again 下方显示 1m");
+assert.ok(landingSource.includes("<b>Hard</b><small>1m</small>"), "Hard 下方显示 1m");
 assert.ok(landingSource.includes('previewLabel("good", "2d")'), "Good 使用 2d 格式的间隔");
 assert.ok(landingSource.includes("拼写更正："), "词源结果显示拼写更正说明");
 assert.ok(
