@@ -137,10 +137,10 @@
 [data-theme="dark"] .queue-tab-new { color: #8fb4ff; border-color: #2c4a82; background: #14243f; }
 [data-theme="dark"] .queue-tab-due { color: #5fd6a0; border-color: #1e5c42; background: #12261c; }
 [data-theme="dark"] .queue-tab-again { color: #ff8a8a; border-color: #7a3232; background: #2b1515; }
-[data-theme="dark"] .rating.again { border-color: #7a3232; color: #ff8a8a; background: linear-gradient(180deg, #2b1515, #331818); }
-[data-theme="dark"] .rating.hard { border-color: #7a5420; color: #ffb15c; background: linear-gradient(180deg, #2a2010, #332514); }
-[data-theme="dark"] .rating.good { border-color: #2e6b43; color: #6fd39a; background: linear-gradient(180deg, #12261c, #16301f); }
-[data-theme="dark"] .rating.easy { border-color: #315d8f; color: #79b8ff; background: linear-gradient(180deg, #13243a, #172c47); }
+[data-theme="dark"] .rating.again { border-color: transparent; color: #fff; background: #c9323b; }
+[data-theme="dark"] .rating.hard { border-color: transparent; color: #fff; background: #d47a00; }
+[data-theme="dark"] .rating.good { border-color: transparent; color: #fff; background: #10a91e; }
+[data-theme="dark"] .rating.easy { border-color: transparent; color: #fff; background: #0d75e8; }
 [data-theme="dark"] .file-button { border-color: #3a4a6e; background: #1c2433; }
 [data-theme="dark"] .auth-body {
   background:
@@ -1755,15 +1755,20 @@ button.landing-login-btn { border: none; cursor: pointer; }
 .flip-face .big-word { font-size: 34px; font-weight: 800; letter-spacing: .5px; }
 #show-answer { margin: 0 auto 14px; display: block; }
 #rating-row { display: flex; gap: 10px; justify-content: center; margin-top: 14px; }
-.rating { flex: 1; max-width: 140px; padding: 12px 8px; font-weight: 650; border-radius: 14px; }
+.rating {
+  display: flex; flex: 1; flex-direction: column-reverse; align-items: center; justify-content: center;
+  max-width: 140px; padding: 12px 8px; font-weight: 650; border-radius: 14px;
+  box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, .2);
+}
 .rating b, .rating small { display: block; }
-.rating small { font-size: 10px; margin-top: 2px; opacity: .72; font-weight: 500; }
+.rating small { font-size: 10px; margin-bottom: 2px; opacity: .9; font-weight: 500; }
 .rating small:empty { display: none; }
-.rating.again { border-color: #efb0b0; color: #d32f2f; background: linear-gradient(180deg, #fffafa, #ffebee); }
-.rating.hard { border-color: #f2c48d; color: #e07a00; background: linear-gradient(180deg, #fffaf2, #fff3e0); }
-.rating.good { border-color: #a9d9b7; color: #2e7d32; background: linear-gradient(180deg, #f8fdf9, #e8f5e9); }
-.rating.easy { border-color: #a8c8ee; color: #1565c0; background: linear-gradient(180deg, #f7fbff, #e3f2fd); }
-.rating:hover { transform: translateY(-1px); }
+.rating.again { border-color: transparent; color: #fff; background: #c9323b; }
+.rating.hard { border-color: transparent; color: #fff; background: #d47a00; }
+.rating.good { border-color: transparent; color: #fff; background: #10a91e; }
+.rating.easy { border-color: transparent; color: #fff; background: #0d75e8; }
+.rating:hover { transform: translateY(-1px); filter: brightness(1.06); }
 /* ---------- 制作新卡 / Anki 队列 ---------- */
 .studio-type, .studio-grid { margin-bottom: 14px; }
 .studio-type { padding: 16px 20px; }

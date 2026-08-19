@@ -149,27 +149,30 @@ assert.match(
   "夜间模式沿用阅读卡的主题高亮变量"
 );
 
-/* ---------- Anki 评分按钮：重来红、困难橙、良好绿、简单蓝 ---------- */
+/* ---------- Anki 评分按钮：纯色红、橙、绿、蓝 ---------- */
 
 const lightRatingColors = {
-  again: "#d32f2f",
-  hard: "#e07a00",
-  good: "#2e7d32",
-  easy: "#1565c0",
+  again: "#c9323b",
+  hard: "#d47a00",
+  good: "#10a91e",
+  easy: "#0d75e8",
 };
-const darkRatingColors = {
-  again: "#ff8a8a",
-  hard: "#ffb15c",
-  good: "#6fd39a",
-  easy: "#79b8ff",
-};
+const darkRatingColors = lightRatingColors;
+
+const ratingBaseRule = styleSource.match(/(?:^|\n)\.rating\s*\{[^}]*\}/);
+assert.ok(ratingBaseRule, "存在评分按钮基础样式");
+assert.match(ratingBaseRule[0], /flex-direction\s*:\s*column-reverse/, "时间显示在评分名称上方");
+assert.match(ratingBaseRule[0], /backdrop-filter\s*:\s*none/, "评分按钮不使用玻璃模糊");
+assert.match(ratingBaseRule[0], /box-shadow\s*:\s*none/, "评分按钮不使用玻璃阴影");
 
 for (const [rating, color] of Object.entries(lightRatingColors)) {
   const rule = styleSource.match(
     new RegExp(`(?:^|\\n)\\.rating\\.${rating}\\s*\\{[^}]*\\}`)
   );
   assert.ok(rule, `存在日间模式 ${rating} 评分按钮样式`);
-  assert.ok(rule[0].includes(`color: ${color}`), `${rating} 使用 Anki 对应颜色`);
+  assert.ok(rule[0].includes(`background: ${color}`), `${rating} 使用浓郁的 Anki 纯色背景`);
+  assert.ok(rule[0].includes("color: #fff"), `${rating} 使用白色文字`);
+  assert.ok(!rule[0].includes("gradient"), `${rating} 不使用渐变玻璃效果`);
 }
 
 for (const [rating, color] of Object.entries(darkRatingColors)) {
@@ -177,13 +180,18 @@ for (const [rating, color] of Object.entries(darkRatingColors)) {
     new RegExp(`\\[data-theme="dark"\\] \\.rating\\.${rating}\\s*\\{[^}]*\\}`)
   );
   assert.ok(rule, `存在夜间模式 ${rating} 评分按钮样式`);
-  assert.ok(rule[0].includes(`color: ${color}`), `${rating} 夜间模式保持 Anki 对应色系`);
+  assert.ok(rule[0].includes(`background: ${color}`), `${rating} 夜间模式保持 Anki 纯色色系`);
+  assert.ok(rule[0].includes("color: #fff"), `${rating} 夜间模式使用白色文字`);
+  assert.ok(!rule[0].includes("gradient"), `${rating} 夜间模式不使用渐变玻璃效果`);
 }
 
 const landingSource = fs.readFileSync(
   path.join(__dirname, "..", "app", "static", "landing-v51.js"),
   "utf8"
 );
+for (const label of ["Again", "Hard", "Good", "Easy"]) {
+  assert.ok(landingSource.includes(`<b>${label}</b>`), `真实评分按钮使用英文名称 ${label}`);
+}
 assert.ok(landingSource.includes("拼写更正："), "词源结果显示拼写更正说明");
 assert.ok(
   landingSource.includes("以下显示正确拼写的词源结果"),
