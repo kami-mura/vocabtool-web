@@ -13,7 +13,7 @@ from sqlalchemy import func, insert, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from . import config, vocab
+from . import api_keys, config, vocab
 from .db import SessionLocal
 from .models import (
     AiDailyQuota,
@@ -42,10 +42,10 @@ _AI_CARD_PER_USER_CONCURRENCY = 1
 _AI_REQUEST_SLOTS = threading.BoundedSemaphore(4)
 _AI_QUOTA_EXCEEDED = "今日 AI 调用次数已达上限，请明天再试或联系管理员"
 _FREE_QUERY_QUOTA_EXCEEDED = (
-    "今日免费 AI 查询额度已用完，请明天再试或配置自己的 DeepSeek API Key"
+    "今日免费 AI 查询额度已用完，请明天再试或配置自己的 API Key"
 )
 _FREE_CARD_QUOTA_EXCEEDED = (
-    "今日免费制卡额度已用完，请明天再试或配置自己的 DeepSeek API Key"
+    "今日免费制卡额度已用完，请明天再试或配置自己的 API Key"
 )
 
 _STREAMLIT_READING_CARD_SYSTEM_PROMPT = (
@@ -306,7 +306,7 @@ AI_WORD_SELECTION_INPUT_LIMIT = 800
 AI_WORD_SELECTION_MAX_OUTPUT = 200
 
 
-def _safe_api_error(exc: Exception, action: str) -> str:
+def _safe_api_error(exc: Exception, action: str, user_api_key=None) -> str:
     """把 SDK 错误转换为可操作提示；日志和响应都不包含 API Key。
 
     模型名按当前 provider 动态生成：配 OpenAI 兼容网关的部署
@@ -314,7 +314,7 @@ def _safe_api_error(exc: Exception, action: str) -> str:
     """
     status = getattr(exc, "status_code", None)
     error_name = type(exc).__name__
-    model = _active_model()
+    model = _active_model(user_api_key)
     logger.warning("%s %s failed: %s (status=%s)", model, action, error_name, status)
     if status == 401 or error_name == "AuthenticationError":
         return f"{model} API Key 无效或已失效，请到控制台重新创建"
@@ -363,8 +363,20 @@ def _card_fields_from_streamlit_result(
     return front[:2000], back[:4000]
 
 
-def _active_provider() -> str:
+def _user_credential(user_api_key) -> api_keys.UserAiCredential | None:
+    if isinstance(user_api_key, api_keys.UserAiCredential):
+        return user_api_key
+    if isinstance(user_api_key, str) and user_api_key:
+        # 保留内部旧调用兼容；新请求都传带 provider 的凭据对象。
+        return api_keys.UserAiCredential(provider="deepseek", api_key=user_api_key)
+    return None
+
+
+def _active_provider(user_api_key=None) -> str:
     """和旧 Streamlit 一样：显式 AI_PROVIDER 优先，其次按已配置的 Key 推断。"""
+    credential = _user_credential(user_api_key)
+    if credential:
+        return credential.provider
     provider = config.AI_PROVIDER
     if provider in {"openai", "deepseek"}:
         return provider
@@ -373,15 +385,16 @@ def _active_provider() -> str:
     return "deepseek"
 
 
-def _active_model(user_api_key: str | None = None) -> str:
-    if user_api_key:
-        return config.DEEPSEEK_MODEL
+def _active_model(user_api_key=None) -> str:
+    credential = _user_credential(user_api_key)
+    if credential:
+        return api_keys.AI_PROVIDERS[credential.provider].model
     if _active_provider() == "openai":
         return config.OPENAI_MODEL
     return config.DEEPSEEK_MODEL
 
 
-def ai_enabled(user_api_key: str | None = None) -> bool:
+def ai_enabled(user_api_key=None) -> bool:
     return bool(user_api_key or config.OPENAI_API_KEY or config.DEEPSEEK_API_KEY)
 
 
@@ -440,13 +453,15 @@ def _card_generation_batch_size(card_template: str) -> int:
     return AI_CARD_BATCH_SIZE
 
 
-def _new_ai_client(user_api_key: str | None = None):
+def _new_ai_client(user_api_key=None):
     from openai import OpenAI
 
-    if user_api_key:
+    credential = _user_credential(user_api_key)
+    if credential:
+        provider = api_keys.AI_PROVIDERS[credential.provider]
         return OpenAI(
-            api_key=user_api_key,
-            base_url=config.DEEPSEEK_BASE_URL,
+            api_key=credential.api_key,
+            base_url=provider.base_url,
             timeout=AI_REQUEST_TIMEOUT_SECONDS,
             max_retries=0,
         )
@@ -468,7 +483,12 @@ def _new_ai_client(user_api_key: str | None = None):
 
 
 def _chat_completion(
-    client, *, thinking: bool = False, reasoning_effort: str | None = None, **kwargs
+    client,
+    *,
+    provider: str | None = None,
+    thinking: bool = False,
+    reasoning_effort: str | None = None,
+    **kwargs,
 ):
     """限制全进程并发，避免多个用户同时请求时拖垮应用线程池。
 
@@ -478,7 +498,8 @@ def _chat_completion(
     reasoning_effort 只由文章生成传入（low/high/max），
     其它调用不传，保持快速。
     """
-    if _active_provider() == "deepseek":
+    provider = provider or _active_provider()
+    if provider == "deepseek":
         extra_body = dict(kwargs.get("extra_body") or {})
         if thinking:
             extra_body["thinking"] = {"type": "enabled"}
@@ -934,7 +955,9 @@ def _parse_speaking_ai_rows(raw_text: str) -> list[dict]:
     return rows
 
 
-def _call_ai_card_batch(client, words: list[str], card_template: str) -> str:
+def _call_ai_card_batch(
+    client, words: list[str], card_template: str, user_api_key=None
+) -> str:
     """Call the active model with the old Streamlit prompt for one template."""
     input_items = "\n".join(words)
     if card_template == "general":
@@ -948,7 +971,8 @@ def _call_ai_card_batch(client, words: list[str], card_template: str) -> str:
 
     response = _chat_completion(
         client,
-        model=_active_model(),
+        provider=_active_provider(user_api_key),
+        model=_active_model(user_api_key),
         temperature=AI_CARD_TEMPERATURE,
         messages=[
             {"role": "system", "content": system_prompt},
@@ -1343,7 +1367,7 @@ def _generate_card_content_locked(
     user_id: int,
     words: list[str],
     card_template: str = "reading",
-    user_api_key: str | None = None,
+    user_api_key: api_keys.UserAiCredential | str | None = None,
     reserve_card_quota: bool = True,
 ) -> tuple[dict[str, dict], dict[str, str], int, dict[str, float | int]]:
     """Generate cards with the old Streamlit prompts in bounded parallel batches.
@@ -1383,7 +1407,7 @@ def _generate_card_content_locked(
     try:
         client = _new_ai_client(user_api_key) if user_api_key else _new_ai_client()
     except Exception as exc:
-        error = _safe_api_error(exc, "card client")
+        error = _safe_api_error(exc, "card client", user_api_key)
         return {}, {word: error for word in unique_words}, 0, _empty_timings()
 
     pending = list(unique_words)
@@ -1405,7 +1429,12 @@ def _generate_card_content_locked(
         for network_attempt in range(AI_CARD_NETWORK_RETRIES):
             attempts += 1
             try:
-                content = _call_ai_card_batch(client, batch, card_template)
+                if user_api_key:
+                    content = _call_ai_card_batch(
+                        client, batch, card_template, user_api_key
+                    )
+                else:
+                    content = _call_ai_card_batch(client, batch, card_template)
                 if not content:
                     raise RuntimeError(
                         f"{_active_model(user_api_key)} returned empty card content"
@@ -1413,7 +1442,9 @@ def _generate_card_content_locked(
                 request_error = ""
                 break
             except Exception as exc:
-                request_error = _safe_api_error(exc, "card generation")
+                request_error = _safe_api_error(
+                    exc, "card generation", user_api_key
+                )
                 if network_attempt < AI_CARD_NETWORK_RETRIES - 1:
                     time.sleep(1 + network_attempt)
         return content, request_error, attempts, time.time() - started
@@ -1510,7 +1541,7 @@ def generate_card_content_in_batches(
     user_id: int,
     words: list[str],
     card_template: str = "reading",
-    user_api_key: str | None = None,
+    user_api_key: api_keys.UserAiCredential | str | None = None,
     reserve_card_quota: bool = True,
 ) -> tuple[dict[str, dict], dict[str, str], int, dict[str, float | int]]:
     """生成卡片：同一用户同时只允许一个制卡任务，超时返回部分结果。
@@ -1598,7 +1629,7 @@ def explain_lookup(
     text: str,
     query_type: str,
     reserve_quota: bool = True,
-    user_api_key: str | None = None,
+    user_api_key: api_keys.UserAiCredential | str | None = None,
 ) -> tuple[dict | None, str | None, bool]:
     """用 AI查词格式解释单词、短语或中文释义。
 
@@ -1631,6 +1662,7 @@ def explain_lookup(
             try:
                 response = _chat_completion(
                     client,
+                    provider=_active_provider(user_api_key),
                     model=_active_model(user_api_key),
                     temperature=0.2,
                     messages=[
@@ -1659,6 +1691,7 @@ def explain_lookup(
                         continue
                     response = _chat_completion(
                         client,
+                        provider=_active_provider(user_api_key),
                         model=_active_model(user_api_key),
                         temperature=0.15,
                         messages=[
@@ -1692,7 +1725,7 @@ def explain_lookup(
                 return result, None, charged
             except Exception as exc:
                 db.rollback()
-                last_error = _safe_api_error(exc, "lookup")
+                last_error = _safe_api_error(exc, "lookup", user_api_key)
                 status = getattr(exc, "status_code", None)
                 if status != 503 or attempt >= AI_CARD_NETWORK_RETRIES - 1:
                     if user_id is None and reserve_quota:
@@ -1709,7 +1742,7 @@ def explain_lookup(
         if user_id is None and reserve_quota:
             guest_ai_quota_refund(db)
             charged = False
-        return None, _safe_api_error(exc, "lookup"), charged
+        return None, _safe_api_error(exc, "lookup", user_api_key), charged
 
 
 def _looks_like_missing_lookup_input(raw_content: str) -> bool:
@@ -1731,7 +1764,7 @@ def quick_lookup(
     db: Session,
     user_id: int | None,
     text: str,
-    user_api_key: str | None = None,
+    user_api_key: api_keys.UserAiCredential | str | None = None,
 ) -> tuple[dict | None, str | None]:
     """词源速查：中文释义 + 底层逻辑 + 词源史诗（移植自 Streamlit）。"""
     normalized = re.sub(r"\s+", " ", str(text or "").strip())
@@ -1765,6 +1798,7 @@ def quick_lookup(
         ]
         response = _chat_completion(
             client,
+            provider=_active_provider(user_api_key),
             model=_active_model(user_api_key),
             temperature=0.15,
             messages=messages,
@@ -1773,6 +1807,7 @@ def quick_lookup(
         if _looks_like_missing_lookup_input(content):
             response = _chat_completion(
                 client,
+                provider=_active_provider(user_api_key),
                 model=_active_model(user_api_key),
                 temperature=0.1,
                 messages=[
@@ -1805,7 +1840,7 @@ def quick_lookup(
         db.rollback()
         if user_id is None:
             guest_ai_quota_refund(db)
-        return None, _safe_api_error(exc, "quick lookup")
+        return None, _safe_api_error(exc, "quick lookup", user_api_key)
 
 
 def _extract_lookup_headword(raw_content: str) -> str:
@@ -1827,7 +1862,7 @@ def answer_question(
     db: Session,
     user_id: int | None,
     question: str,
-    user_api_key: str | None = None,
+    user_api_key: api_keys.UserAiCredential | str | None = None,
 ) -> tuple[str | None, str | None]:
     """回答英语学习问题（移植自 Streamlit 完整版 prompt）。"""
     normalized = " ".join(str(question or "").split()).strip()
@@ -1853,6 +1888,7 @@ def answer_question(
         client = _new_ai_client(user_api_key) if user_api_key else _new_ai_client()
         response = _chat_completion(
             client,
+            provider=_active_provider(user_api_key),
             model=_active_model(user_api_key),
             temperature=0.3,
             messages=[
@@ -1871,7 +1907,7 @@ def answer_question(
         db.rollback()
         if user_id is None:
             guest_ai_quota_refund(db)
-        return None, _safe_api_error(exc, "question")
+        return None, _safe_api_error(exc, "question", user_api_key)
 
 
 def generate_topic_word_list(

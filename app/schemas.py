@@ -29,7 +29,12 @@ class PasswordResetIn(BaseModel):
 
 
 class ApiKeyIn(BaseModel):
-    api_key: str = Field(min_length=11, max_length=256)
+    provider: str = Field(min_length=2, max_length=20)
+    api_key: str = Field(min_length=10, max_length=256)
+
+
+class LegacyApiKeyIn(BaseModel):
+    api_key: str = Field(min_length=10, max_length=256)
 
 
 class ReadingDisplayIn(BaseModel):

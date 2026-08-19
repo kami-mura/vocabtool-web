@@ -469,21 +469,27 @@
   } catch (_) { /* 隐私模式等场景忽略 */ }
 
   const accountPanel = document.getElementById("account-menu-panel");
+  const accountApiProvider = document.getElementById("account-api-provider");
   const accountApiKeyInput = document.getElementById("account-api-key-input");
   const accountApiKeySave = document.getElementById("account-api-key-save");
   const accountApiKeyDelete = document.getElementById("account-api-key-delete");
   const accountApiKeyStatus = document.getElementById("account-api-key-status");
   let accountApiKeyLoaded = false;
+  let configuredApiProviderLabel = "";
 
   async function loadAccountApiKeyStatus(force) {
     if (!isLoggedIn || !accountApiKeyStatus || (accountApiKeyLoaded && !force)) return;
     try {
-      const res = await fetch("/api/ai-credentials/deepseek");
+      const res = await fetch("/api/ai-credentials");
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.detail || "状态加载失败");
       accountApiKeyLoaded = true;
+      configuredApiProviderLabel = data.provider_label || "";
+      if (data.configured && accountApiProvider && data.provider) {
+        accountApiProvider.value = data.provider;
+      }
       accountApiKeyStatus.textContent = data.configured
-        ? "已配置自己的 Key" + (data.key_hint ? "（尾号 " + data.key_hint + "）" : "")
+        ? "已配置 " + configuredApiProviderLabel + " Key" + (data.key_hint ? "（尾号 " + data.key_hint + "）" : "")
         : "未配置，当前使用网站免费额度";
       accountApiKeyStatus.className = "account-api-key-status" + (data.configured ? " ok" : "");
       if (accountApiKeyDelete) accountApiKeyDelete.hidden = !data.configured;
@@ -496,17 +502,18 @@
   if (accountApiKeySave) {
     accountApiKeySave.onclick = async () => {
       const apiKey = (accountApiKeyInput && accountApiKeyInput.value || "").trim();
-      if (!/^sk-[A-Za-z0-9_-]{8,253}$/.test(apiKey)) {
-        accountApiKeyStatus.textContent = "请输入有效的 DeepSeek API Key";
+      const provider = accountApiProvider && accountApiProvider.value || "deepseek";
+      if (!/^[\x21-\x7e]{10,256}$/.test(apiKey)) {
+        accountApiKeyStatus.textContent = "请输入有效的 API Key";
         accountApiKeyStatus.className = "account-api-key-status error";
         return;
       }
       accountApiKeySave.disabled = true;
       try {
-        const res = await fetch("/api/ai-credentials/deepseek", {
+        const res = await fetch("/api/ai-credentials", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ api_key: apiKey }),
+          body: JSON.stringify({ provider: provider, api_key: apiKey }),
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.detail || "保存失败");
@@ -523,8 +530,8 @@
   }
   if (accountApiKeyDelete) {
     accountApiKeyDelete.onclick = async () => {
-      if (!window.confirm("删除已保存的 DeepSeek API Key？")) return;
-      const res = await fetch("/api/ai-credentials/deepseek", { method: "DELETE" });
+      if (!window.confirm("删除已保存的 " + (configuredApiProviderLabel || "AI") + " API Key？")) return;
+      const res = await fetch("/api/ai-credentials", { method: "DELETE" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         accountApiKeyStatus.textContent = data.detail || "删除失败";
@@ -2380,7 +2387,7 @@
       articleGenerating = true;
       generateArticle.disabled = true;
       status.hidden = false;
-      status.textContent = "DeepSeek 正在生成今日短文…";
+      status.textContent = "AI 正在生成今日短文…";
       result.hidden = true;
       if (placeholder) placeholder.hidden = false;
       try {

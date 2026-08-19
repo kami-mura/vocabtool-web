@@ -81,11 +81,13 @@ def _require_user(db: Session, request: Request) -> User:
     return user
 
 
-def _user_deepseek_api_key(db: Session, user: User | None) -> str | None:
+def _user_ai_credential(
+    db: Session, user: User | None
+) -> api_keys.UserAiCredential | None:
     if user is None:
         return None
     try:
-        return api_keys.load_deepseek_key(db, user.id)
+        return api_keys.load_api_key(db, user.id)
     except api_keys.ApiKeyError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 

@@ -30,6 +30,7 @@ from ..api_support import (
 )
 from ..schemas import (
     ApiKeyIn,
+    LegacyApiKeyIn,
     LoginIn,
     PasswordResetIn,
     ReadingDisplayIn,
@@ -172,43 +173,68 @@ def me(request: Request, db: Session = Depends(get_db)):
     return {"email": user.email, "user_id": user.id}
 
 
-@router.get("/ai-credentials/deepseek")
-def get_deepseek_credential(request: Request, db: Session = Depends(get_db)):
+@router.get("/ai-credentials")
+def get_ai_credential(request: Request, db: Session = Depends(get_db)):
     user = _require_user(db, request)
     return api_keys.credential_status(db, user.id)
 
 
-@router.put("/ai-credentials/deepseek")
-def save_deepseek_credential(
+@router.put("/ai-credentials")
+def save_ai_credential(
     body: ApiKeyIn, request: Request, db: Session = Depends(get_db)
 ):
     user = _require_user(db, request)
     if not check_request_rate(
         db,
-        action="save-deepseek-key",
+        action="save-ai-key",
         identity=f"u{user.id}",
         limit=20,
         window_minutes=60,
     ):
         raise HTTPException(status_code=429, detail="API Key 更新过于频繁，请稍后再试")
     try:
-        credential = api_keys.save_deepseek_key(db, user.id, body.api_key)
+        credential = api_keys.save_api_key(db, user.id, body.provider, body.api_key)
     except api_keys.ApiKeyError as exc:
         status = 503 if "服务器尚未配置" in str(exc) else 400
         raise HTTPException(status_code=status, detail=str(exc)) from exc
     return {
         "ok": True,
         "configured": True,
-        "provider": "deepseek",
+        "provider": credential.provider,
+        "provider_label": api_keys.AI_PROVIDERS[credential.provider].label,
         "key_hint": credential.key_hint,
     }
 
 
-@router.delete("/ai-credentials/deepseek")
-def delete_deepseek_credential(request: Request, db: Session = Depends(get_db)):
+@router.delete("/ai-credentials")
+def delete_ai_credential(request: Request, db: Session = Depends(get_db)):
     user = _require_user(db, request)
-    deleted = api_keys.delete_deepseek_key(db, user.id)
+    deleted = api_keys.delete_api_key(db, user.id)
     return {"ok": True, "deleted": deleted, "configured": False}
+
+
+# 兼容已经被浏览器/PWA 缓存的上一版前端；新前端只使用通用端点。
+@router.get("/ai-credentials/deepseek")
+def get_legacy_deepseek_credential(
+    request: Request, db: Session = Depends(get_db)
+):
+    return get_ai_credential(request, db)
+
+
+@router.put("/ai-credentials/deepseek")
+def save_legacy_deepseek_credential(
+    body: LegacyApiKeyIn, request: Request, db: Session = Depends(get_db)
+):
+    return save_ai_credential(
+        ApiKeyIn(provider="deepseek", api_key=body.api_key), request, db
+    )
+
+
+@router.delete("/ai-credentials/deepseek")
+def delete_legacy_deepseek_credential(
+    request: Request, db: Session = Depends(get_db)
+):
+    return delete_ai_credential(request, db)
 
 
 @router.get("/storage")

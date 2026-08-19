@@ -20,7 +20,8 @@ def test_landing_js_bundle_is_served(client):
     assert "text/javascript" in response.headers["content-type"]
     assert "function renderRealReview" in response.text
     assert "if (realReviewQueue.length === 0) renderRealReview();" in response.text
-    assert 'fetch("/api/ai-credentials/deepseek"' in response.text
+    assert 'fetch("/api/ai-credentials"' in response.text
+    assert "account-api-provider" in response.text
     assert 'accountApiKeyInput.value = "";' in response.text
     assert "})();" in response.text
 
@@ -78,7 +79,7 @@ def test_home_page_has_guest_search_demo_and_login_link(client):
     assert "体验 AI 短文" in page.text
 
 
-def test_deepseek_key_is_encrypted_never_returned_and_user_isolated(client, monkeypatch):
+def test_ai_key_is_encrypted_never_returned_and_user_isolated(client, monkeypatch):
     from app.models import UserApiCredential
 
     monkeypatch.setattr(config, "API_KEY_ENCRYPTION_SECRET", "test-encryption-secret")
@@ -86,19 +87,20 @@ def test_deepseek_key_is_encrypted_never_returned_and_user_isolated(client, monk
     register(client, "key-owner@example.com")
 
     saved = client.put(
-        "/api/ai-credentials/deepseek",
-        json={"api_key": api_key},
+        "/api/ai-credentials",
+        json={"provider": "qwen", "api_key": api_key},
     )
     assert saved.status_code == 200, saved.text
     assert api_key not in saved.text
     assert saved.json() == {
         "ok": True,
         "configured": True,
-        "provider": "deepseek",
+        "provider": "qwen",
+        "provider_label": "通义千问",
         "key_hint": "7890",
     }
 
-    status = client.get("/api/ai-credentials/deepseek")
+    status = client.get("/api/ai-credentials")
     assert status.status_code == 200
     assert api_key not in status.text
     assert status.json()["configured"] is True
@@ -116,27 +118,40 @@ def test_deepseek_key_is_encrypted_never_returned_and_user_isolated(client, monk
 
     client.post("/api/logout")
     register(client, "other-key-user@example.com")
-    other_status = client.get("/api/ai-credentials/deepseek").json()
+    other_status = client.get("/api/ai-credentials").json()
     assert other_status == {
         "configured": False,
-        "provider": "deepseek",
+        "provider": "",
+        "provider_label": "",
         "key_hint": "",
     }
 
 
-def test_deepseek_key_can_be_deleted_without_returning_plaintext(client, monkeypatch):
+def test_ai_key_can_be_deleted_without_returning_plaintext(client, monkeypatch):
     monkeypatch.setattr(config, "API_KEY_ENCRYPTION_SECRET", "test-encryption-secret")
     register(client, "delete-key@example.com")
     api_key = "sk-delete-this-secret-12345678"
     assert client.put(
-        "/api/ai-credentials/deepseek", json={"api_key": api_key}
+        "/api/ai-credentials",
+        json={"provider": "deepseek", "api_key": api_key},
     ).status_code == 200
 
-    deleted = client.delete("/api/ai-credentials/deepseek")
+    deleted = client.delete("/api/ai-credentials")
     assert deleted.status_code == 200
     assert api_key not in deleted.text
     assert deleted.json()["configured"] is False
-    assert client.get("/api/ai-credentials/deepseek").json()["configured"] is False
+    assert client.get("/api/ai-credentials").json()["configured"] is False
+
+
+def test_ai_key_rejects_provider_outside_server_allowlist(client, monkeypatch):
+    monkeypatch.setattr(config, "API_KEY_ENCRYPTION_SECRET", "test-encryption-secret")
+    register(client, "bad-provider@example.com")
+    response = client.put(
+        "/api/ai-credentials",
+        json={"provider": "custom", "api_key": "secret-key-123456"},
+    )
+    assert response.status_code == 400
+    assert "不支持" in response.json()["detail"]
 
 
 def test_theme_is_applied_before_stylesheets_on_home_and_login(client):
@@ -176,6 +191,9 @@ def test_home_page_stays_guest_like_when_logged_in(client):
     assert '<form id="landing-search-form"' in page.text
     assert 'landing-hint' not in page.text
     assert 'id="account-menu-panel"' in page.text
+    assert 'id="account-api-provider"' in page.text
+    for provider in ("deepseek", "openai", "gemini", "anthropic", "qwen", "kimi", "glm", "xai"):
+        assert f'<option value="{provider}">' in page.text
     assert 'id="account-api-key-input" type="password"' in page.text
     assert "保存后不再显示明文" in page.text
     assert 'data-mobile-view="cards"' in page.text

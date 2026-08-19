@@ -36,8 +36,18 @@
         <div id="account-menu-panel" class="account-menu-panel" hidden>
           <p class="account-email">邮箱：<strong id="home-email">…</strong></p>
           <div class="account-api-key">
-            <label for="account-api-key-input">DeepSeek API Key</label>
-            <input id="account-api-key-input" type="password" placeholder="sk-…" autocomplete="new-password" spellcheck="false" data-1p-ignore>
+            <label for="account-api-provider">自己的 AI API Key</label>
+            <select id="account-api-provider" aria-label="AI 服务商">
+              <option value="deepseek">DeepSeek</option>
+              <option value="openai">OpenAI</option>
+              <option value="gemini">Google Gemini</option>
+              <option value="anthropic">Anthropic Claude</option>
+              <option value="qwen">通义千问</option>
+              <option value="kimi">Kimi</option>
+              <option value="glm">智谱 GLM</option>
+              <option value="xai">xAI Grok</option>
+            </select>
+            <input id="account-api-key-input" type="password" placeholder="输入所选服务商的 API Key" autocomplete="new-password" spellcheck="false" data-1p-ignore>
             <div class="account-api-key-actions">
               <button id="account-api-key-save" class="small" type="button">保存 Key</button>
               <button id="account-api-key-delete" class="small danger" type="button" hidden>删除 Key</button>
@@ -70,7 +80,7 @@
           <input type="text" name="q" placeholder="输入单词，短语或者简短中文（双击可查词）" aria-label="搜索单词">
           <button id="landing-search-clear" class="landing-clear-btn" type="button" aria-label="清空搜索" hidden>×</button>
         </div>
-        <button class="primary" type="submit">DeepSeek</button>
+        <button class="primary" type="submit">AI 查询</button>
       </form>
       <div id="landing-search-result" class="landing-search-result" role="status" aria-live="polite" aria-atomic="true" hidden></div>
     </section>
@@ -434,7 +444,7 @@
 
             <div class="card-step" id="card-step-3" hidden>
               <textarea id="real-card-words" rows="4" placeholder="目标词（可编辑，每行一个）"></textarea>
-              <p class="hint card-deepseek-note">卡片正面与释义由 DeepSeek 生成，单词越多耗时越长</p>
+              <p class="hint card-deepseek-note">卡片正面与释义由 AI 生成，单词越多耗时越长</p>
               <div id="real-card-progress-wrap" class="card-generate-progress" hidden>
                 <div id="real-card-progress-bar" class="card-generate-progress-bar">
                   <div id="real-card-progress-fill" class="card-generate-progress-fill"></div>

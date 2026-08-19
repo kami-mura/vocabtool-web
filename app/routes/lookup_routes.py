@@ -20,7 +20,7 @@ from ..api_support import (
     _anonymous_request_identity,
     _require_storage_space,
     _require_user,
-    _user_deepseek_api_key,
+    _user_ai_credential,
     _utf8_size,
     ai_mod,
     builtin_lookup,
@@ -221,7 +221,7 @@ def create_lookup(body: LookupIn, request: Request, db: Session = Depends(get_db
         raise HTTPException(status_code=429, detail="查词请求过多，请稍后再试")
     started_at = time.perf_counter()
     user = current_user(request, db)
-    user_api_key = _user_deepseek_api_key(db, user)
+    user_credential = _user_ai_credential(db, user)
     guest = user is None
     guest_remaining = None
     text = _validate_lookup_query(body.text)
@@ -273,28 +273,32 @@ def create_lookup(body: LookupIn, request: Request, db: Session = Depends(get_db
             "card_back": cached.card_back or "",
         }
         lookup_source = "local_cache"
-    elif ai_mod.ai_enabled():
-        if user_api_key:
+    elif (
+        ai_mod.ai_enabled(user_credential)
+        if user_credential
+        else ai_mod.ai_enabled()
+    ):
+        if user_credential:
             result, ai_error, first_call_charged = ai_mod.explain_lookup(
                 db,
                 user.id if user else None,
                 text,
                 query_type,
-                user_api_key=user_api_key,
+                user_api_key=user_credential,
             )
         else:
             result, ai_error, first_call_charged = ai_mod.explain_lookup(
                 db, user.id if user else None, text, query_type
             )
         if result:
-            lookup_source = "deepseek"
+            lookup_source = ai_mod._active_provider(user_credential)
             if cached:
                 cached.query_type = query_type
                 cached.explanation = result["explanation"]
                 cached.card_front = result["card_front"]
                 cached.card_back = result["card_back"]
                 cached.prompt_version = _LOOKUP_CACHE_VERSION
-                cached.source = "deepseek"
+                cached.source = lookup_source
                 cached.updated_at = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
             else:
                 try:
@@ -307,7 +311,7 @@ def create_lookup(body: LookupIn, request: Request, db: Session = Depends(get_db
                                 card_front=result["card_front"],
                                 card_back=result["card_back"],
                                 prompt_version=_LOOKUP_CACHE_VERSION,
-                                source="deepseek",
+                                source=lookup_source,
                             )
                         )
                 except IntegrityError:
@@ -387,18 +391,22 @@ def create_lookup(body: LookupIn, request: Request, db: Session = Depends(get_db
                         "card_back": cached_corrected.card_back or "",
                     }
                     corrected_source = "local_cache"
-                elif ai_mod.ai_enabled():
+                elif (
+                    ai_mod.ai_enabled(user_credential)
+                    if user_credential
+                    else ai_mod.ai_enabled()
+                ):
                     # 第一次 AI 查询已实际消耗配额时才复用（不再重复扣）；
                     # 未消耗（配额不足被拒、游客失败已退还）时必须重新预占，
                     # 否则拼写纠错路径会成为绕过配额免费调用 AI 的通道。
-                    if user_api_key:
+                    if user_credential:
                         corrected, _, _ = ai_mod.explain_lookup(
                             db,
                             user.id if user else None,
                             suggestion,
                             query_type,
                             reserve_quota=not first_call_charged,
-                            user_api_key=user_api_key,
+                            user_api_key=user_credential,
                         )
                     else:
                         corrected, _, _ = ai_mod.explain_lookup(
@@ -409,7 +417,7 @@ def create_lookup(body: LookupIn, request: Request, db: Session = Depends(get_db
                             reserve_quota=not first_call_charged,
                         )
                     if corrected:
-                        corrected_source = "deepseek"
+                        corrected_source = ai_mod._active_provider(user_credential)
                         # 与主路径一致写入缓存：否则同一个拼写错误每次
                         # 都重新调 AI 并扣一次配额。
                         if cached_corrected:
@@ -418,7 +426,7 @@ def create_lookup(body: LookupIn, request: Request, db: Session = Depends(get_db
                             cached_corrected.card_front = corrected["card_front"]
                             cached_corrected.card_back = corrected["card_back"]
                             cached_corrected.prompt_version = _LOOKUP_CACHE_VERSION
-                            cached_corrected.source = "deepseek"
+                            cached_corrected.source = corrected_source
                             cached_corrected.updated_at = (
                                 dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
                             )
@@ -435,7 +443,7 @@ def create_lookup(body: LookupIn, request: Request, db: Session = Depends(get_db
                                             card_front=corrected["card_front"],
                                             card_back=corrected["card_back"],
                                             prompt_version=_LOOKUP_CACHE_VERSION,
-                                            source="deepseek",
+                                            source=corrected_source,
                                         )
                                     )
                             except IntegrityError:
@@ -499,7 +507,9 @@ def create_lookup(body: LookupIn, request: Request, db: Session = Depends(get_db
         "elapsed_ms": elapsed_ms,
         "guest_remaining": guest_remaining,
         "ai_enabled": (
-            ai_mod.ai_enabled(user_api_key) if user_api_key else ai_mod.ai_enabled()
+            ai_mod.ai_enabled(user_credential)
+            if user_credential
+            else ai_mod.ai_enabled()
         ),
         "ai_error": ai_error,
         "spelling_note": spelling_note,
@@ -644,7 +654,7 @@ def save_lookup_word(
 def quick_lookup(body: QuickLookupIn, request: Request, db: Session = Depends(get_db)):
     """词源速查：中文释义 + 底层逻辑 + 词源史诗。"""
     user = current_user(request, db)
-    user_api_key = _user_deepseek_api_key(db, user)
+    user_credential = _user_ai_credential(db, user)
     guest = user is None
     guest_remaining = None
     if not check_request_rate(
@@ -659,9 +669,9 @@ def quick_lookup(body: QuickLookupIn, request: Request, db: Session = Depends(ge
         raise HTTPException(status_code=429, detail="查询请求过多，请稍后再试")
     if guest:
         guest_remaining = _reserve_guest_lookup(db, request)
-    if user_api_key:
+    if user_credential:
         result, error = ai_mod.quick_lookup(
-            db, user.id if user else None, body.text, user_api_key
+            db, user.id if user else None, body.text, user_credential
         )
     else:
         result, error = ai_mod.quick_lookup(db, user.id if user else None, body.text)
@@ -702,7 +712,7 @@ def quick_lookup(body: QuickLookupIn, request: Request, db: Session = Depends(ge
 def ask_question(body: QuestionIn, request: Request, db: Session = Depends(get_db)):
     """回答英语学习问题（用法、语法、翻译、改写等）。"""
     user = current_user(request, db)
-    user_api_key = _user_deepseek_api_key(db, user)
+    user_credential = _user_ai_credential(db, user)
     guest = user is None
     guest_remaining = None
     if not check_request_rate(
@@ -717,9 +727,9 @@ def ask_question(body: QuestionIn, request: Request, db: Session = Depends(get_d
         raise HTTPException(status_code=429, detail="问答请求过多，请稍后再试")
     if guest:
         guest_remaining = _reserve_guest_lookup(db, request)
-    if user_api_key:
+    if user_credential:
         answer, error = ai_mod.answer_question(
-            db, user.id if user else None, body.question, user_api_key
+            db, user.id if user else None, body.question, user_credential
         )
     else:
         answer, error = ai_mod.answer_question(

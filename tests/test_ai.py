@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 
-from app import ai, config
+from app import ai, api_keys, config
 from app.ai import (
     _STREAMLIT_SIMPLE_LOOKUP_PROMPT,
     _build_speaking_front_prompts,
@@ -62,6 +62,49 @@ def test_deepseek_fast_mode_explicitly_disables_thinking(monkeypatch):
     assert captured["extra_body"] == {"thinking": {"type": "disabled"}}
     assert captured["temperature"] == 0.2
     assert "reasoning_effort" not in captured
+
+
+def test_user_provider_uses_fixed_openai_compatible_endpoint_and_model(monkeypatch):
+    import openai
+
+    captured = {}
+
+    def fake_openai(**kwargs):
+        captured.update(kwargs)
+        return object()
+
+    monkeypatch.setattr(openai, "OpenAI", fake_openai)
+    credential = api_keys.UserAiCredential(
+        provider="gemini", api_key="AIza-test-key-1234567890"
+    )
+    ai._new_ai_client(credential)
+    assert captured["api_key"] == credential.api_key
+    assert captured["base_url"] == (
+        "https://generativelanguage.googleapis.com/v1beta/openai/"
+    )
+    assert ai._active_provider(credential) == "gemini"
+    assert ai._active_model(credential) == "gemini-2.5-flash"
+
+
+def test_non_deepseek_provider_does_not_receive_deepseek_thinking_parameters():
+    captured = {}
+
+    def create(**kwargs):
+        captured.update(kwargs)
+        return object()
+
+    client = SimpleNamespace(
+        chat=SimpleNamespace(completions=SimpleNamespace(create=create))
+    )
+    ai._chat_completion(
+        client,
+        provider="gemini",
+        model="gemini-2.5-flash",
+        messages=[],
+        temperature=0.2,
+    )
+    assert captured["temperature"] == 0.2
+    assert "extra_body" not in captured
 
 
 def test_streamlit_lookup_format_extracts_complete_sentence_card():
@@ -533,7 +576,7 @@ def test_card_generation_reserves_card_count_and_own_key_bypasses_it(monkeypatch
     monkeypatch.setattr(ai, "ai_enabled", lambda *_args: True)
     monkeypatch.setattr(ai, "_new_ai_client", lambda *_args: object())
 
-    def fake_cards(_client, words, _template):
+    def fake_cards(_client, words, _template, _user_api_key=None):
         rows = [
             f"{word} ||| ||| n. | test meaning | 测试释义 ||| "
             f"Readers remember {word} through this clear example sentence. ||| |||"

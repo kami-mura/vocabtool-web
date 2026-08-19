@@ -1307,7 +1307,8 @@ button.landing-login-btn { border: none; cursor: pointer; }
   border-bottom: 1px solid var(--line);
 }
 .account-api-key label { color: var(--text); font-size: 13px; font-weight: 700; }
-.account-api-key input { width: 100%; padding: 9px 10px; font-size: 13px; }
+.account-api-key input,
+.account-api-key select { width: 100%; padding: 9px 10px; font-size: 13px; }
 .account-api-key-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .account-api-key-status,
 .account-api-key-note { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.45; }

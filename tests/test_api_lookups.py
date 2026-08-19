@@ -74,7 +74,7 @@ def test_quick_lookup_and_qa_and_topic_endpoints(client, monkeypatch):
     assert bad_quick.status_code == 422
 
 
-def test_saved_deepseek_key_is_decrypted_only_for_user_ai_call(client, monkeypatch):
+def test_saved_ai_key_is_decrypted_only_for_user_ai_call(client, monkeypatch):
     from app import ai as ai_mod
     from app import config
 
@@ -82,18 +82,20 @@ def test_saved_deepseek_key_is_decrypted_only_for_user_ai_call(client, monkeypat
     register(client, "key-route@example.com")
     api_key = "sk-route-secret-1234567890"
     assert client.put(
-        "/api/ai-credentials/deepseek", json={"api_key": api_key}
+        "/api/ai-credentials",
+        json={"provider": "gemini", "api_key": api_key},
     ).status_code == 200
     received = []
 
-    def fake_quick(_db, _uid, text, user_api_key):
-        received.append(user_api_key)
+    def fake_quick(_db, _uid, text, user_credential):
+        received.append(user_credential)
         return {"explanation": "【释义】\n竞技场", "headword": text, "rank": 123}, None
 
     monkeypatch.setattr(ai_mod, "quick_lookup", fake_quick)
     response = client.post("/api/lookups/quick", json={"text": "arena"})
     assert response.status_code == 200, response.text
-    assert received == [api_key]
+    assert received[0].provider == "gemini"
+    assert received[0].api_key == api_key
     assert api_key not in response.text
 
 
