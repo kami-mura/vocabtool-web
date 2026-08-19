@@ -49,7 +49,7 @@
   <main class="landing-main">
     <section class="landing-hero" id="landing-hero">
       <div class="logo">V</div>
-      <h1>查单词、<mark class="oil-highlight">记词汇</mark>，读文章</h1>
+      <h1>查单词、<mark class="word-highlight">记词汇</mark>，读文章</h1>
       <form id="landing-search-form" class="landing-search">
         <div class="search-mode" role="group" aria-label="查询模式">
           <button type="button" class="search-mode-btn active" data-search-mode="lookup" aria-pressed="true">查词</button>
@@ -211,6 +211,7 @@
             <button id="real-manage-library" type="button" role="menuitem">我的词库</button>
             <button id="real-manage-add-card" type="button" role="menuitem">制作新卡</button>
             <button id="real-manage-browser" type="button" role="menuitem">我的卡片</button>
+            <button id="real-review-refresh-sentences" type="button" role="menuitem">更新阅读卡例句</button>
             <button id="real-anki-import" type="button" role="menuitem">从 Anki 导入</button>
             <button id="real-anki-export" type="button" role="menuitem">导出到 Anki</button>
             <div class="review-manage-daily">
@@ -243,9 +244,9 @@
         <p>通用、阅读、Cloze 与口语卡，点击翻面体验</p>
       </div>
       {% set demo_cards = [
-        {"type": "通用卡", "front": "<mark class='oil-highlight'>pond</mark>", "answer": "pond /pɒnd/", "meaning": "n. 池塘", "sentence": "The children fed the ducks by the pond after school.", "audio": "pond", "audio_back": "The children fed the ducks by the pond after school.", "front_audio": true},
-        {"type": "阅读卡", "front": "The old <mark class='oil-highlight'>fisherman</mark> checked his net before sunrise.", "answer": "fisherman", "meaning": "n. 渔夫；钓鱼的人", "sentence": "", "audio": "The old fisherman checked his net before sunrise.", "front_audio": true},
-        {"type": "Cloze 卡", "front": "She spoke in a <mark class='oil-highlight'>______</mark> voice so the baby would not wake.", "answer": "gentle /ˈdʒentl/", "meaning": "adj. 轻柔的；温和的", "sentence": "", "audio": "She spoke in a gentle voice so the baby would not wake.", "front_audio": false},
+        {"type": "通用卡", "front": "<mark class='word-highlight'>pond</mark>", "answer": "pond /pɒnd/", "meaning": "n. 池塘", "sentence": "The children fed the ducks by the pond after school.", "audio": "pond", "audio_back": "The children fed the ducks by the pond after school.", "front_audio": true},
+        {"type": "阅读卡", "front": "The old <mark class='word-highlight'>fisherman</mark> checked his net before sunrise.", "answer": "fisherman", "meaning": "n. 渔夫；钓鱼的人", "sentence": "", "audio": "The old fisherman checked his net before sunrise.", "front_audio": true},
+        {"type": "Cloze 卡", "front": "She spoke in a <mark class='word-highlight'>______</mark> voice so the baby would not wake.", "answer": "gentle /ˈdʒentl/", "meaning": "adj. 轻柔的；温和的", "sentence": "", "audio": "She spoke in a gentle voice so the baby would not wake.", "front_audio": false},
         {"type": "口语卡", "front": "如何称赞对方说话很有感染力？", "answer": "Your words are truly eloquent.", "meaning": "称赞对方表达生动、有感染力", "sentence": "", "audio": "Your words are truly eloquent.", "front_audio": false}
       ] %}
       <div class="demo-cards">
@@ -261,33 +262,33 @@
       </div>
     </section>
 
-    <section class="landing-section oil-today oil-only" id="oil-today"{% if not logged_in %} hidden{% endif %}>
-      <div class="oil-today-card">
-        <div class="oil-today-main">
-          <div class="oil-today-ring" aria-hidden="true">
+    <section class="landing-section today-overview" id="today-overview"{% if not logged_in %} hidden{% endif %}>
+      <div class="today-overview-card">
+        <div class="today-overview-main">
+          <div class="today-overview-ring" aria-hidden="true">
             <svg viewBox="0 0 110 110">
-              <circle class="oil-today-ring-track" cx="55" cy="55" r="44"></circle>
-              <circle class="oil-today-ring-fill" id="oil-today-ring-fill" cx="55" cy="55" r="44"></circle>
+              <circle class="today-overview-ring-track" cx="55" cy="55" r="44"></circle>
+              <circle class="today-overview-ring-fill" id="today-overview-ring-fill" cx="55" cy="55" r="44"></circle>
             </svg>
-            <div class="oil-today-ring-label"><b id="oil-today-ring-text">0%</b><span>今日进度</span></div>
+            <div class="today-overview-ring-label"><b id="today-overview-ring-text">0%</b><span>今日进度</span></div>
           </div>
-          <div class="oil-today-copy">
-            <p class="oil-today-kicker">今日学习</p>
-            <h2 id="oil-today-title">今天也要见面 5 分钟</h2>
-            <p class="oil-today-sub" id="oil-today-sub">先解决到期卡片，再学一点新词</p>
+          <div class="today-overview-copy">
+            <p class="today-overview-kicker">今日学习</p>
+            <h2 id="today-overview-title">今天也要见面 5 分钟</h2>
+            <p class="today-overview-sub" id="today-overview-sub">先解决到期卡片，再学一点新词</p>
           </div>
         </div>
-        <div class="oil-today-stats">
-          <div class="oil-today-stat"><b id="oil-today-due">–</b><span>复习</span></div>
-          <div class="oil-today-stat"><b id="oil-today-new">–</b><span>新学</span></div>
-          <div class="oil-today-stat"><b id="oil-today-studied">–</b><span>今日已学</span></div>
-          <div class="oil-today-stat stat-days"><b id="oil-today-days">–</b><span>连续学习</span></div>
+        <div class="today-overview-stats">
+          <div class="today-overview-stat"><b id="today-overview-due">–</b><span>复习</span></div>
+          <div class="today-overview-stat"><b id="today-overview-new">–</b><span>新学</span></div>
+          <div class="today-overview-stat"><b id="today-overview-studied">–</b><span>今日已学</span></div>
+          <div class="today-overview-stat stat-days"><b id="today-overview-days">–</b><span>连续学习</span></div>
         </div>
-        <div class="oil-today-actions">
-          <button id="oil-today-start" class="primary" type="button">开始今日学习</button>
-          <button id="oil-today-add" type="button">制作新卡</button>
-          <button id="oil-today-article" type="button">读今日短文</button>
-          <button id="oil-today-extra" type="button" hidden>继续学习</button>
+        <div class="today-overview-actions">
+          <button id="today-overview-start" class="primary" type="button">开始今日学习</button>
+          <button id="today-overview-add" type="button">制作新卡</button>
+          <button id="today-overview-article" type="button">读今日短文</button>
+          <button id="today-overview-extra" type="button" hidden>继续学习</button>
         </div>
       </div>
     </section>

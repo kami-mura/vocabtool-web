@@ -2070,16 +2070,16 @@ mark.article-word {
 }
 [data-theme="dark"] mark.article-word { color: #8fb0f8; }
 
-/* 高亮词标记的默认中性化：Oil 白纸风皮肤里启用暖黄荧光笔，
+/* 高亮词标记的默认中性化：默认白纸风皮肤里启用暖黄荧光笔，
    其他皮肤保持与普通文字完全一致，不受 UA 黄色 mark 影响。 */
-mark.oil-highlight {
+mark.word-highlight {
   background: transparent;
   color: inherit;
   padding: 0;
   font-weight: inherit;
 }
 
-/* 皮肤专属区块默认隐藏：只有插画是 oil 皮肤独有，
+/* 皮肤专属区块默认隐藏：只有插画是 默认皮肤独有，
    流程演示与今日概览在所有皮肤下保持相同布局。 */
 .manga-hero-art {
   display: none;
@@ -2562,11 +2562,11 @@ mark.oil-highlight {
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
 .toast.err { background: rgba(168, 42, 42, .95); }
 
-.oil-today {
+.today-overview {
   display: block;
   margin-top: 40px;
 }
-.oil-today-card {
+.today-overview-card {
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) auto minmax(240px, .9fr);
   gap: 28px 34px;
@@ -2577,39 +2577,39 @@ mark.oil-highlight {
   background: var(--panel);
   box-shadow: var(--shadow);
 }
-.oil-today-main {
+.today-overview-main {
   display: flex;
   align-items: center;
   gap: 20px;
   min-width: 0;
 }
-.oil-today-ring {
+.today-overview-ring {
   position: relative;
   width: 112px;
   height: 112px;
   flex: none;
 }
-.oil-today-ring svg {
+.today-overview-ring svg {
   width: 100%;
   height: 100%;
   transform: rotate(-90deg);
 }
-.oil-today-ring-track,
-.oil-today-ring-fill {
+.today-overview-ring-track,
+.today-overview-ring-fill {
   fill: none;
   stroke-width: 9;
 }
-.oil-today-ring-track {
+.today-overview-ring-track {
   stroke: var(--surface-2);
 }
-.oil-today-ring-fill {
+.today-overview-ring-fill {
   stroke: var(--accent);
   stroke-linecap: round;
   stroke-dasharray: 276.5;
   stroke-dashoffset: 276.5;
   transition: stroke-dashoffset .7s var(--ease);
 }
-.oil-today-ring-label {
+.today-overview-ring-label {
   position: absolute;
   inset: 0;
   display: flex;
@@ -2619,87 +2619,87 @@ mark.oil-highlight {
   gap: 1px;
   text-align: center;
 }
-.oil-today-ring-label b {
+.today-overview-ring-label b {
   font-size: 20px;
   letter-spacing: -.02em;
 }
-.oil-today-ring-label span {
+.today-overview-ring-label span {
   font-size: 14px;
   color: var(--muted);
 }
-.oil-today-copy {
+.today-overview-copy {
   min-width: 0;
 }
-.oil-today-kicker {
+.today-overview-kicker {
   margin: 0 0 5px;
   font-size: 14px;
   font-weight: 600;
   letter-spacing: .1em;
   color: var(--muted);
 }
-.oil-today-copy h2 {
+.today-overview-copy h2 {
   margin: 0 0 7px;
   font-size: 22px;
   line-height: 1.35;
   letter-spacing: -.01em;
 }
-.oil-today-sub {
+.today-overview-sub {
   margin: 0;
   font-size: 15px;
   line-height: 1.6;
   color: var(--muted);
 }
-.oil-today-stats {
+.today-overview-stats {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 14px 30px;
   padding: 0 6px;
 }
-.oil-today-stat {
+.today-overview-stat {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
-.oil-today-stat b {
+.today-overview-stat b {
   font-size: 23px;
   line-height: 1.1;
   letter-spacing: -.02em;
 }
-.oil-today-stat span {
+.today-overview-stat span {
   font-size: 14px;
   color: var(--muted);
 }
-.oil-today-actions {
+.today-overview-actions {
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
-.oil-today-actions button {
+.today-overview-actions button {
   width: 100%;
   justify-content: center;
   padding: 11px 18px;
   font-size: 15px;
 }
 @media (max-width: 960px) {
-  .oil-today-card {
+  .today-overview-card {
     grid-template-columns: minmax(0, 1fr);
     gap: 22px;
     align-items: start;
   }
-  .oil-today-main {
+  .today-overview-main {
     justify-content: center;
   }
-  .oil-today-stats {
+  .today-overview-stats {
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 12px;
     padding: 0;
     text-align: center;
   }
-  .oil-today-actions {
+  .today-overview-actions {
     flex-direction: row;
     flex-wrap: wrap;
   }
-  .oil-today-actions button {
+  .today-overview-actions button {
     width: auto;
     flex: 1;
     min-width: 150px;
@@ -2708,21 +2708,21 @@ mark.oil-highlight {
 
 @media (max-width: 700px) {
   /* 手机端隐藏占空间的流程演示与聊天，保留核心学习内容 */
-  .oil-today-ring {
+  .today-overview-ring {
     width: 96px;
     height: 96px;
   }
-  .oil-today-ring-label b {
+  .today-overview-ring-label b {
     font-size: 18px;
   }
-  .oil-today-stats {
+  .today-overview-stats {
     grid-template-columns: 1fr 1fr;
     text-align: left;
   }
-  .oil-today-actions {
+  .today-overview-actions {
     flex-direction: column;
   }
-  .oil-today-actions button {
+  .today-overview-actions button {
     width: 100%;
   }
 }
@@ -2886,7 +2886,7 @@ button.ghost.small {
     color: #ffffff;
     box-shadow: 0 8px 20px rgba(0, 122, 255, .28);
   }
-  .oil-today-actions #oil-today-extra {
+  .today-overview-actions #today-overview-extra {
     background: linear-gradient(135deg, var(--accent), var(--accent-2));
     border: none;
     color: #ffffff;
@@ -2896,28 +2896,28 @@ button.ghost.small {
   .real-review-manage-row .review-remaining { order: 1; }
   .real-review-manage-row .review-manage { order: 2; }
   /* 手机端数据卡：四个统计一行排开，按钮两列对齐，继续学习独占一行 */
-  .oil-today-stats {
+  .today-overview-stats {
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 8px;
   }
-  .oil-today-stat b { font-size: 20px; }
-  .oil-today-actions {
+  .today-overview-stat b { font-size: 20px; }
+  .today-overview-actions {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
   }
-  .oil-today-actions button {
+  .today-overview-actions button {
     width: 100%;
     min-height: 44px;
     font-size: 15px;
     white-space: nowrap;
   }
-  .oil-today-actions #oil-today-start,
-  .oil-today-actions #oil-today-extra { grid-column: 1 / -1; }
+  .today-overview-actions #today-overview-start,
+  .today-overview-actions #today-overview-extra { grid-column: 1 / -1; }
   /* 手机端去掉圆形进度环，节省纵向空间，只留文字与按钮 */
-  .oil-today-ring { display: none; }
-  .oil-today-main { gap: 0; }
-  .oil-today { margin-top: 26px; }
+  .today-overview-ring { display: none; }
+  .today-overview-main { gap: 0; }
+  .today-overview { margin-top: 26px; }
   .demo-cards { grid-template-columns: 1fr 1fr; }
   input, textarea, select { font-size: 16px; }
   button, .file-button, summary { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
@@ -3834,8 +3834,8 @@ svg {
 }
 .landing-hero h1,
 .landing-tagline,
-.oil-today-copy h2,
-.oil-today-sub,
+.today-overview-copy h2,
+.today-overview-sub,
 .account-email {
   overflow-wrap: anywhere;
 }
@@ -3844,28 +3844,28 @@ svg {
   .demo-cards {
     grid-template-columns: 1fr;
   }
-  .oil-today-card {
+  .today-overview-card {
     padding: 18px 16px;
   }
-  .oil-today-main {
+  .today-overview-main {
     flex-direction: column;
     align-items: center;
     text-align: center;
   }
-  .oil-today-stats {
+  .today-overview-stats {
     gap: 10px 14px;
   }
 }
 
 @media (max-width: 430px) {
-  .oil-today-ring {
+  .today-overview-ring {
     width: 84px;
     height: 84px;
   }
-  .oil-today-ring-label b {
+  .today-overview-ring-label b {
     font-size: 16px;
   }
-  .oil-today-ring-label span {
+  .today-overview-ring-label span {
     font-size: 12px;
   }
 }
@@ -3920,24 +3920,24 @@ svg {
     min-height: 48px !important;
     font-size: 16px !important;
   }
-  .oil-today-card {
+  .today-overview-card {
     padding: 22px 18px !important;
     gap: 24px;
   }
-  .oil-today-stats {
+  .today-overview-stats {
     gap: 14px 16px;
   }
-  .oil-today-actions {
+  .today-overview-actions {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
   }
-  .oil-today-actions button {
+  .today-overview-actions button {
     width: 100%;
     min-height: 48px;
     font-size: 16px;
   }
-  .oil-today-actions #oil-today-start { grid-column: 1 / -1; }
+  .today-overview-actions #today-overview-start { grid-column: 1 / -1; }
   .real-review-manage-row {
     gap: 14px;
   }
@@ -3954,7 +3954,7 @@ svg {
   .landing-section {
     margin-top: 32px;
   }
-  .oil-today-card {
+  .today-overview-card {
     padding: 18px 14px !important;
   }
 }

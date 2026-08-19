@@ -37,7 +37,7 @@ def test_app_defaults_to_study_and_exposes_progress_mobile_controls(client):
     assert 'id="real-review-remaining-total"' in html
     assert 'id="real-extra-count"' in html
     # 数据卡保留四个统计，其中学习天数只在手机端显示。
-    assert 'id="oil-today-days"' in html
+    assert 'id="today-overview-days"' in html
     assert '<form id="landing-search-form"' in html
     assert html.count('id="daily-new-limit"') == 0
     assert html.count('id="real-review-daily-new-limit"') == 1

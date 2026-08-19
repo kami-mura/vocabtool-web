@@ -17,7 +17,7 @@
   }
   registerMobileSection("landing-hero", "search");
   registerMobileSection("real-review", "study");
-  registerMobileSection("oil-today", "study");
+  registerMobileSection("today-overview", "study");
   registerMobileSection("guest-demo-cards", "study");
   registerMobileSection("guest-demo-article", "article");
   registerMobileSection("real-article-panel", "article");
@@ -31,14 +31,14 @@
      桌面端数据卡（今日学习）在学习卡片上方，手机端学习卡片在最上方。 */
   function arrangeLearningOrder() {
     const realReview = document.getElementById("real-review");
-    const oilToday = document.getElementById("oil-today");
-    if (!realReview || !oilToday) return;
+    const todayOverview = document.getElementById("today-overview");
+    if (!realReview || !todayOverview) return;
     if (isMobileLayout()) {
-      if (realReview.nextElementSibling !== oilToday) {
-        realReview.insertAdjacentElement("afterend", oilToday);
+      if (realReview.nextElementSibling !== todayOverview) {
+        realReview.insertAdjacentElement("afterend", todayOverview);
       }
-    } else if (oilToday.nextElementSibling !== realReview) {
-      realReview.insertAdjacentElement("beforebegin", oilToday);
+    } else if (todayOverview.nextElementSibling !== realReview) {
+      realReview.insertAdjacentElement("beforebegin", todayOverview);
     }
   }
 
@@ -68,7 +68,7 @@
       const visiblePanel = document.querySelector(".manage-panel:not([hidden])");
       if (!visiblePanel) realShowManagePanelOnly("real-library", true);
     }
-    if (view === "study" && isLoggedIn) loadOilToday();
+    if (view === "study" && isLoggedIn) loadTodayOverview();
     if (scrollTop) window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -379,7 +379,7 @@
           (data.spelling_note && data.spelling_note.corrected) || lookup.query || text;
         html =
           '<div class="lookup-head">' +
-          '<div class="lookup-word"><mark class="oil-highlight">' + escapeHtml(displayWord) + "</mark>" +
+          '<div class="lookup-word"><mark class="word-highlight">' + escapeHtml(displayWord) + "</mark>" +
           ' <button class="demo-audio lookup-audio" data-real-audio="' + escapeHtml(displayWord) +
           '" type="button" aria-label="朗读发音">▶</button></div>' +
           (lookup.ngsl_rank
@@ -662,8 +662,8 @@
   let realReviewTotalCards = 0;
   let realReviewLoaded = false;
   let realTodayStats = null;
-  let oilDashboardData = null;
-  let oilTodayTimer = null;
+  let todayDashboardData = null;
+  let todayOverviewTimer = null;
   let realReviewHistory = [];
   let realReviewLastRatingAt = 0;
   let realReviewCanUndo = false;
@@ -1053,9 +1053,9 @@
       frontInner = renderMarkdown(card.front, target);
       if (!frontInner.includes("target-word")) {
         if (card.card_type === "general") {
-          frontInner = '<mark class="oil-highlight">' + frontInner + "</mark>";
+          frontInner = '<mark class="word-highlight">' + frontInner + "</mark>";
         } else if (card.card_type === "cloze") {
-          frontInner = frontInner.replace(/(_{2,})/g, '<mark class="oil-highlight">$1</mark>');
+          frontInner = frontInner.replace(/(_{2,})/g, '<mark class="word-highlight">$1</mark>');
         }
       }
     }
@@ -1064,7 +1064,7 @@
       // 阅读卡正面：目标词一行（带播放按钮），例句默认隐藏，点击“例句”按钮后显示并播放。
       frontHtml =
         '<div class="reading-word-row">' +
-        '<mark class="oil-highlight">' + escapeHtml(target) + "</mark>" +
+        '<mark class="word-highlight">' + escapeHtml(target) + "</mark>" +
         ' <button class="demo-audio" data-real-audio="' + escapeHtml(target) +
         '" type="button">▶</button></div>' +
         (sentence && sentence !== target
@@ -1210,7 +1210,7 @@
       );
     }
     updateRemainingBadge();
-    updateOilToday();
+    updateTodayOverview();
     // 评分写库期间不要同时触发 TTS 限流计数写库；SQLite 只有一个写者。
     if (realReviewInFlight === 0) {
       prefetchRealAudio();
@@ -1319,7 +1319,7 @@
       }
       const stats = data.today_stats || {};
       realTodayStats = stats;
-      updateOilToday();
+      updateTodayOverview();
       setReviewStatus("");
     } catch (err) {
       if (preserveOnError) return;
@@ -1330,19 +1330,19 @@
     renderRealReview();
   }
 
-  /* ---------- oil 皮肤：今日学习概览 ---------- */
-  function updateOilToday() {
-    const wrap = document.getElementById("oil-today");
+  /* ---------- 默认皮肤：今日学习概览 ---------- */
+  function updateTodayOverview() {
+    const wrap = document.getElementById("today-overview");
     if (!wrap || wrap.hidden) return;
-    const dueEl = document.getElementById("oil-today-due");
-    const newEl = document.getElementById("oil-today-new");
-    const studiedEl = document.getElementById("oil-today-studied");
-    const ringFill = document.getElementById("oil-today-ring-fill");
-    const ringText = document.getElementById("oil-today-ring-text");
-    const titleEl = document.getElementById("oil-today-title");
-    const subEl = document.getElementById("oil-today-sub");
-    const extraEl = document.getElementById("oil-today-extra");
-    const daysEl = document.getElementById("oil-today-days");
+    const dueEl = document.getElementById("today-overview-due");
+    const newEl = document.getElementById("today-overview-new");
+    const studiedEl = document.getElementById("today-overview-studied");
+    const ringFill = document.getElementById("today-overview-ring-fill");
+    const ringText = document.getElementById("today-overview-ring-text");
+    const titleEl = document.getElementById("today-overview-title");
+    const subEl = document.getElementById("today-overview-sub");
+    const extraEl = document.getElementById("today-overview-extra");
+    const daysEl = document.getElementById("today-overview-days");
     if (!dueEl || !newEl || !studiedEl || !ringFill || !ringText || !titleEl || !subEl) return;
 
     const stats = realTodayStats || {};
@@ -1367,7 +1367,7 @@
     studiedEl.textContent = String(studied);
     if (extraEl) extraEl.hidden = !canExtra;
     if (daysEl) {
-      const days = oilDashboardData ? Number(oilDashboardData.consecutive_study_days) || 0 : null;
+      const days = todayDashboardData ? Number(todayDashboardData.consecutive_study_days) || 0 : null;
       daysEl.textContent = days === null ? "–" : days + "天";
     }
 
@@ -1387,21 +1387,21 @@
     subEl.textContent = sub;
   }
 
-  async function loadOilToday() {
-    const wrap = document.getElementById("oil-today");
+  async function loadTodayOverview() {
+    const wrap = document.getElementById("today-overview");
     if (!wrap || wrap.hidden) return;
     try {
       const res = await fetch("/api/dashboard", {
         headers: { "Content-Type": "application/json" },
       });
       if (!res.ok) return;
-      oilDashboardData = await res.json();
-      updateOilToday();
+      todayDashboardData = await res.json();
+      updateTodayOverview();
     } catch (_) { /* 概览失败不打扰学习 */ }
   }
 
-  function wireOilTodayButtons() {
-    const start = document.getElementById("oil-today-start");
+  function wireTodayOverviewButtons() {
+    const start = document.getElementById("today-overview-start");
     if (start) {
       start.addEventListener("click", () => {
         if (isMobileLayout()) applyMobileView("study", false);
@@ -1410,13 +1410,13 @@
         if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
       });
     }
-    const add = document.getElementById("oil-today-add");
+    const add = document.getElementById("today-overview-add");
     if (add) {
       add.addEventListener("click", () => {
         if (realShowManagePanel) realShowManagePanel("real-add-card");
       });
     }
-    const article = document.getElementById("oil-today-article");
+    const article = document.getElementById("today-overview-article");
     if (article) {
       article.addEventListener("click", () => {
         if (isMobileLayout()) applyMobileView("article", false);
@@ -1425,7 +1425,7 @@
         if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
       });
     }
-    const extra = document.getElementById("oil-today-extra");
+    const extra = document.getElementById("today-overview-extra");
     if (extra) {
       extra.addEventListener("click", () => {
         if (isMobileLayout()) applyMobileView("study", false);
@@ -1627,8 +1627,8 @@
       }
       renderRealReview();
       flushReviewRefreshIfIdle();
-      loadOilToday();
-      updateOilToday();
+      loadTodayOverview();
+      updateTodayOverview();
     } catch (err) {
       const status = document.getElementById("real-undo-status");
       if (status) {
@@ -1737,7 +1737,7 @@
       } else {
         await loadRealReview(true);
       }
-      loadOilToday();
+      loadTodayOverview();
       if (status) status.textContent = "撤回成功";
       clearTimeout(realUndoStatusTimer);
       realUndoStatusTimer = setTimeout(() => {
@@ -1902,6 +1902,25 @@
   if (realManageBrowser) {
     realManageBrowser.onclick = () => {
       if (realShowManagePanel) realShowManagePanel("real-card-browser");
+    };
+  }
+  const realReviewRefreshSentences = document.getElementById("real-review-refresh-sentences");
+  if (realReviewRefreshSentences) {
+    realReviewRefreshSentences.onclick = async () => {
+      setReviewStatus("正在更新阅读卡例句…");
+      try {
+        const res = await fetch("/api/cards/refresh-sentences", { method: "POST" });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.detail || "更新失败");
+        const updated = Number(data.updated) || 0;
+        setReviewStatus(updated > 0 ? "已更新 " + updated + " 张阅读卡例句" : "暂无可更新的阅读卡");
+        if (updated > 0) {
+          requestReviewRefresh();
+          loadRealBrowser();
+        }
+      } catch (err) {
+        setReviewStatus("更新失败：" + err.message);
+      }
     };
   }
 
@@ -3790,8 +3809,8 @@
     loadRealProfile();
     loadRealWords();
     loadRealBrowser();
-    wireOilTodayButtons();
-    loadOilToday();
+    wireTodayOverviewButtons();
+    loadTodayOverview();
   }
 
   /* ---------- 三种查询模式：查词 / 词源 / 问答 ---------- */
@@ -3980,7 +3999,7 @@
         const quickLookup = data.lookup || {};
         box.innerHTML =
           '<div class="lookup-head">' +
-          '<div class="lookup-word"><mark class="oil-highlight">' + escapeHtml(text) + "</mark>" +
+          '<div class="lookup-word"><mark class="word-highlight">' + escapeHtml(text) + "</mark>" +
           ' <button class="demo-audio lookup-audio" data-real-audio="' + escapeHtml(text) +
           '" type="button" aria-label="朗读发音">▶</button></div>' +
           (quickLookup.ngsl_rank
@@ -4013,7 +4032,7 @@
         (data.spelling_note && data.spelling_note.corrected) || lookup.query || text;
       box.innerHTML =
         '<div class="lookup-head">' +
-        '<div class="lookup-word"><mark class="oil-highlight">' + escapeHtml(displayWord) + "</mark>" +
+        '<div class="lookup-word"><mark class="word-highlight">' + escapeHtml(displayWord) + "</mark>" +
         ' <button class="demo-audio lookup-audio" data-real-audio="' + escapeHtml(displayWord) +
         '" type="button" aria-label="朗读发音">▶</button></div>' +
         (lookup.ngsl_rank

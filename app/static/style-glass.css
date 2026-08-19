@@ -117,7 +117,7 @@
 }
 
 /* ============================================================
-   卡片外观：默认与 oil 统一（参考 oil 白纸大卡）
+   卡片外观：默认与基础皮肤统一（参考白纸大卡）
    ============================================================ */
 #real-review .home-review-cards {
   display: grid;
@@ -249,7 +249,7 @@ html.js-ui-polish .demo-card.ui-tilt {
 }
 
 /* ============================================================
-   查词结果：默认与 oil 同一结构，主题色不同
+   查词结果：默认与基础皮肤同一结构，主题色不同
    ============================================================ */
 body .landing-search-result {
   background: var(--panel);
@@ -269,8 +269,8 @@ body .landing-search-result .lookup-word {
   margin-bottom: 8px;
   color: var(--accent);
 }
-body .landing-search-result .lookup-word mark.oil-highlight,
-body .floating-lookup .lookup-word mark.oil-highlight {
+body .landing-search-result .lookup-word mark.word-highlight,
+body .floating-lookup .lookup-word mark.word-highlight {
   font-size: 24px;
   font-weight: 700;
   padding: 0 4px;
