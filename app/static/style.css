@@ -2093,12 +2093,6 @@ mark.word-highlight {
   font-weight: inherit;
 }
 
-/* 皮肤专属区块默认隐藏：只有插画是 默认皮肤独有，
-   流程演示与今日概览在所有皮肤下保持相同布局。 */
-.manga-hero-art {
-  display: none;
-}
-
 .card-browser {
   margin-top: 16px;
   padding: 8px 10px;
