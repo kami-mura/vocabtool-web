@@ -898,7 +898,8 @@ def _anki_model(model_id: int, deck_id: int, modified: int) -> dict[str, object]
             for index, name in enumerate(names)
         ],
         "css": (
-            ".card { font-family: Arial; font-size: 20px; text-align: left; "
+            ".card { font-family: Arial; font-size: 28px; line-height: 1.6; "
+            "text-align: center; "
             "color: #111; background: white; }\n"
             ".target-word { color: #2f6fed; font-weight: 700; }\n"
             ".nightMode .target-word { color: #8fb0f8; }"
