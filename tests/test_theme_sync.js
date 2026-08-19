@@ -149,6 +149,37 @@ assert.match(
   "夜间模式沿用阅读卡的主题高亮变量"
 );
 
+/* ---------- Anki 评分按钮：重来红、困难橙、良好绿、简单蓝 ---------- */
+
+const lightRatingColors = {
+  again: "#d32f2f",
+  hard: "#e07a00",
+  good: "#2e7d32",
+  easy: "#1565c0",
+};
+const darkRatingColors = {
+  again: "#ff8a8a",
+  hard: "#ffb15c",
+  good: "#6fd39a",
+  easy: "#79b8ff",
+};
+
+for (const [rating, color] of Object.entries(lightRatingColors)) {
+  const rule = styleSource.match(
+    new RegExp(`(?:^|\\n)\\.rating\\.${rating}\\s*\\{[^}]*\\}`)
+  );
+  assert.ok(rule, `存在日间模式 ${rating} 评分按钮样式`);
+  assert.ok(rule[0].includes(`color: ${color}`), `${rating} 使用 Anki 对应颜色`);
+}
+
+for (const [rating, color] of Object.entries(darkRatingColors)) {
+  const rule = styleSource.match(
+    new RegExp(`\\[data-theme="dark"\\] \\.rating\\.${rating}\\s*\\{[^}]*\\}`)
+  );
+  assert.ok(rule, `存在夜间模式 ${rating} 评分按钮样式`);
+  assert.ok(rule[0].includes(`color: ${color}`), `${rating} 夜间模式保持 Anki 对应色系`);
+}
+
 const landingSource = fs.readFileSync(
   path.join(__dirname, "..", "app", "static", "landing-v51.js"),
   "utf8"
