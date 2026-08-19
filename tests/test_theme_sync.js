@@ -149,30 +149,35 @@ assert.match(
   "夜间模式沿用阅读卡的主题高亮变量"
 );
 
-/* ---------- Anki 评分按钮：纯色红、橙、绿、蓝 ---------- */
+/* ---------- Anki 评分按钮：浓郁红、橙、绿、蓝 + 玻璃质感 ---------- */
 
 const lightRatingColors = {
-  again: "#c9323b",
-  hard: "#d47a00",
-  good: "#10a91e",
-  easy: "#0d75e8",
+  again: "rgba(214, 54, 65, .92)",
+  hard: "rgba(230, 139, 16, .92)",
+  good: "rgba(25, 187, 43, .92)",
+  easy: "rgba(28, 128, 240, .92)",
 };
-const darkRatingColors = lightRatingColors;
+const darkRatingColors = {
+  again: "rgba(214, 54, 65, .94)",
+  hard: "rgba(230, 139, 16, .94)",
+  good: "rgba(25, 187, 43, .94)",
+  easy: "rgba(28, 128, 240, .94)",
+};
 
 const ratingBaseRule = styleSource.match(/(?:^|\n)\.rating\s*\{[^}]*\}/);
 assert.ok(ratingBaseRule, "存在评分按钮基础样式");
 assert.match(ratingBaseRule[0], /flex-direction\s*:\s*column-reverse/, "时间显示在评分名称上方");
-assert.match(ratingBaseRule[0], /backdrop-filter\s*:\s*none/, "评分按钮不使用玻璃模糊");
-assert.match(ratingBaseRule[0], /box-shadow\s*:\s*none/, "评分按钮不使用玻璃阴影");
+assert.match(ratingBaseRule[0], /backdrop-filter\s*:\s*blur\(10px\)/, "评分按钮使用玻璃模糊");
+assert.match(ratingBaseRule[0], /box-shadow\s*:\s*inset/, "评分按钮使用内高光和柔和阴影");
 
 for (const [rating, color] of Object.entries(lightRatingColors)) {
   const rule = styleSource.match(
     new RegExp(`(?:^|\\n)\\.rating\\.${rating}\\s*\\{[^}]*\\}`)
   );
   assert.ok(rule, `存在日间模式 ${rating} 评分按钮样式`);
-  assert.ok(rule[0].includes(`background: ${color}`), `${rating} 使用浓郁的 Anki 纯色背景`);
+  assert.ok(rule[0].includes(color), `${rating} 使用浓郁的 Anki 色彩`);
   assert.ok(rule[0].includes("color: #fff"), `${rating} 使用白色文字`);
-  assert.ok(!rule[0].includes("gradient"), `${rating} 不使用渐变玻璃效果`);
+  assert.ok(rule[0].includes("linear-gradient"), `${rating} 使用渐变玻璃效果`);
 }
 
 for (const [rating, color] of Object.entries(darkRatingColors)) {
@@ -180,9 +185,9 @@ for (const [rating, color] of Object.entries(darkRatingColors)) {
     new RegExp(`\\[data-theme="dark"\\] \\.rating\\.${rating}\\s*\\{[^}]*\\}`)
   );
   assert.ok(rule, `存在夜间模式 ${rating} 评分按钮样式`);
-  assert.ok(rule[0].includes(`background: ${color}`), `${rating} 夜间模式保持 Anki 纯色色系`);
+  assert.ok(rule[0].includes(color), `${rating} 夜间模式保持 Anki 色系`);
   assert.ok(rule[0].includes("color: #fff"), `${rating} 夜间模式使用白色文字`);
-  assert.ok(!rule[0].includes("gradient"), `${rating} 夜间模式不使用渐变玻璃效果`);
+  assert.ok(rule[0].includes("linear-gradient"), `${rating} 夜间模式使用渐变玻璃效果`);
 }
 
 const landingSource = fs.readFileSync(
@@ -192,6 +197,9 @@ const landingSource = fs.readFileSync(
 for (const label of ["Again", "Hard", "Good", "Easy"]) {
   assert.ok(landingSource.includes(`<b>${label}</b>`), `真实评分按钮使用英文名称 ${label}`);
 }
+assert.ok(landingSource.includes("<b>Again</b><small>1m</small>"), "Again 上方显示 1m");
+assert.ok(landingSource.includes("<b>Hard</b><small>1m</small>"), "Hard 上方显示 1m");
+assert.ok(landingSource.includes('previewLabel("good", "2d")'), "Good 使用 2d 格式的间隔");
 assert.ok(landingSource.includes("拼写更正："), "词源结果显示拼写更正说明");
 assert.ok(
   landingSource.includes("以下显示正确拼写的词源结果"),

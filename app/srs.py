@@ -219,7 +219,7 @@ def rating_previews(
             seconds = max(0, int((due - review_time).total_seconds()))
             due_day = due.astimezone(tz).date()
             day_gap = (due_day - today).days
-            label = f"{day_gap} 天" if day_gap >= 1 else _interval_label(seconds)
+            label = f"{day_gap}d" if day_gap >= 1 else _interval_label(seconds)
         result[rating] = {
             "label": label,
             "due_at": _naive_utc(due).isoformat(),

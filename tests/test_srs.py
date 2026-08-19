@@ -166,8 +166,8 @@ def test_rating_previews_show_four_ratings():
     assert set(previews) == {"again", "hard", "good", "easy"}
     assert previews["again"]["label"] == ""
     assert previews["hard"]["label"] == ""
-    assert previews["good"]["label"] != ""
-    assert previews["easy"]["label"] != ""
+    assert previews["good"]["label"].endswith("d")
+    assert previews["easy"]["label"].endswith("d")
     assert previews["good"]["interval_days"] >= 1
     assert previews["easy"]["interval_days"] >= 1
 
