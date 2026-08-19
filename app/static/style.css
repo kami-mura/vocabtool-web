@@ -735,6 +735,15 @@ button.landing-login-btn { border: none; cursor: pointer; }
   margin-top: 12px;
   width: 100%;
 }
+/* 反面例句必须与正面完全一致：.demo-card-face.back p 的 muted/13px
+   特异性更高会把反面例句染成灰色小字；这里用 ID 前缀强制拉回正面样式。 */
+#real-review .reading-back-sentence .demo-front-text {
+  margin: 0;
+  color: var(--text);
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.45;
+}
 .sentence-refresh-panel {
   align-items: center;
   gap: 8px;

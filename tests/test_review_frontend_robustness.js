@@ -128,5 +128,18 @@ assert.ok(
   !css.includes(".reading-sentence-hidden") && !css.includes(".reading-reveal-sentence"),
   "已删除不再使用的例句隐藏/展开按钮样式"
 );
+// 反面例句字体必须与正面完全一致：.demo-card-face.back p 会把反面所有 p
+// 染成 muted/13px，必须有一条 ID 前缀规则把反面例句拉回正面样式。
+assert.match(
+  css,
+  /#real-review \.reading-back-sentence \.demo-front-text\s*\{[\s\S]*?color:\s*var\(--text\);[\s\S]*?font-size:\s*17px;[\s\S]*?font-weight:\s*700;/,
+  "反面例句颜色/字号/字重与正面 demo-front-text 完全一致"
+);
+const backPIdx = css.indexOf(".demo-card-face.back p");
+const backSentenceIdx = css.indexOf("#real-review .reading-back-sentence .demo-front-text");
+assert.ok(
+  backPIdx !== -1 && backSentenceIdx !== -1 && backSentenceIdx > backPIdx,
+  "反面例句覆盖规则必须定义在 .demo-card-face.back p 之后（特异性更高）"
+);
 
 console.log("PASS: 评分请求超时、失效按钮对齐、撤回显示上一张卡与阅读卡例句直显符合预期");
