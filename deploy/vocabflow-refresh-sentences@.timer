@@ -1,0 +1,11 @@
+[Unit]
+Description=VocabFlow 阅读卡例句每日轮换（每天凌晨 4 点）
+After=vocabflow@%i.service
+
+[Timer]
+OnCalendar=*-*-* 04:00:00
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

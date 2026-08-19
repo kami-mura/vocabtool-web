@@ -2977,6 +2977,63 @@
       }
     };
   }
+  async function loadSentenceRefreshPreference() {
+    try {
+      const res = await fetch("/api/cards/sentence-refresh-preference");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || "加载失败");
+      const select = document.getElementById("real-sentence-refresh-interval");
+      if (select) select.value = String(data.interval || 0);
+    } catch (err) {
+      // 加载失败保持默认关闭即可
+    }
+  }
+
+  async function saveSentenceRefreshPreference() {
+    const select = document.getElementById("real-sentence-refresh-interval");
+    const status = document.getElementById("real-sentence-refresh-status");
+    if (!select) return;
+    const interval = parseInt(select.value, 10) || 0;
+    try {
+      const res = await fetch("/api/cards/sentence-refresh-preference", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ interval }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || "保存失败");
+      if (status) status.textContent = "已保存";
+    } catch (err) {
+      if (status) status.textContent = err.message || "保存失败";
+    }
+  }
+
+  async function refreshSentencesNow() {
+    const status = document.getElementById("real-sentence-refresh-status");
+    const button = document.getElementById("real-sentence-refresh-now");
+    if (button) button.disabled = true;
+    try {
+      const res = await fetch("/api/cards/refresh-sentences", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || "刷新失败");
+      if (status) status.textContent = "已换 " + (data.updated || 0) + " 张";
+      loadRealBrowser();
+    } catch (err) {
+      if (status) status.textContent = err.message || "刷新失败";
+    } finally {
+      if (button) button.disabled = false;
+    }
+  }
+
+  const realSentenceRefreshSave = document.getElementById("real-sentence-refresh-save");
+  if (realSentenceRefreshSave) {
+    realSentenceRefreshSave.onclick = saveSentenceRefreshPreference;
+  }
+  const realSentenceRefreshNow = document.getElementById("real-sentence-refresh-now");
+  if (realSentenceRefreshNow) {
+    realSentenceRefreshNow.onclick = refreshSentencesNow;
+  }
+
   const realBrowserResults = document.getElementById("real-browser-results");
   if (realBrowserResults) {
     realBrowserResults.addEventListener("click", async (e) => {
@@ -4133,6 +4190,9 @@
       }
       const area = document.querySelector(".manage-area");
       if (area) area.scrollIntoView({ behavior: "smooth", block: "start" });
+      if (id === "real-card-browser" && typeof loadSentenceRefreshPreference === "function") {
+        loadSentenceRefreshPreference();
+      }
     };
     buttons.forEach((button) => {
       button.addEventListener("click", () => showPanel(button.dataset.managePanel));

@@ -1,0 +1,10 @@
+[Unit]
+Description=VocabFlow 阅读卡例句每日轮换任务
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=%i
+WorkingDirectory=/opt/vocabflow
+ExecStart=/opt/vocabflow/.venv/bin/python -m app.cli refresh-reading-sentences --limit 10
+Nice=10

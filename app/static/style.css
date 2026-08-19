@@ -721,6 +721,25 @@ button.landing-login-btn { border: none; cursor: pointer; }
 .reading-reveal-sentence {
   min-width: 80px;
 }
+.sentence-refresh-panel {
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.sentence-refresh-label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-right: auto;
+}
+.sentence-refresh-label span {
+  font-weight: 700;
+  font-size: 15px;
+}
+.sentence-refresh-label small {
+  font-size: 12px;
+  color: var(--muted);
+}
 .demo-flip {
   position: absolute;
   right: 10px;

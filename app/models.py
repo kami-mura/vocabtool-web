@@ -107,6 +107,18 @@ class SentenceRefreshState(Base):
     last_run_at = Column(DateTime, default=_utcnow, nullable=False)
 
 
+class SentenceRefreshPreference(Base):
+    """阅读卡例句自动轮换的每用户设置。interval=0 表示关闭。"""
+
+    __tablename__ = "sentence_refresh_preferences"
+
+    user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    interval = Column(Integer, default=0, nullable=False)
+    enabled_at = Column(DateTime, nullable=True)
+
+
 class DailyNewAssignment(Base):
     """每天零点后固定抽取的新卡，刷新页面不会换一批；is_extra 标记加学卡。"""
 

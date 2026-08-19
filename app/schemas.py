@@ -83,6 +83,10 @@ class ReviewSettingsIn(BaseModel):
     new_cards_per_day: int = Field(ge=0, le=200)
 
 
+class SentenceRefreshPreferenceIn(BaseModel):
+    interval: int = Field(default=0, ge=0, le=30)
+
+
 class WordBatchDeleteIn(BaseModel):
     words: list[str] = Field(default=[], max_length=2000)
 
