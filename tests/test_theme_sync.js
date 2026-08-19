@@ -135,4 +135,28 @@ assert.match(
   "查询问答结果使用主题文字色，夜间模式不再显示为低对比度深色文字"
 );
 
+/* ---------- 全站目标词高亮：与阅读卡例句保持一致 ---------- */
+
+const unifiedHighlightRule = styleSource.match(
+  /mark\.word-highlight,\s*mark\.article-word,\s*\.demo-article mark,\s*\.ai-article-body mark,\s*\.target-word\s*\{[^}]*\}/
+);
+assert.ok(unifiedHighlightRule, "存在覆盖全站目标词的统一高亮规则");
+assert.match(unifiedHighlightRule[0], /var\(--card-hl\)/, "统一使用阅读卡荧光笔背景");
+assert.match(unifiedHighlightRule[0], /color\s*:\s*var\(--accent\)/, "统一使用阅读卡目标词颜色");
+assert.match(
+  styleSource,
+  /\[data-theme="dark"\] mark\.word-highlight,[\s\S]*?var\(--card-hl\)[\s\S]*?color\s*:\s*var\(--accent\)/,
+  "夜间模式沿用阅读卡的主题高亮变量"
+);
+
+const landingSource = fs.readFileSync(
+  path.join(__dirname, "..", "app", "static", "landing-v51.js"),
+  "utf8"
+);
+assert.ok(landingSource.includes("拼写更正："), "词源结果显示拼写更正说明");
+assert.ok(
+  landingSource.includes("以下显示正确拼写的词源结果"),
+  "词源结果明确说明正在显示正确拼写的结果"
+);
+
 console.log("theme system-sync checks passed");

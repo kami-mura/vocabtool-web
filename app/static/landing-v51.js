@@ -4115,10 +4115,19 @@
         const data = await res.json().catch(function () { return {}; });
         if (!res.ok) throw new Error(data.detail || "查询失败");
         const quickLookup = data.lookup || {};
+        const displayWord =
+          (data.spelling_note && data.spelling_note.corrected) || quickLookup.headword || text;
+        const spellingNote = data.spelling_note && data.spelling_note.corrected
+          ? '<div class="spelling-note">拼写更正：<s>' +
+            escapeHtml(data.spelling_note.original || text) + "</s> → <strong>" +
+            escapeHtml(data.spelling_note.corrected) +
+            "</strong>，以下显示正确拼写的词源结果。</div>"
+          : "";
         box.innerHTML =
+          spellingNote +
           '<div class="lookup-head">' +
-          '<div class="lookup-word"><mark class="word-highlight">' + escapeHtml(text) + "</mark>" +
-          ' <button class="demo-audio lookup-audio" data-real-audio="' + escapeHtml(text) +
+          '<div class="lookup-word"><mark class="word-highlight">' + escapeHtml(displayWord) + "</mark>" +
+          ' <button class="demo-audio lookup-audio" data-real-audio="' + escapeHtml(displayWord) +
           '" type="button" aria-label="朗读发音">▶</button></div>' +
           (quickLookup.ngsl_rank
             ? '<div class="search-rank">NGSL 排名 #' + Number(quickLookup.ngsl_rank) + "</div>"
@@ -4127,7 +4136,7 @@
         '<div class="lookup-explanation">' +
         renderLookupExplanation(quickLookup.explanation || "暂无解释") +
         "</div>" + lookupCardActionHtml(quickLookup);
-        warmUpAudioTexts([text].concat(lookupSentenceTexts(quickLookup.explanation)));
+        warmUpAudioTexts([displayWord].concat(lookupSentenceTexts(quickLookup.explanation)));
         box.className = "landing-search-result ok";
         addSearchClose();
         return;

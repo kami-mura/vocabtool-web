@@ -2092,13 +2092,28 @@ mark.article-word {
 }
 [data-theme="dark"] mark.article-word { color: #8fb0f8; }
 
-/* 高亮词标记的默认中性化：默认白纸风皮肤里启用暖黄荧光笔，
-   其他皮肤保持与普通文字完全一致，不受 UA 黄色 mark 影响。 */
-mark.word-highlight {
-  background: transparent;
-  color: inherit;
-  padding: 0;
-  font-weight: inherit;
+/* 所有目标词高亮统一采用阅读卡例句的样式；主题变量同时覆盖夜间模式。 */
+mark.word-highlight,
+mark.article-word,
+.demo-article mark,
+.ai-article-body mark,
+.target-word {
+  background: linear-gradient(transparent 58%, var(--card-hl) 58%, var(--card-hl) 94%, transparent 94%);
+  color: var(--accent);
+  padding: 0 2px;
+  border-radius: 0;
+  font-weight: 600;
+}
+[data-theme="dark"] mark.word-highlight,
+[data-theme="dark"] mark.article-word,
+[data-theme="dark"] .demo-article mark,
+[data-theme="dark"] .ai-article-body mark,
+[data-theme="dark"] .target-word {
+  background: linear-gradient(transparent 58%, var(--card-hl) 58%, var(--card-hl) 94%, transparent 94%);
+  color: var(--accent);
+  padding: 0 2px;
+  border-radius: 0;
+  font-weight: 600;
 }
 
 .card-browser {

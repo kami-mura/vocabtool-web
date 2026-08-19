@@ -74,6 +74,31 @@ def test_quick_lookup_and_qa_and_topic_endpoints(client, monkeypatch):
     assert bad_quick.status_code == 422
 
 
+def test_quick_lookup_corrects_misspelling_before_ai_and_explains(client, monkeypatch):
+    from app import ai as ai_mod
+
+    received = []
+
+    def fake_quick(_db, _uid, text):
+        received.append(text)
+        return {
+            "explanation": "【释义】\n环境\n\n【底层逻辑】\n包围之物",
+            "headword": text,
+            "rank": 412,
+        }, None
+
+    monkeypatch.setattr(ai_mod, "quick_lookup", fake_quick)
+    response = client.post("/api/lookups/quick", json={"text": "environemnt"})
+
+    assert response.status_code == 200, response.text
+    assert received == ["environment"]
+    assert response.json()["lookup"]["headword"] == "environment"
+    assert response.json()["spelling_note"] == {
+        "original": "environemnt",
+        "corrected": "environment",
+    }
+
+
 def test_saved_ai_key_is_decrypted_only_for_user_ai_call(client, monkeypatch):
     from app import ai as ai_mod
     from app import config

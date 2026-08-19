@@ -669,15 +669,33 @@ def quick_lookup(body: QuickLookupIn, request: Request, db: Session = Depends(ge
         raise HTTPException(status_code=429, detail="查询请求过多，请稍后再试")
     if guest:
         guest_remaining = _reserve_guest_lookup(db, request)
+    original_text = re.sub(r"\s+", " ", str(body.text or "").strip())
+    text = original_text
+    spelling_note = None
+    if re.fullmatch(r"[A-Za-z]+(?:['-][A-Za-z]+)?", text):
+        suggestion = vocab.suggest_correction(text)
+        if suggestion and suggestion != text.lower():
+            text = suggestion
+            spelling_note = {"original": original_text, "corrected": suggestion}
     if user_credential:
         result, error = ai_mod.quick_lookup(
-            db, user.id if user else None, body.text, user_credential
+            db, user.id if user else None, text, user_credential
         )
     else:
-        result, error = ai_mod.quick_lookup(db, user.id if user else None, body.text)
+        result, error = ai_mod.quick_lookup(db, user.id if user else None, text)
     if error:
         raise HTTPException(status_code=400, detail=error)
-    text = re.sub(r"\s+", " ", str(body.text or "").strip())
+    result_headword = str(result.get("headword") or "").strip()
+    if (
+        spelling_note is None
+        and re.fullmatch(r"[A-Za-z]+(?:['-][A-Za-z]+)?", original_text)
+        and re.fullmatch(r"[A-Za-z]+(?:['-][A-Za-z]+)?", result_headword)
+        and result_headword.lower() != original_text.lower()
+    ):
+        text = result_headword
+        spelling_note = {"original": original_text, "corrected": result_headword}
+    if spelling_note:
+        result = {**result, "headword": text}
     query_type = (
         "word" if re.fullmatch(r"[A-Za-z]+(?:['-][A-Za-z]+)?", text) else "phrase"
     )
@@ -689,6 +707,7 @@ def quick_lookup(body: QuickLookupIn, request: Request, db: Session = Depends(ge
             "ngsl_rank": vocab.rank_of(text) if query_type == "word" else None,
         },
         "guest_remaining": guest_remaining,
+        "spelling_note": spelling_note,
     }
     if guest:
         db.commit()
