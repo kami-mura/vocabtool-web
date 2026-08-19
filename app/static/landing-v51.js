@@ -1061,16 +1061,16 @@
     }
     let frontHtml;
     if (card.card_type === "reading") {
-      // 阅读卡正面：目标词一行（带播放按钮），例句默认隐藏，点击“例句”按钮后显示并播放。
+      // 阅读卡正面：目标词一行（带播放按钮），下方直接显示完整例句，
+      // 不再需要点击“例句”按钮展开（例句就是学习内容，直接可见）。
       frontHtml =
         '<div class="reading-word-row">' +
         '<mark class="word-highlight">' + escapeHtml(target) + "</mark>" +
         ' <button class="demo-audio" data-real-audio="' + escapeHtml(target) +
         '" type="button">▶</button></div>' +
         (sentence && sentence !== target
-          ? '<div class="reading-sentence-wrap" data-reading-sentence-wrap>' +
-            '<button class="demo-audio reading-reveal-sentence" type="button" data-real-reveal-sentence>例句</button>' +
-            '<div class="reading-sentence-content reading-sentence-hidden" data-reading-sentence-content>' +
+          ? '<div class="reading-sentence-wrap">' +
+            '<div class="reading-sentence-content">' +
             '<p class="demo-front-text">' + frontInner + "</p>" +
             '<div class="demo-audio-row"><button class="demo-audio" data-real-audio="' +
             escapeHtml(sentence) + '" type="button">▶</button></div>' +
@@ -1102,6 +1102,16 @@
             '<button class="demo-audio" data-real-audio="' + escapeHtml(sentence) +       '" type="button">▶</button>';
         }
         backInner += "</div>";
+      } else if (card.card_type === "reading" && sentence && sentence !== target) {
+        // 阅读卡反面：释义之后也展示例句（含目标词高亮与发音），
+        // 翻面复习时例句直接可见，与正面保持一致。
+        backInner +=
+          '<div class="reading-sentence-wrap reading-back-sentence">' +
+          '<div class="reading-sentence-content">' +
+          '<p class="demo-front-text">' + frontInner + "</p>" +
+          '<div class="demo-audio-row"><button class="demo-audio" data-real-audio="' +
+          escapeHtml(sentence) + '" type="button">▶</button></div>' +
+          "</div></div>";
       }
     }
     const showBury = (realReviewAgainCounts.get(card.id) || 0) >= 3;
@@ -2029,14 +2039,6 @@
     const audioButton = e.target.closest("[data-real-audio]");
     if (audioButton) {
       playRealAudio(audioButton.dataset.realAudio, audioButton);
-      return;
-    }
-    const revealButton = e.target.closest("[data-real-reveal-sentence]");
-    if (revealButton) {
-      const wrap = revealButton.closest("[data-reading-sentence-wrap]");
-      const content = wrap && wrap.querySelector("[data-reading-sentence-content]");
-      if (content) content.classList.remove("reading-sentence-hidden");
-      revealButton.hidden = true;
       return;
     }
   });

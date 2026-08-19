@@ -728,11 +728,12 @@ button.landing-login-btn { border: none; cursor: pointer; }
   margin-top: 12px;
   text-align: center;
 }
-.reading-sentence-hidden {
-  display: none;
-}
-.reading-reveal-sentence {
-  min-width: 80px;
+/* 反面例句：与释义保持间距，视觉上独立成块 */
+.reading-back-sentence {
+  border-top: 1px dashed var(--line);
+  padding-top: 10px;
+  margin-top: 12px;
+  width: 100%;
 }
 .sentence-refresh-panel {
   align-items: center;

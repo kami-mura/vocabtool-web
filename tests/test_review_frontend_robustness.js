@@ -91,3 +91,42 @@ assert.deepStrictEqual(
 );
 
 console.log("PASS: 评分请求超时、失效按钮对齐与撤回显示上一张卡符合预期");
+
+/* ---------- 阅读卡例句直接显示（正面/反面） ---------- */
+
+// 阅读卡正面直接显示例句：不允许再出现“例句”按钮 + 默认隐藏的旧逻辑。
+assert.ok(
+  !source.includes("reading-reveal-sentence"),
+  "阅读卡正面不再有“例句”展开按钮"
+);
+assert.ok(
+  !source.includes("reading-sentence-hidden"),
+  "阅读卡正面例句不再默认隐藏"
+);
+assert.ok(
+  !source.includes("data-real-reveal-sentence"),
+  "不再监听例句展开按钮的点击"
+);
+assert.match(
+  source,
+  /card\.card_type === "reading"[\s\S]*?reading-word-row[\s\S]*?reading-sentence-wrap[\s\S]*?demo-front-text[\s\S]*?frontInner/,
+  "阅读卡正面直接渲染例句内容（目标词行 + 例句 + 发音按钮）"
+);
+// 阅读卡反面：释义之后追加例句区块。
+assert.match(
+  source,
+  /card\.card_type === "reading" && sentence && sentence !== target[\s\S]*?reading-back-sentence[\s\S]*?frontInner[\s\S]*?escapeHtml\(sentence\)/,
+  "阅读卡反面在释义后追加例句（含高亮与发音按钮）"
+);
+const css = fs.readFileSync(path.join(ROOT, "app", "static", "style.css"), "utf8");
+assert.match(
+  css,
+  /\.reading-back-sentence\s*\{/,
+  "反面例句有独立样式（与释义分隔）"
+);
+assert.ok(
+  !css.includes(".reading-sentence-hidden") && !css.includes(".reading-reveal-sentence"),
+  "已删除不再使用的例句隐藏/展开按钮样式"
+);
+
+console.log("PASS: 评分请求超时、失效按钮对齐、撤回显示上一张卡与阅读卡例句直显符合预期");
