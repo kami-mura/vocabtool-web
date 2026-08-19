@@ -162,6 +162,28 @@ def test_refresh_cards_updates_front_and_context(client):
         db.close()
 
 
+def test_api_single_card_refresh(client):
+    register(client, "single-refresh@example.com")
+    user_id = _user_id("single-refresh@example.com")
+    db = SessionLocal()
+    try:
+        card = _make_reading_card(db, user_id, "zeta")
+    finally:
+        db.close()
+
+    res = client.post(f"/api/cards/{card.id}/refresh-sentence")
+    assert res.status_code == 200
+    assert res.json()["updated"] == 1
+
+    db = SessionLocal()
+    try:
+        card_now = db.get(Card, card.id)
+        assert "zeta" in card_now.front
+        assert "original test sentence" not in card_now.front
+    finally:
+        db.close()
+
+
 def test_api_save_preference_and_manual_refresh(client):
     register(client, "api-refresh@example.com")
     user_id = _user_id("api-refresh@example.com")

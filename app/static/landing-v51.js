@@ -1069,8 +1069,7 @@
         '" type="button">▶</button></div>' +
         (sentence && sentence !== target
           ? '<div class="reading-sentence-wrap" data-reading-sentence-wrap>' +
-            '<button class="demo-audio reading-reveal-sentence" type="button" data-real-reveal-sentence data-sentence="' +
-            escapeHtml(sentence) + '">例句</button>' +
+            '<button class="demo-audio reading-reveal-sentence" type="button" data-real-reveal-sentence>例句</button>' +
             '<div class="reading-sentence-content reading-sentence-hidden" data-reading-sentence-content>' +
             '<p class="demo-front-text">' + frontInner + "</p>" +
             '<div class="demo-audio-row"><button class="demo-audio" data-real-audio="' +
@@ -1967,10 +1966,8 @@
     if (revealButton) {
       const wrap = revealButton.closest("[data-reading-sentence-wrap]");
       const content = wrap && wrap.querySelector("[data-reading-sentence-content]");
-      const audioBtn = content && content.querySelector("[data-real-audio]");
       if (content) content.classList.remove("reading-sentence-hidden");
       revealButton.hidden = true;
-      if (audioBtn) playRealAudio(revealButton.dataset.sentence, audioBtn);
       return;
     }
   });
@@ -2831,6 +2828,9 @@
           (card.buried
             ? '<button class="small" data-real-unbury="' + card.id + '" type="button">恢复这张卡</button>'
             : '<button class="small" data-real-bury="' + card.id + '" type="button">不想学</button>') +
+          (card.card_type === "reading"
+            ? '<button class="small" data-real-refresh-sentence="' + card.id + '" type="button">换句</button>'
+            : "") +
           '<button class="small danger" data-real-delete-card="' + card.id +
           '" data-real-delete-word="' + escapeHtml(card.word) + '" type="button">删除这张卡</button>' +
           "</div></div></details></div>"
@@ -3064,6 +3064,21 @@
           if (!res.ok) throw new Error(data.detail || "操作失败");
           loadRealBrowser();
           requestReviewRefresh();
+        } catch (err) {
+          realBrowserResults.innerHTML = '<div class="empty-state">' + escapeHtml(err.message) + "</div>";
+        }
+        return;
+      }
+      const refreshSentence = e.target.closest("[data-real-refresh-sentence]");
+      if (refreshSentence) {
+        try {
+          const res = await fetch("/api/cards/" + refreshSentence.dataset.realRefreshSentence + "/refresh-sentence", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(data.detail || "换句失败");
+          loadRealBrowser();
         } catch (err) {
           realBrowserResults.innerHTML = '<div class="empty-state">' + escapeHtml(err.message) + "</div>";
         }

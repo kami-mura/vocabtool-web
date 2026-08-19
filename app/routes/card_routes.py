@@ -1210,6 +1210,28 @@ def refresh_sentences_now(request: Request, db: Session = Depends(get_db)):
     return {"updated": updated, "errors": errors}
 
 
+@router.post("/cards/{card_id}/refresh-sentence")
+def refresh_single_card_sentence(
+    card_id: int, request: Request, db: Session = Depends(get_db)
+):
+    """手动为单张阅读卡换例句；失败时保留原句。"""
+    user = _require_user(db, request)
+    card = (
+        db.query(Card)
+        .filter(Card.id == card_id, Card.user_id == user.id)
+        .first()
+    )
+    if not card:
+        raise HTTPException(status_code=404, detail="卡片不存在")
+    if card.card_type != "reading":
+        raise HTTPException(status_code=400, detail="只有阅读卡支持换句")
+    updated, errors = refresh_cards(db, user.id, [card])
+    if updated:
+        return {"ok": True, "updated": 1, "errors": []}
+    message = errors[0] if errors else "换句失败"
+    return JSONResponse(status_code=400, content={"ok": False, "detail": message})
+
+
 @router.get("/cards/browse")
 def browse_cards(
     request: Request,
