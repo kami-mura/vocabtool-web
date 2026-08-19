@@ -12,6 +12,7 @@ import hashlib
 import html
 import io
 import json
+import math
 import re
 import sqlite3
 import tempfile
@@ -618,6 +619,33 @@ def _latest_card_mod(db: Session, card: Card) -> int:
     return max(imported_mod, _timestamp(latest), _timestamp(card.created_at, 1))
 
 
+def _anki_card_data(card: Card) -> str:
+    """Map VocabFlow's FSRS memory state to Anki's card data JSON."""
+    state = _safe_json_object(card.fsrs_state)
+    try:
+        stability = float(state["stability"])
+        difficulty = float(state["difficulty"])
+    except (KeyError, TypeError, ValueError):
+        return ""
+    if (
+        not math.isfinite(stability)
+        or not math.isfinite(difficulty)
+        or stability <= 0
+        or not 1 <= difficulty <= 10
+    ):
+        return ""
+    data: dict[str, object] = {"s": stability, "d": difficulty}
+    last_review = state.get("last_review")
+    if isinstance(last_review, str):
+        try:
+            reviewed_at = dt.datetime.fromisoformat(last_review.replace("Z", "+00:00"))
+        except ValueError:
+            pass
+        else:
+            data["lrt"] = _timestamp(reviewed_at)
+    return json.dumps(data, separators=(",", ":"))
+
+
 def _export_review_rows(db: Session, card: Card, anki_card_id: int) -> list[tuple[int, ...]]:
     result: list[tuple[int, ...]] = []
     used_ids = set()
@@ -780,7 +808,7 @@ def export_apkg(db: Session, user_id: int) -> tuple[bytes, int]:
                         0,
                         0,
                         0,
-                        "",
+                        _anki_card_data(card),
                     ),
                 )
                 connection.executemany(

@@ -163,6 +163,44 @@ def test_apkg_export_contains_schedule_and_review_history(client):
     assert card["reviews"][0]["last_interval_days"] == 4
 
 
+def test_apkg_export_preserves_fsrs_memory_state(client, tmp_path):
+    register(client)
+    source = _scheduled_card("alice@example.com")
+    db = SessionLocal()
+    try:
+        card = db.get(Card, source.id)
+        card.fsrs_state = json.dumps(
+            {
+                "card_id": card.id,
+                "state": 2,
+                "step": None,
+                "stability": 12.345,
+                "difficulty": 6.789,
+                "due": "2026-08-20T00:00:00+00:00",
+                "last_review": "2026-08-12T01:02:03+00:00",
+            }
+        )
+        db.commit()
+    finally:
+        db.close()
+
+    package = _export_package(client)
+    with zipfile.ZipFile(io.BytesIO(package)) as archive:
+        collection_path = tmp_path / "collection.anki2"
+        collection_path.write_bytes(archive.read("collection.anki2"))
+    connection = sqlite3.connect(str(collection_path))
+    try:
+        card_data = connection.execute("SELECT data FROM cards").fetchone()[0]
+    finally:
+        connection.close()
+
+    assert json.loads(card_data) == {
+        "s": 12.345,
+        "d": 6.789,
+        "lrt": 1_786_496_523,
+    }
+
+
 def test_apkg_round_trip_is_idempotent_and_keeps_history(client):
     register(client)
     _scheduled_card("alice@example.com")
