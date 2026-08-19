@@ -2222,7 +2222,7 @@ mark.word-highlight {
 /* ---------- 个人词汇库 ---------- */
 .qa-answer-box { margin-top: 10px; padding-top: 12px; border-top: 1px solid var(--line); }
 .qa-answer-box h3 { margin: 0 0 8px; font-size: 15px; }
-.qa-rich { line-height: 1.8; color: #36445b; }
+.qa-rich { line-height: 1.8; color: var(--text); }
 .qa-rich p { margin: 6px 0; }
 .qa-rich h2, .qa-rich h3, .qa-rich h4 { margin: 12px 0 6px; }
 .qa-rich h2 { font-size: 16px; }

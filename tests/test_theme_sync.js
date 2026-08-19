@@ -121,4 +121,18 @@ for (const name of ["landing.html", "login.html"]) {
   );
 }
 
+/* ---------- 查询问答结果：文字颜色必须跟随日夜主题 ---------- */
+
+const styleSource = fs.readFileSync(
+  path.join(__dirname, "..", "app", "static", "style.css"),
+  "utf8"
+);
+const qaRichRule = styleSource.match(/\.qa-rich\s*\{[^}]*\}/);
+assert.ok(qaRichRule, "存在查询问答结果 .qa-rich 样式");
+assert.match(
+  qaRichRule[0],
+  /color\s*:\s*var\(--text\)/,
+  "查询问答结果使用主题文字色，夜间模式不再显示为低对比度深色文字"
+);
+
 console.log("theme system-sync checks passed");
