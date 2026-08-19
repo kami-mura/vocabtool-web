@@ -902,7 +902,10 @@ def _anki_model(model_id: int, deck_id: int, modified: int) -> dict[str, object]
             "text-align: center; "
             "color: #111; background: white; }\n"
             ".target-word { color: #2f6fed; font-weight: 700; }\n"
-            ".nightMode .target-word { color: #8fb0f8; }"
+            ".nightMode .target-word { color: #8fb0f8; }\n"
+            "@media (max-width: 600px) {\n"
+            "  .card { font-size: 22px; line-height: 1.5; }\n"
+            "}"
         ),
         "latexPre": "",
         "latexPost": "",

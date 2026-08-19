@@ -139,6 +139,8 @@ def test_export_renders_target_word_and_uses_vocabtool_name(client, tmp_path):
     deck = next(iter(json.loads(decks_raw).values()))
     assert model["name"] == "vocabtool"
     assert "font-size: 28px; line-height: 1.6; text-align: center;" in model["css"]
+    assert "@media (max-width: 600px)" in model["css"]
+    assert "font-size: 22px; line-height: 1.5;" in model["css"]
     assert ".target-word { color: #2f6fed; font-weight: 700; }" in model["css"]
     assert ".nightMode .target-word { color: #8fb0f8; }" in model["css"]
     assert deck["name"] == "vocabtool"
