@@ -1061,16 +1061,21 @@
     }
     let frontHtml;
     if (card.card_type === "reading") {
-      // 阅读卡正面：目标词一行（带播放按钮）+ 例句 + 例句下方播放按钮
+      // 阅读卡正面：目标词一行（带播放按钮），例句默认隐藏，点击“例句”按钮后显示并播放。
       frontHtml =
         '<div class="reading-word-row">' +
         '<mark class="oil-highlight">' + escapeHtml(target) + "</mark>" +
         ' <button class="demo-audio" data-real-audio="' + escapeHtml(target) +
         '" type="button">▶</button></div>' +
-        '<p class="demo-front-text">' + frontInner + "</p>" +
         (sentence && sentence !== target
-          ? '<div class="demo-audio-row"><button class="demo-audio" data-real-audio="' +
-            escapeHtml(sentence) + '" type="button">▶</button></div>'
+          ? '<div class="reading-sentence-wrap" data-reading-sentence-wrap>' +
+            '<button class="demo-audio reading-reveal-sentence" type="button" data-real-reveal-sentence data-sentence="' +
+            escapeHtml(sentence) + '">例句</button>' +
+            '<div class="reading-sentence-content reading-sentence-hidden" data-reading-sentence-content>' +
+            '<p class="demo-front-text">' + frontInner + "</p>" +
+            '<div class="demo-audio-row"><button class="demo-audio" data-real-audio="' +
+            escapeHtml(sentence) + '" type="button">▶</button></div>' +
+            "</div></div>"
           : "");
     } else {
       frontHtml =
@@ -1956,6 +1961,16 @@
     const audioButton = e.target.closest("[data-real-audio]");
     if (audioButton) {
       playRealAudio(audioButton.dataset.realAudio, audioButton);
+      return;
+    }
+    const revealButton = e.target.closest("[data-real-reveal-sentence]");
+    if (revealButton) {
+      const wrap = revealButton.closest("[data-reading-sentence-wrap]");
+      const content = wrap && wrap.querySelector("[data-reading-sentence-content]");
+      const audioBtn = content && content.querySelector("[data-real-audio]");
+      if (content) content.classList.remove("reading-sentence-hidden");
+      revealButton.hidden = true;
+      if (audioBtn) playRealAudio(revealButton.dataset.sentence, audioBtn);
       return;
     }
   });

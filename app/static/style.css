@@ -711,6 +711,16 @@ button.landing-login-btn { border: none; cursor: pointer; }
   gap: 8px;
   justify-content: center;
 }
+.reading-sentence-wrap {
+  margin-top: 12px;
+  text-align: center;
+}
+.reading-sentence-hidden {
+  display: none;
+}
+.reading-reveal-sentence {
+  min-width: 80px;
+}
 .demo-flip {
   position: absolute;
   right: 10px;
