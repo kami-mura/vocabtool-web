@@ -34,6 +34,21 @@ class User(Base):
     created_at = Column(DateTime, default=_utcnow)
 
 
+class UserApiCredential(Base):
+    """用户自带的 API Key；只保存服务端加密后的密文与尾号提示。"""
+
+    __tablename__ = "user_api_credentials"
+
+    user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    provider = Column(String(20), default="deepseek", nullable=False)
+    encrypted_key = Column(Text, nullable=False)
+    key_hint = Column(String(4), nullable=False)
+    created_at = Column(DateTime, default=_utcnow, nullable=False)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow, nullable=False)
+
+
 class VocabularyProfile(Base):
     """每个用户自己的 NGSL 基础词汇量范围。"""
 
@@ -445,6 +460,24 @@ class AiDailyQuota(Base):
     day = Column(String(10), nullable=False, index=True)
     count = Column(Integer, default=0, nullable=False)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
+
+
+class AiFreeDailyQuota(Base):
+    """平台 Key 的每用户每日免费查询与制卡额度。"""
+
+    __tablename__ = "ai_free_daily_quota"
+    __table_args__ = (
+        UniqueConstraint("user_id", "day", name="uq_ai_free_daily_quota_user_day"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    day = Column(String(10), nullable=False, index=True)
+    query_count = Column(Integer, default=0, nullable=False)
+    card_count = Column(Integer, default=0, nullable=False)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow, nullable=False)
 
 
 class LookupCache(Base):

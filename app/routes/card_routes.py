@@ -43,6 +43,7 @@ from ..api_support import (
     _sentence_refresh_due,
     _today_stats,
     _try_heavy_import_slot,
+    _user_deepseek_api_key,
     _utf8_size,
     _words_with_cards,
     ai_mod,
@@ -569,7 +570,10 @@ def card_studio_needs(request: Request, db: Session = Depends(get_db)):
 
 
 def _create_speaking_cards(
-    db: Session, user: User, words: list[str]
+    db: Session,
+    user: User,
+    words: list[str],
+    user_api_key: str | None = None,
 ) -> dict:
     """口语卡制卡：每行一个表达需求，AI 在反面生成 3 个常用表达。"""
     fronts = _parse_expression_needs("\n".join(words))[: config.MAX_CARDS_PER_RUN]
@@ -598,11 +602,18 @@ def _create_speaking_cards(
     if ai_fronts:
         # 先结束只读事务并释放连接：长 AI 调用期间不占用连接池。
         db.commit()
-        generated, ai_errors, ai_requests, ai_timings = (
-            ai_mod.generate_card_content_in_batches(
-                db, user.id, ai_fronts, "speaking"
+        if user_api_key:
+            generated, ai_errors, ai_requests, ai_timings = (
+                ai_mod.generate_card_content_in_batches(
+                    db, user.id, ai_fronts, "speaking", user_api_key
+                )
             )
-        )
+        else:
+            generated, ai_errors, ai_requests, ai_timings = (
+                ai_mod.generate_card_content_in_batches(
+                    db, user.id, ai_fronts, "speaking"
+                )
+            )
 
     existing_count = 0
     existing_front_list: list[str] = []
@@ -753,6 +764,7 @@ def create_cards_from_studio(
 ):
     """唯一的站内制卡入口；查词和阅读页只能把词送到这里。"""
     user = _require_user(db, request)
+    user_api_key = _user_deepseek_api_key(db, user)
     if not check_request_rate(
         db,
         action="card-studio-cards",
@@ -765,7 +777,7 @@ def create_cards_from_studio(
         raise HTTPException(status_code=400, detail="无效卡片类型")
     try:
         if body.card_type == "speaking":
-            result = _create_speaking_cards(db, user, body.words)
+            result = _create_speaking_cards(db, user, body.words, user_api_key)
             ai_mod.mark_card_generation_done(
                 user.id,
                 {
@@ -885,9 +897,18 @@ def create_cards_from_studio(
         if ai_need:
             # 先结束只读事务并释放连接：长 AI 调用期间不占用连接池。
             db.commit()
-            generated, ai_errors, ai_requests, ai_timings = (
-                ai_mod.generate_card_content_in_batches(db, user.id, ai_need, body.card_type)
-            )
+            if user_api_key:
+                generated, ai_errors, ai_requests, ai_timings = (
+                    ai_mod.generate_card_content_in_batches(
+                        db, user.id, ai_need, body.card_type, user_api_key
+                    )
+                )
+            else:
+                generated, ai_errors, ai_requests, ai_timings = (
+                    ai_mod.generate_card_content_in_batches(
+                        db, user.id, ai_need, body.card_type
+                    )
+                )
     
         existing_count = 0
         existing_word_list: list[str] = []

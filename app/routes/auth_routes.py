@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
+from .. import api_keys
 from ..api_support import (
     ALLOWED_READING_FONTS,
     Depends,
@@ -27,7 +28,14 @@ from ..api_support import (
     login_user,
     register_user,
 )
-from ..schemas import LoginIn, PasswordResetIn, ReadingDisplayIn, RegisterIn, VerificationCodeIn
+from ..schemas import (
+    ApiKeyIn,
+    LoginIn,
+    PasswordResetIn,
+    ReadingDisplayIn,
+    RegisterIn,
+    VerificationCodeIn,
+)
 
 router = APIRouter()
 
@@ -164,6 +172,45 @@ def me(request: Request, db: Session = Depends(get_db)):
     return {"email": user.email, "user_id": user.id}
 
 
+@router.get("/ai-credentials/deepseek")
+def get_deepseek_credential(request: Request, db: Session = Depends(get_db)):
+    user = _require_user(db, request)
+    return api_keys.credential_status(db, user.id)
+
+
+@router.put("/ai-credentials/deepseek")
+def save_deepseek_credential(
+    body: ApiKeyIn, request: Request, db: Session = Depends(get_db)
+):
+    user = _require_user(db, request)
+    if not check_request_rate(
+        db,
+        action="save-deepseek-key",
+        identity=f"u{user.id}",
+        limit=20,
+        window_minutes=60,
+    ):
+        raise HTTPException(status_code=429, detail="API Key 更新过于频繁，请稍后再试")
+    try:
+        credential = api_keys.save_deepseek_key(db, user.id, body.api_key)
+    except api_keys.ApiKeyError as exc:
+        status = 503 if "服务器尚未配置" in str(exc) else 400
+        raise HTTPException(status_code=status, detail=str(exc)) from exc
+    return {
+        "ok": True,
+        "configured": True,
+        "provider": "deepseek",
+        "key_hint": credential.key_hint,
+    }
+
+
+@router.delete("/ai-credentials/deepseek")
+def delete_deepseek_credential(request: Request, db: Session = Depends(get_db)):
+    user = _require_user(db, request)
+    deleted = api_keys.delete_deepseek_key(db, user.id)
+    return {"ok": True, "deleted": deleted, "configured": False}
+
+
 @router.get("/storage")
 def storage_usage(request: Request, db: Session = Depends(get_db)):
     user = _require_user(db, request)
@@ -212,4 +259,3 @@ def update_reading_display_preference(
     db.commit()
     db.refresh(preference)
     return {"ok": True, **_reading_display_dict(preference)}
-

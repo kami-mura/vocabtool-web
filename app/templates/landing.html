@@ -35,6 +35,16 @@
         <button id="account-menu-toggle" class="account-menu-summary" data-ico="account" type="button"><span class="ic nav-emoji" aria-hidden="true">👤</span>个人</button>
         <div id="account-menu-panel" class="account-menu-panel" hidden>
           <p class="account-email">邮箱：<strong id="home-email">…</strong></p>
+          <div class="account-api-key">
+            <label for="account-api-key-input">DeepSeek API Key</label>
+            <input id="account-api-key-input" type="password" placeholder="sk-…" autocomplete="new-password" spellcheck="false" data-1p-ignore>
+            <div class="account-api-key-actions">
+              <button id="account-api-key-save" class="small" type="button">保存 Key</button>
+              <button id="account-api-key-delete" class="small danger" type="button" hidden>删除 Key</button>
+            </div>
+            <p id="account-api-key-status" class="account-api-key-status">加载中…</p>
+            <p class="account-api-key-note">加密保存在服务器，保存后不再显示明文。</p>
+          </div>
           <button id="account-vocabulary-test" class="small" type="button">词汇量测试</button>
           <button id="account-theme-toggle" class="small" type="button"><span id="account-theme-toggle-label">☾ 夜间模式</span></button>
           <button id="home-logout" class="danger" type="button">退出登录</button>

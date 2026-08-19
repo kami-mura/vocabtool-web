@@ -232,6 +232,8 @@ def test_old_sqlite_database_migrates_cleanly(monkeypatch, tmp_path):
         assert "schema_migrations" in tables
         assert "saved_words" in tables
         assert "anki_review_logs" in tables
+        assert "user_api_credentials" in tables
+        assert "ai_free_daily_quota" in tables
         assert "word_status" not in tables
         assert "word_status_legacy" in tables
         legacy = connection.execute(
@@ -257,6 +259,7 @@ def test_old_sqlite_database_migrates_cleanly(monkeypatch, tmp_path):
         assert "020_fsrs_state" in versions
         assert "024_saved_words" in versions
         assert "026_anki_exchange" in versions
+        assert "028_user_api_credentials_free_quota" in versions
     finally:
         connection.close()
 

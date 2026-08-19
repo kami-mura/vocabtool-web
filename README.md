@@ -123,10 +123,12 @@ uvicorn app.main:app --reload --port 8000
 | --- | --- |
 | `DEEPSEEK_API_KEY` | AI 查词、问答、制卡和短文 |
 | `DEEPSEEK_BASE_URL`、`DEEPSEEK_MODEL` | 切换兼容 OpenAI 接口格式的服务和模型 |
-| `RESEND_API_KEY`、`EMAIL_FROM`、`VERIFICATION_SECRET` | 邮箱验证码和密码重置 |
+| `RESEND_API_KEY`、`EMAIL_FROM`、`VERIFICATION_SECRET` | 邮箱验证码、密码重置及用户 API Key 加密根密钥 |
+| `API_KEY_ENCRYPTION_SECRET` | 可选的用户 API Key 独立加密根密钥 |
 | `NEW_CARDS_PER_DAY` | 默认每日新卡数量 |
 | `DEFAULT_KNOWN_RANK` | 默认已认识的 NGSL 排名范围 |
-| `AI_DAILY_REQUEST_LIMIT`、`GUEST_AI_DAILY_LIMIT` | 用户和游客 AI 日调用限额 |
+| `AI_FREE_DAILY_QUERY_LIMIT`、`AI_FREE_DAILY_CARD_LIMIT` | 平台 Key 的用户每日免费查询/制卡额度 |
+| `AI_DAILY_REQUEST_LIMIT`、`GUEST_AI_DAILY_LIMIT` | AI 内部请求和游客日调用限额 |
 | `MAX_UPLOAD_BYTES`、`USER_STORAGE_QUOTA_BYTES` | 单文件和单用户存储限制 |
 | `ALLOWED_HOSTS`、`COOKIE_SECURE` | 生产域名和安全 Cookie 配置 |
 

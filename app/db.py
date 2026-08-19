@@ -176,6 +176,14 @@ def _migrate_anki_exchange() -> None:
         )
 
 
+def _migrate_user_api_credentials_and_free_quota() -> None:
+    """增加用户加密 API Key 与平台免费额度表，兼容 SQLite/PostgreSQL。"""
+    from .models import AiFreeDailyQuota, UserApiCredential
+
+    UserApiCredential.__table__.create(bind=engine, checkfirst=True)
+    AiFreeDailyQuota.__table__.create(bind=engine, checkfirst=True)
+
+
 def _migrate_graduate_one_day_to_midnight() -> None:
     """把存量卡到期时间对齐到站点时区所在日期 0 点（Anki 日界风格）。
 
@@ -482,7 +490,7 @@ def _ensure_runtime_indexes() -> None:
 
 def _prune_ai_usage() -> None:
     """保留最近一段时间的 AI 用量记录，避免 ai_usage 无限增长。"""
-    from .models import AiDailyQuota, AiUsage
+    from .models import AiDailyQuota, AiFreeDailyQuota, AiUsage
 
     cutoff = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None) - dt.timedelta(days=config.AI_USAGE_RETENTION_DAYS)
     try:
@@ -499,6 +507,9 @@ def _prune_ai_usage() -> None:
         ).isoformat()
         connection.execute(
             AiDailyQuota.__table__.delete().where(AiDailyQuota.day < old_day)
+        )
+        connection.execute(
+            AiFreeDailyQuota.__table__.delete().where(AiFreeDailyQuota.day < old_day)
         )
 
 
@@ -1159,6 +1170,7 @@ _SCHEMA_MIGRATIONS: list[tuple[str, Callable[[], None]]] = [
     ("025_saved_word_status", _migrate_saved_word_status),
     ("026_anki_exchange", _migrate_anki_exchange),
     ("027_anki_multi_template_cards", _migrate_anki_multi_template_cards),
+    ("028_user_api_credentials_free_quota", _migrate_user_api_credentials_and_free_quota),
 ]
 
 

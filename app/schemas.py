@@ -28,6 +28,10 @@ class PasswordResetIn(BaseModel):
     code: str = Field(min_length=6, max_length=6)
 
 
+class ApiKeyIn(BaseModel):
+    api_key: str = Field(min_length=11, max_length=256)
+
+
 class ReadingDisplayIn(BaseModel):
     font_family: str = Field(default="book", max_length=32)
     font_size: int = Field(default=17, ge=14, le=24)

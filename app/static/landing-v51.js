@@ -469,6 +469,72 @@
   } catch (_) { /* 隐私模式等场景忽略 */ }
 
   const accountPanel = document.getElementById("account-menu-panel");
+  const accountApiKeyInput = document.getElementById("account-api-key-input");
+  const accountApiKeySave = document.getElementById("account-api-key-save");
+  const accountApiKeyDelete = document.getElementById("account-api-key-delete");
+  const accountApiKeyStatus = document.getElementById("account-api-key-status");
+  let accountApiKeyLoaded = false;
+
+  async function loadAccountApiKeyStatus(force) {
+    if (!isLoggedIn || !accountApiKeyStatus || (accountApiKeyLoaded && !force)) return;
+    try {
+      const res = await fetch("/api/ai-credentials/deepseek");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || "状态加载失败");
+      accountApiKeyLoaded = true;
+      accountApiKeyStatus.textContent = data.configured
+        ? "已配置自己的 Key" + (data.key_hint ? "（尾号 " + data.key_hint + "）" : "")
+        : "未配置，当前使用网站免费额度";
+      accountApiKeyStatus.className = "account-api-key-status" + (data.configured ? " ok" : "");
+      if (accountApiKeyDelete) accountApiKeyDelete.hidden = !data.configured;
+    } catch (err) {
+      accountApiKeyStatus.textContent = err.message || "状态加载失败";
+      accountApiKeyStatus.className = "account-api-key-status error";
+    }
+  }
+
+  if (accountApiKeySave) {
+    accountApiKeySave.onclick = async () => {
+      const apiKey = (accountApiKeyInput && accountApiKeyInput.value || "").trim();
+      if (!/^sk-[A-Za-z0-9_-]{8,253}$/.test(apiKey)) {
+        accountApiKeyStatus.textContent = "请输入有效的 DeepSeek API Key";
+        accountApiKeyStatus.className = "account-api-key-status error";
+        return;
+      }
+      accountApiKeySave.disabled = true;
+      try {
+        const res = await fetch("/api/ai-credentials/deepseek", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ api_key: apiKey }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.detail || "保存失败");
+        accountApiKeyInput.value = "";
+        accountApiKeyLoaded = false;
+        await loadAccountApiKeyStatus(true);
+      } catch (err) {
+        accountApiKeyStatus.textContent = err.message || "保存失败";
+        accountApiKeyStatus.className = "account-api-key-status error";
+      } finally {
+        accountApiKeySave.disabled = false;
+      }
+    };
+  }
+  if (accountApiKeyDelete) {
+    accountApiKeyDelete.onclick = async () => {
+      if (!window.confirm("删除已保存的 DeepSeek API Key？")) return;
+      const res = await fetch("/api/ai-credentials/deepseek", { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        accountApiKeyStatus.textContent = data.detail || "删除失败";
+        accountApiKeyStatus.className = "account-api-key-status error";
+        return;
+      }
+      accountApiKeyLoaded = false;
+      await loadAccountApiKeyStatus(true);
+    };
+  }
   // 事件委托：无论按钮何时渲染都能响应，兼容缓存的新旧页面结构。
   document.addEventListener("click", (e) => {
     if (e.target.closest("#account-menu-toggle")) {
@@ -476,7 +542,10 @@
         location.href = "/login";
         return;
       }
-      if (accountPanel) accountPanel.hidden = !accountPanel.hidden;
+      if (accountPanel) {
+        accountPanel.hidden = !accountPanel.hidden;
+        if (!accountPanel.hidden) loadAccountApiKeyStatus();
+      }
       return;
     }
     if (accountPanel && !accountPanel.hidden && !e.target.closest("#account-menu")) {

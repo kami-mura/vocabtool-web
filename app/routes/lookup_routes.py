@@ -20,6 +20,7 @@ from ..api_support import (
     _anonymous_request_identity,
     _require_storage_space,
     _require_user,
+    _user_deepseek_api_key,
     _utf8_size,
     ai_mod,
     builtin_lookup,
@@ -220,6 +221,7 @@ def create_lookup(body: LookupIn, request: Request, db: Session = Depends(get_db
         raise HTTPException(status_code=429, detail="查词请求过多，请稍后再试")
     started_at = time.perf_counter()
     user = current_user(request, db)
+    user_api_key = _user_deepseek_api_key(db, user)
     guest = user is None
     guest_remaining = None
     text = _validate_lookup_query(body.text)
@@ -272,9 +274,18 @@ def create_lookup(body: LookupIn, request: Request, db: Session = Depends(get_db
         }
         lookup_source = "local_cache"
     elif ai_mod.ai_enabled():
-        result, ai_error, first_call_charged = ai_mod.explain_lookup(
-            db, user.id if user else None, text, query_type
-        )
+        if user_api_key:
+            result, ai_error, first_call_charged = ai_mod.explain_lookup(
+                db,
+                user.id if user else None,
+                text,
+                query_type,
+                user_api_key=user_api_key,
+            )
+        else:
+            result, ai_error, first_call_charged = ai_mod.explain_lookup(
+                db, user.id if user else None, text, query_type
+            )
         if result:
             lookup_source = "deepseek"
             if cached:
@@ -380,10 +391,23 @@ def create_lookup(body: LookupIn, request: Request, db: Session = Depends(get_db
                     # 第一次 AI 查询已实际消耗配额时才复用（不再重复扣）；
                     # 未消耗（配额不足被拒、游客失败已退还）时必须重新预占，
                     # 否则拼写纠错路径会成为绕过配额免费调用 AI 的通道。
-                    corrected, _, _ = ai_mod.explain_lookup(
-                        db, user.id if user else None, suggestion, query_type,
-                        reserve_quota=not first_call_charged,
-                    )
+                    if user_api_key:
+                        corrected, _, _ = ai_mod.explain_lookup(
+                            db,
+                            user.id if user else None,
+                            suggestion,
+                            query_type,
+                            reserve_quota=not first_call_charged,
+                            user_api_key=user_api_key,
+                        )
+                    else:
+                        corrected, _, _ = ai_mod.explain_lookup(
+                            db,
+                            user.id if user else None,
+                            suggestion,
+                            query_type,
+                            reserve_quota=not first_call_charged,
+                        )
                     if corrected:
                         corrected_source = "deepseek"
                         # 与主路径一致写入缓存：否则同一个拼写错误每次
@@ -474,7 +498,9 @@ def create_lookup(body: LookupIn, request: Request, db: Session = Depends(get_db
         "lookup_source": lookup_source,
         "elapsed_ms": elapsed_ms,
         "guest_remaining": guest_remaining,
-        "ai_enabled": ai_mod.ai_enabled(),
+        "ai_enabled": (
+            ai_mod.ai_enabled(user_api_key) if user_api_key else ai_mod.ai_enabled()
+        ),
         "ai_error": ai_error,
         "spelling_note": spelling_note,
     }
@@ -618,6 +644,7 @@ def save_lookup_word(
 def quick_lookup(body: QuickLookupIn, request: Request, db: Session = Depends(get_db)):
     """词源速查：中文释义 + 底层逻辑 + 词源史诗。"""
     user = current_user(request, db)
+    user_api_key = _user_deepseek_api_key(db, user)
     guest = user is None
     guest_remaining = None
     if not check_request_rate(
@@ -632,7 +659,12 @@ def quick_lookup(body: QuickLookupIn, request: Request, db: Session = Depends(ge
         raise HTTPException(status_code=429, detail="查询请求过多，请稍后再试")
     if guest:
         guest_remaining = _reserve_guest_lookup(db, request)
-    result, error = ai_mod.quick_lookup(db, user.id if user else None, body.text)
+    if user_api_key:
+        result, error = ai_mod.quick_lookup(
+            db, user.id if user else None, body.text, user_api_key
+        )
+    else:
+        result, error = ai_mod.quick_lookup(db, user.id if user else None, body.text)
     if error:
         raise HTTPException(status_code=400, detail=error)
     text = re.sub(r"\s+", " ", str(body.text or "").strip())
@@ -670,6 +702,7 @@ def quick_lookup(body: QuickLookupIn, request: Request, db: Session = Depends(ge
 def ask_question(body: QuestionIn, request: Request, db: Session = Depends(get_db)):
     """回答英语学习问题（用法、语法、翻译、改写等）。"""
     user = current_user(request, db)
+    user_api_key = _user_deepseek_api_key(db, user)
     guest = user is None
     guest_remaining = None
     if not check_request_rate(
@@ -684,7 +717,14 @@ def ask_question(body: QuestionIn, request: Request, db: Session = Depends(get_d
         raise HTTPException(status_code=429, detail="问答请求过多，请稍后再试")
     if guest:
         guest_remaining = _reserve_guest_lookup(db, request)
-    answer, error = ai_mod.answer_question(db, user.id if user else None, body.question)
+    if user_api_key:
+        answer, error = ai_mod.answer_question(
+            db, user.id if user else None, body.question, user_api_key
+        )
+    else:
+        answer, error = ai_mod.answer_question(
+            db, user.id if user else None, body.question
+        )
     if error:
         raise HTTPException(status_code=400, detail=error)
     question = re.sub(r"\s+", " ", str(body.question or "").strip())

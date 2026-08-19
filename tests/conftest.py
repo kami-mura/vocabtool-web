@@ -47,13 +47,22 @@ def _clean_database_between_tests():
 
 
 @pytest.fixture(autouse=True)
+def _disable_new_free_ai_quotas_by_default(monkeypatch):
+    """旧测试聚焦原有行为；新增额度测试自行显式开启目标限额。"""
+    from app import config
+
+    monkeypatch.setattr(config, "AI_FREE_DAILY_QUERY_LIMIT", 0)
+    monkeypatch.setattr(config, "AI_FREE_DAILY_CARD_LIMIT", 0)
+
+
+@pytest.fixture(autouse=True)
 def _fake_ai_card_generation_for_api_tests(monkeypatch, request):
     """API 集成测试不连真实 DeepSeek；制卡统一走确定性假结果。"""
     if "/test_api" not in request.node.nodeid:
         return
     from app import ai as ai_mod
 
-    def fake_generate(_db, _user_id, words, card_template="reading"):
+    def fake_generate(_db, _user_id, words, card_template="reading", *args, **kwargs):
         results = {}
         errors = {}
         for word in words:

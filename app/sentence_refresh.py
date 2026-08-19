@@ -196,6 +196,7 @@ def refresh_cards(
         user_id,
         words,
         card_template="reading",
+        reserve_card_quota=False,
     )
     updated = 0
     skipped_errors: list[str] = []

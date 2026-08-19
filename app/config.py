@@ -81,6 +81,11 @@ EMAIL_VERIFICATION_REQUIRED = os.environ.get(
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
 EMAIL_FROM = os.environ.get("EMAIL_FROM", "VocabTool <verify@example.com>")
 VERIFICATION_SECRET = os.environ.get("VERIFICATION_SECRET", "")
+# 用户自带的 DeepSeek Key 使用独立派生用途加密；未单独配置时复用验证码
+# 根密钥并通过用途标签派生，避免部署时再维护一份必需密钥。
+API_KEY_ENCRYPTION_SECRET = os.environ.get(
+    "API_KEY_ENCRYPTION_SECRET", VERIFICATION_SECRET
+)
 VERIFICATION_CODE_TTL_MINUTES = _env_int("VERIFICATION_CODE_TTL_MINUTES", 10)
 NEW_CARDS_PER_DAY = _env_int("NEW_CARDS_PER_DAY", 10)
 DEFAULT_KNOWN_RANK = _env_int("DEFAULT_KNOWN_RANK", 3000)
@@ -100,6 +105,9 @@ AI_USAGE_RETENTION_DAYS = max(
 # 每位用户每日 AI 请求上限（按站点时区自然日计数）；0 表示不限制。
 # 默认 3000：查词 100 次、制卡 2000 张（约 200-400 次批量请求）都不会触发。
 AI_DAILY_REQUEST_LIMIT = max(0, _env_int("AI_DAILY_REQUEST_LIMIT", 3000))
+# 平台 Key 的免费用量按业务动作分别限制；用户自带 Key 不消耗这两项。
+AI_FREE_DAILY_QUERY_LIMIT = max(0, _env_int("AI_FREE_DAILY_QUERY_LIMIT", 50))
+AI_FREE_DAILY_CARD_LIMIT = max(0, _env_int("AI_FREE_DAILY_CARD_LIMIT", 50))
 
 # 全站未登录用户每日 AI 查词总量上限；0 表示不限制。
 GUEST_AI_DAILY_LIMIT = max(0, _env_int("GUEST_AI_DAILY_LIMIT", 500))

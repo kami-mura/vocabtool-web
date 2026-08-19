@@ -15,7 +15,14 @@ from sqlalchemy.orm import Session
 
 from . import config, vocab
 from .db import SessionLocal
-from .models import AiDailyQuota, AiUsage, GuestAiQuota, VocabularyProfile, WordEntry
+from .models import (
+    AiDailyQuota,
+    AiFreeDailyQuota,
+    AiUsage,
+    GuestAiQuota,
+    VocabularyProfile,
+    WordEntry,
+)
 from .word_forms import target_surface_pattern
 
 logger = logging.getLogger(__name__)
@@ -34,6 +41,12 @@ _AI_CARD_GENERATION_DEADLINE_SECONDS = 300.0
 _AI_CARD_PER_USER_CONCURRENCY = 1
 _AI_REQUEST_SLOTS = threading.BoundedSemaphore(4)
 _AI_QUOTA_EXCEEDED = "今日 AI 调用次数已达上限，请明天再试或联系管理员"
+_FREE_QUERY_QUOTA_EXCEEDED = (
+    "今日免费 AI 查询额度已用完，请明天再试或配置自己的 DeepSeek API Key"
+)
+_FREE_CARD_QUOTA_EXCEEDED = (
+    "今日免费制卡额度已用完，请明天再试或配置自己的 DeepSeek API Key"
+)
 
 _STREAMLIT_READING_CARD_SYSTEM_PROMPT = (
     "You generate high-quality Anki reading-recognition data. Be natural, "
@@ -360,14 +373,16 @@ def _active_provider() -> str:
     return "deepseek"
 
 
-def _active_model() -> str:
+def _active_model(user_api_key: str | None = None) -> str:
+    if user_api_key:
+        return config.DEEPSEEK_MODEL
     if _active_provider() == "openai":
         return config.OPENAI_MODEL
     return config.DEEPSEEK_MODEL
 
 
-def ai_enabled() -> bool:
-    return bool(config.OPENAI_API_KEY or config.DEEPSEEK_API_KEY)
+def ai_enabled(user_api_key: str | None = None) -> bool:
+    return bool(user_api_key or config.OPENAI_API_KEY or config.DEEPSEEK_API_KEY)
 
 
 def _clean_card_entry(value: str) -> str:
@@ -425,9 +440,16 @@ def _card_generation_batch_size(card_template: str) -> int:
     return AI_CARD_BATCH_SIZE
 
 
-def _new_ai_client():
+def _new_ai_client(user_api_key: str | None = None):
     from openai import OpenAI
 
+    if user_api_key:
+        return OpenAI(
+            api_key=user_api_key,
+            base_url=config.DEEPSEEK_BASE_URL,
+            timeout=AI_REQUEST_TIMEOUT_SECONDS,
+            max_retries=0,
+        )
     if _active_provider() == "openai":
         kwargs = {
             "api_key": config.OPENAI_API_KEY,
@@ -1185,6 +1207,76 @@ def ai_quota_reserve(db: Session, user_id: int, need: int = 1) -> str | None:
         return f"{_AI_QUOTA_EXCEEDED}（{used}/{limit}）"
 
 
+def free_ai_quota_reserve(
+    db: Session, user_id: int, quota_type: str, need: int = 1
+) -> str | None:
+    """原子预占平台 Key 的免费查询次数或待生成卡片数。"""
+    if quota_type not in {"query", "card"}:
+        raise ValueError("unsupported free AI quota type")
+    limit = int(
+        config.AI_FREE_DAILY_QUERY_LIMIT
+        if quota_type == "query"
+        else config.AI_FREE_DAILY_CARD_LIMIT
+    )
+    if limit <= 0 or need <= 0:
+        return None
+    need = max(1, int(need))
+    message = (
+        _FREE_QUERY_QUOTA_EXCEEDED
+        if quota_type == "query"
+        else _FREE_CARD_QUOTA_EXCEEDED
+    )
+    if need > limit:
+        return f"{message}（本次 {need} / 每日 {limit}）"
+    day = _quota_day()
+    column = (
+        AiFreeDailyQuota.query_count
+        if quota_type == "query"
+        else AiFreeDailyQuota.card_count
+    )
+
+    def _try_update() -> bool:
+        updated = db.execute(
+            update(AiFreeDailyQuota)
+            .where(
+                AiFreeDailyQuota.user_id == user_id,
+                AiFreeDailyQuota.day == day,
+                column + need <= limit,
+            )
+            .values({column.key: column + need})
+        )
+        return bool(updated.rowcount)
+
+    if _try_update():
+        db.commit()
+        return None
+    values = {
+        "user_id": user_id,
+        "day": day,
+        "query_count": need if quota_type == "query" else 0,
+        "card_count": need if quota_type == "card" else 0,
+    }
+    try:
+        db.execute(insert(AiFreeDailyQuota).values(**values))
+        db.commit()
+        return None
+    except IntegrityError:
+        db.rollback()
+        if _try_update():
+            db.commit()
+            return None
+        row = (
+            db.query(column)
+            .filter(
+                AiFreeDailyQuota.user_id == user_id,
+                AiFreeDailyQuota.day == day,
+            )
+            .first()
+        )
+        used = int(row[0]) if row else 0
+        return f"{message}（已用 {used} / 每日 {limit}）"
+
+
 def guest_ai_quota_reserve(db: Session, need: int = 1) -> str | None:
     """全站游客每日 AI 查词总量原子预占（跨进程安全，按站点时区自然日）。"""
     limit = int(config.GUEST_AI_DAILY_LIMIT or 0)
@@ -1251,6 +1343,8 @@ def _generate_card_content_locked(
     user_id: int,
     words: list[str],
     card_template: str = "reading",
+    user_api_key: str | None = None,
+    reserve_card_quota: bool = True,
 ) -> tuple[dict[str, dict], dict[str, str], int, dict[str, float | int]]:
     """Generate cards with the old Streamlit prompts in bounded parallel batches.
 
@@ -1262,7 +1356,7 @@ def _generate_card_content_locked(
     unique_words = _unique_card_words(words)
     if not unique_words:
         return {}, {}, 0, _empty_timings()
-    if not ai_enabled():
+    if not (ai_enabled(user_api_key) if user_api_key else ai_enabled()):
         return (
             {},
             {word: "服务器尚未配置 AI API Key" for word in unique_words},
@@ -1270,8 +1364,24 @@ def _generate_card_content_locked(
             _empty_timings(),
         )
 
+    if not user_api_key and reserve_card_quota:
+        quota_db = SessionLocal()
+        try:
+            quota_error = free_ai_quota_reserve(
+                quota_db, user_id, "card", need=len(unique_words)
+            )
+        finally:
+            quota_db.close()
+        if quota_error:
+            return (
+                {},
+                {word: quota_error for word in unique_words},
+                0,
+                _empty_timings(),
+            )
+
     try:
-        client = _new_ai_client()
+        client = _new_ai_client(user_api_key) if user_api_key else _new_ai_client()
     except Exception as exc:
         error = _safe_api_error(exc, "card client")
         return {}, {word: error for word in unique_words}, 0, _empty_timings()
@@ -1297,7 +1407,9 @@ def _generate_card_content_locked(
             try:
                 content = _call_ai_card_batch(client, batch, card_template)
                 if not content:
-                    raise RuntimeError(f"{_active_model()} returned empty card content")
+                    raise RuntimeError(
+                        f"{_active_model(user_api_key)} returned empty card content"
+                    )
                 request_error = ""
                 break
             except Exception as exc:
@@ -1333,7 +1445,7 @@ def _generate_card_content_locked(
                 attempts_by_key[key] = attempts_by_key.get(key, 0) + 1
 
             quota_error = None
-            if config.AI_DAILY_REQUEST_LIMIT > 0:
+            if not user_api_key and config.AI_DAILY_REQUEST_LIMIT > 0:
                 quota_db = SessionLocal()
                 try:
                     quota_error = ai_quota_reserve(quota_db, user_id, need=1)
@@ -1398,6 +1510,8 @@ def generate_card_content_in_batches(
     user_id: int,
     words: list[str],
     card_template: str = "reading",
+    user_api_key: str | None = None,
+    reserve_card_quota: bool = True,
 ) -> tuple[dict[str, dict], dict[str, str], int, dict[str, float | int]]:
     """生成卡片：同一用户同时只允许一个制卡任务，超时返回部分结果。
 
@@ -1411,7 +1525,13 @@ def generate_card_content_in_batches(
         error = "已有制卡任务正在进行，请稍后再试"
         return {}, {word: error for word in unique_words}, 0, _empty_timings()
     try:
-        return _generate_card_content_locked(user_id, unique_words, card_template)
+        return _generate_card_content_locked(
+            user_id,
+            unique_words,
+            card_template,
+            user_api_key,
+            reserve_card_quota,
+        )
     finally:
         _release_card_generation_slot(user_id)
 
@@ -1478,6 +1598,7 @@ def explain_lookup(
     text: str,
     query_type: str,
     reserve_quota: bool = True,
+    user_api_key: str | None = None,
 ) -> tuple[dict | None, str | None, bool]:
     """用 AI查词格式解释单词、短语或中文释义。
 
@@ -1487,27 +1608,30 @@ def explain_lookup(
     """
     if query_type == "sentence":
         return None, "AI查词不能查询完整句子", False
-    if not ai_enabled():
+    if not (ai_enabled(user_api_key) if user_api_key else ai_enabled()):
         return None, "服务器尚未配置 DEEPSEEK_API_KEY", False
     charged = False
     if reserve_quota:
-        if user_id is not None:
+        if user_id is not None and not user_api_key:
+            quota_error = free_ai_quota_reserve(db, user_id, "query", need=1)
+            if quota_error:
+                return None, quota_error, False
             quota_error = ai_quota_reserve(db, user_id, need=1)
             if quota_error:
                 return None, quota_error, False
-        else:
+        elif user_id is None:
             quota_error = guest_ai_quota_reserve(db, need=1)
             if quota_error:
                 return None, quota_error, False
         charged = True
     try:
-        client = _new_ai_client()
-        last_error = f"{_active_model()} 查询暂时失败，请稍后重试"
+        client = _new_ai_client(user_api_key) if user_api_key else _new_ai_client()
+        last_error = f"{_active_model(user_api_key)} 查询暂时失败，请稍后重试"
         for attempt in range(AI_CARD_NETWORK_RETRIES):
             try:
                 response = _chat_completion(
                     client,
-                    model=_active_model(),
+                    model=_active_model(user_api_key),
                     temperature=0.2,
                     messages=[
                         {
@@ -1531,11 +1655,11 @@ def explain_lookup(
                 content = str(response.choices[0].message.content or "").strip()
                 if _looks_like_missing_lookup_input(content):
                     if attempt >= AI_CARD_NETWORK_RETRIES - 1:
-                        last_error = f"{_active_model()} 没有理解查询，请稍后重试"
+                        last_error = f"{_active_model(user_api_key)} 没有理解查询，请稍后重试"
                         continue
                     response = _chat_completion(
                         client,
-                        model=_active_model(),
+                        model=_active_model(user_api_key),
                         temperature=0.15,
                         messages=[
                             {
@@ -1553,7 +1677,9 @@ def explain_lookup(
                     )
                     content = str(response.choices[0].message.content or "").strip()
                 if not content:
-                    raise RuntimeError(f"{_active_model()} 没有返回内容，请重新查询")
+                    raise RuntimeError(
+                        f"{_active_model(user_api_key)} 没有返回内容，请重新查询"
+                    )
                 card_front, card_back = _card_fields_from_streamlit_result(
                     content, text, query_type
                 )
@@ -1602,25 +1728,31 @@ def _looks_like_missing_lookup_input(raw_content: str) -> bool:
 
 
 def quick_lookup(
-    db: Session, user_id: int | None, text: str
+    db: Session,
+    user_id: int | None,
+    text: str,
+    user_api_key: str | None = None,
 ) -> tuple[dict | None, str | None]:
     """词源速查：中文释义 + 底层逻辑 + 词源史诗（移植自 Streamlit）。"""
     normalized = re.sub(r"\s+", " ", str(text or "").strip())
     if not normalized:
         return None, "查询内容不能为空"
-    if not ai_enabled():
+    if not (ai_enabled(user_api_key) if user_api_key else ai_enabled()):
         return None, "服务器尚未配置 DEEPSEEK_API_KEY"
     # 未登录用户受游客体验额度限制，不占个人每日 AI 配额。
-    if user_id is not None:
+    if user_id is not None and not user_api_key:
+        quota_error = free_ai_quota_reserve(db, user_id, "query", need=1)
+        if quota_error:
+            return None, quota_error
         quota_error = ai_quota_reserve(db, user_id, need=1)
         if quota_error:
             return None, quota_error
-    else:
+    elif user_id is None:
         quota_error = guest_ai_quota_reserve(db, need=1)
         if quota_error:
             return None, quota_error
     try:
-        client = _new_ai_client()
+        client = _new_ai_client(user_api_key) if user_api_key else _new_ai_client()
         messages = [
             {"role": "system", "content": _STREAMLIT_QUICK_LOOKUP_PROMPT},
             {
@@ -1632,13 +1764,16 @@ def quick_lookup(
             },
         ]
         response = _chat_completion(
-            client, model=_active_model(), temperature=0.15, messages=messages
+            client,
+            model=_active_model(user_api_key),
+            temperature=0.15,
+            messages=messages,
         )
         content = str(response.choices[0].message.content or "").replace("*", "")
         if _looks_like_missing_lookup_input(content):
             response = _chat_completion(
                 client,
-                model=_active_model(),
+                model=_active_model(user_api_key),
                 temperature=0.1,
                 messages=[
                     messages[0],
@@ -1656,7 +1791,7 @@ def quick_lookup(
         if not content.strip():
             if user_id is None:
                 guest_ai_quota_refund(db)
-            return None, f"{_active_model()} 没有返回内容，请重新查询"
+            return None, f"{_active_model(user_api_key)} 没有返回内容，请重新查询"
         headword = _extract_lookup_headword(content)
         if not headword or headword.startswith(("🌱", "【")):
             headword = normalized
@@ -1689,7 +1824,10 @@ def _extract_lookup_headword(raw_content: str) -> str:
 
 
 def answer_question(
-    db: Session, user_id: int | None, question: str
+    db: Session,
+    user_id: int | None,
+    question: str,
+    user_api_key: str | None = None,
 ) -> tuple[str | None, str | None]:
     """回答英语学习问题（移植自 Streamlit 完整版 prompt）。"""
     normalized = " ".join(str(question or "").split()).strip()
@@ -1697,22 +1835,25 @@ def answer_question(
         return None, "问题不能为空"
     if len(normalized) > 2000:
         return None, "问题过长"
-    if not ai_enabled():
+    if not (ai_enabled(user_api_key) if user_api_key else ai_enabled()):
         return None, "服务器尚未配置 DEEPSEEK_API_KEY"
     # 未登录用户受游客体验额度限制，不占个人每日 AI 配额。
-    if user_id is not None:
+    if user_id is not None and not user_api_key:
+        quota_error = free_ai_quota_reserve(db, user_id, "query", need=1)
+        if quota_error:
+            return None, quota_error
         quota_error = ai_quota_reserve(db, user_id, need=1)
         if quota_error:
             return None, quota_error
-    else:
+    elif user_id is None:
         quota_error = guest_ai_quota_reserve(db, need=1)
         if quota_error:
             return None, quota_error
     try:
-        client = _new_ai_client()
+        client = _new_ai_client(user_api_key) if user_api_key else _new_ai_client()
         response = _chat_completion(
             client,
-            model=_active_model(),
+            model=_active_model(user_api_key),
             temperature=0.3,
             messages=[
                 {"role": "system", "content": _STREAMLIT_QUESTION_PROMPT},
@@ -1723,7 +1864,7 @@ def answer_question(
         if not content:
             if user_id is None:
                 guest_ai_quota_refund(db)
-            return None, f"{_active_model()} 没有返回内容，请重新提问"
+            return None, f"{_active_model(user_api_key)} 没有返回内容，请重新提问"
         db.commit()
         return content[:10_000], None
     except Exception as exc:

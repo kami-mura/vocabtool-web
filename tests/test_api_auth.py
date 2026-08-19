@@ -20,6 +20,8 @@ def test_landing_js_bundle_is_served(client):
     assert "text/javascript" in response.headers["content-type"]
     assert "function renderRealReview" in response.text
     assert "if (realReviewQueue.length === 0) renderRealReview();" in response.text
+    assert 'fetch("/api/ai-credentials/deepseek"' in response.text
+    assert 'accountApiKeyInput.value = "";' in response.text
     assert "})();" in response.text
 
 
@@ -76,6 +78,67 @@ def test_home_page_has_guest_search_demo_and_login_link(client):
     assert "体验 AI 短文" in page.text
 
 
+def test_deepseek_key_is_encrypted_never_returned_and_user_isolated(client, monkeypatch):
+    from app.models import UserApiCredential
+
+    monkeypatch.setattr(config, "API_KEY_ENCRYPTION_SECRET", "test-encryption-secret")
+    api_key = "sk-test-user-secret-1234567890"
+    register(client, "key-owner@example.com")
+
+    saved = client.put(
+        "/api/ai-credentials/deepseek",
+        json={"api_key": api_key},
+    )
+    assert saved.status_code == 200, saved.text
+    assert api_key not in saved.text
+    assert saved.json() == {
+        "ok": True,
+        "configured": True,
+        "provider": "deepseek",
+        "key_hint": "7890",
+    }
+
+    status = client.get("/api/ai-credentials/deepseek")
+    assert status.status_code == 200
+    assert api_key not in status.text
+    assert status.json()["configured"] is True
+    assert "encrypted_key" not in status.json()
+
+    db = SessionLocal()
+    try:
+        owner = db.query(User).filter(User.email == "key-owner@example.com").one()
+        credential = db.get(UserApiCredential, owner.id)
+        assert credential is not None
+        assert api_key not in credential.encrypted_key
+        assert credential.encrypted_key != api_key
+    finally:
+        db.close()
+
+    client.post("/api/logout")
+    register(client, "other-key-user@example.com")
+    other_status = client.get("/api/ai-credentials/deepseek").json()
+    assert other_status == {
+        "configured": False,
+        "provider": "deepseek",
+        "key_hint": "",
+    }
+
+
+def test_deepseek_key_can_be_deleted_without_returning_plaintext(client, monkeypatch):
+    monkeypatch.setattr(config, "API_KEY_ENCRYPTION_SECRET", "test-encryption-secret")
+    register(client, "delete-key@example.com")
+    api_key = "sk-delete-this-secret-12345678"
+    assert client.put(
+        "/api/ai-credentials/deepseek", json={"api_key": api_key}
+    ).status_code == 200
+
+    deleted = client.delete("/api/ai-credentials/deepseek")
+    assert deleted.status_code == 200
+    assert api_key not in deleted.text
+    assert deleted.json()["configured"] is False
+    assert client.get("/api/ai-credentials/deepseek").json()["configured"] is False
+
+
 def test_theme_is_applied_before_stylesheets_on_home_and_login(client):
     """主题必须在首帧前生效：theme-head.js 先于样式表加载，且页面不能依赖
     内联脚本（CSP script-src 'self' 会拦截内联脚本，夜间模式刷新会闪日间模式）。"""
@@ -113,6 +176,8 @@ def test_home_page_stays_guest_like_when_logged_in(client):
     assert '<form id="landing-search-form"' in page.text
     assert 'landing-hint' not in page.text
     assert 'id="account-menu-panel"' in page.text
+    assert 'id="account-api-key-input" type="password"' in page.text
+    assert "保存后不再显示明文" in page.text
     assert 'data-mobile-view="cards"' in page.text
     assert 'id="guest-demo-cards" hidden' in page.text
     assert 'id="real-review"' in page.text and 'id="real-review" hidden' not in page.text

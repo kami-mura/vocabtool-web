@@ -425,6 +425,153 @@ def test_ai_quota_reserve_is_atomic_across_calls(monkeypatch):
         db.close()
 
 
+def test_free_ai_query_and_card_quotas_are_separate_and_atomic(monkeypatch):
+    from app.db import SessionLocal
+    from app.models import AiFreeDailyQuota, User
+
+    monkeypatch.setattr(config, "AI_FREE_DAILY_QUERY_LIMIT", 2)
+    monkeypatch.setattr(config, "AI_FREE_DAILY_CARD_LIMIT", 3)
+    db = SessionLocal()
+    try:
+        user = User(email="free-quota@example.com", password_hash="x", salt="y")
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+        assert ai.free_ai_quota_reserve(db, user.id, "query") is None
+        assert ai.free_ai_quota_reserve(db, user.id, "query") is None
+        assert "免费 AI 查询额度" in ai.free_ai_quota_reserve(
+            db, user.id, "query"
+        )
+        assert ai.free_ai_quota_reserve(db, user.id, "card", need=3) is None
+        assert "免费制卡额度" in ai.free_ai_quota_reserve(
+            db, user.id, "card"
+        )
+
+        row = db.query(AiFreeDailyQuota).filter_by(user_id=user.id).one()
+        assert row.query_count == 2
+        assert row.card_count == 3
+
+        monkeypatch.setattr(ai, "_quota_day", lambda: "2099-01-02")
+        assert ai.free_ai_quota_reserve(db, user.id, "query") is None
+        assert (
+            db.query(AiFreeDailyQuota).filter_by(user_id=user.id).count() == 2
+        )
+    finally:
+        db.close()
+
+
+def test_own_api_key_bypasses_free_query_quota(monkeypatch):
+    from app.db import SessionLocal
+    from app.models import AiFreeDailyQuota, User
+
+    monkeypatch.setattr(config, "AI_FREE_DAILY_QUERY_LIMIT", 1)
+    monkeypatch.setattr(ai, "_new_ai_client", lambda *_args: object())
+    monkeypatch.setattr(
+        ai,
+        "_chat_completion",
+        lambda *_args, **_kwargs: _fake_chat_response(
+            "【释义】\n竞技场\n\n【底层逻辑】\n沙地舞台。\n\n"
+            "【🌱 Etymology 词源史诗】\n来自拉丁语 harena。"
+        ),
+    )
+    db = SessionLocal()
+    try:
+        user = User(email="own-key-query@example.com", password_hash="x", salt="y")
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        for _ in range(2):
+            result, error = ai.quick_lookup(
+                db, user.id, "arena", "sk-own-key-1234567890"
+            )
+            assert result and error is None
+        assert (
+            db.query(AiFreeDailyQuota).filter_by(user_id=user.id).first() is None
+        )
+    finally:
+        db.close()
+
+
+def test_platform_query_stops_at_free_daily_limit(monkeypatch):
+    from app.db import SessionLocal
+    from app.models import User
+
+    monkeypatch.setattr(config, "AI_FREE_DAILY_QUERY_LIMIT", 1)
+    monkeypatch.setattr(config, "AI_DAILY_REQUEST_LIMIT", 0)
+    monkeypatch.setattr(ai, "ai_enabled", lambda *_args: True)
+    monkeypatch.setattr(ai, "_new_ai_client", lambda *_args: object())
+    monkeypatch.setattr(
+        ai,
+        "_chat_completion",
+        lambda *_args, **_kwargs: _fake_chat_response(
+            "【释义】\n竞技场\n\n【底层逻辑】\n沙地舞台。\n\n"
+            "【🌱 Etymology 词源史诗】\n来自拉丁语 harena。"
+        ),
+    )
+    db = SessionLocal()
+    try:
+        user = User(email="platform-query@example.com", password_hash="x", salt="y")
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        result, error = ai.quick_lookup(db, user.id, "arena")
+        assert result and error is None
+        blocked, error = ai.quick_lookup(db, user.id, "arena")
+        assert blocked is None
+        assert "免费 AI 查询额度" in error
+    finally:
+        db.close()
+
+
+def test_card_generation_reserves_card_count_and_own_key_bypasses_it(monkeypatch):
+    from app.db import SessionLocal
+    from app.models import AiFreeDailyQuota, User
+
+    monkeypatch.setattr(config, "AI_FREE_DAILY_CARD_LIMIT", 2)
+    monkeypatch.setattr(config, "AI_DAILY_REQUEST_LIMIT", 0)
+    monkeypatch.setattr(ai, "ai_enabled", lambda *_args: True)
+    monkeypatch.setattr(ai, "_new_ai_client", lambda *_args: object())
+
+    def fake_cards(_client, words, _template):
+        rows = [
+            f"{word} ||| ||| n. | test meaning | 测试释义 ||| "
+            f"Readers remember {word} through this clear example sentence. ||| |||"
+            for word in words
+        ]
+        return "```text\n" + "\n".join(rows) + "\n```"
+
+    monkeypatch.setattr(ai, "_call_ai_card_batch", fake_cards)
+    db = SessionLocal()
+    try:
+        user = User(email="card-free-quota@example.com", password_hash="x", salt="y")
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+        results, errors, _, _ = ai.generate_card_content_in_batches(
+            db, user.id, ["alpha", "beta"]
+        )
+        assert len(results) == 2 and not errors
+        blocked, errors, request_count, _ = ai.generate_card_content_in_batches(
+            db, user.id, ["gamma"]
+        )
+        assert blocked == {} and request_count == 0
+        assert "免费制卡额度" in errors["gamma"]
+
+        own_results, own_errors, _, _ = ai.generate_card_content_in_batches(
+            db,
+            user.id,
+            ["gamma", "delta", "epsilon"],
+            user_api_key="sk-own-key-1234567890",
+        )
+        assert len(own_results) == 3 and not own_errors
+        row = db.query(AiFreeDailyQuota).filter_by(user_id=user.id).one()
+        assert row.card_count == 2
+    finally:
+        db.close()
+
+
 def test_guest_ai_quota_reserve_is_atomic_across_calls(monkeypatch):
     from app.db import SessionLocal
 

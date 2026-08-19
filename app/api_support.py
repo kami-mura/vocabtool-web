@@ -26,6 +26,7 @@ from starlette.requests import ClientDisconnect
 
 from . import ai as ai_mod
 from . import (
+    api_keys,
     builtin_lookup,
     card_builder,
     config,
@@ -78,6 +79,15 @@ def _require_user(db: Session, request: Request) -> User:
     if not user:
         raise HTTPException(status_code=401, detail="请先登录")
     return user
+
+
+def _user_deepseek_api_key(db: Session, user: User | None) -> str | None:
+    if user is None:
+        return None
+    try:
+        return api_keys.load_deepseek_key(db, user.id)
+    except api_keys.ApiKeyError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 def _corpus_or_404(db: Session, user: User, corpus_id: int) -> Corpus:

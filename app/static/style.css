@@ -1299,6 +1299,20 @@ button.landing-login-btn { border: none; cursor: pointer; }
 .account-menu-panel .account-email strong { color: var(--text); }
 .account-menu-panel .storage-usage { margin-top: 0; }
 .account-menu-panel button { width: 100%; }
+.account-api-key {
+  display: grid;
+  gap: 7px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.account-api-key label { color: var(--text); font-size: 13px; font-weight: 700; }
+.account-api-key input { width: 100%; padding: 9px 10px; font-size: 13px; }
+.account-api-key-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.account-api-key-status,
+.account-api-key-note { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.45; }
+.account-api-key-status.ok { color: var(--success, #16845b); }
+.account-api-key-status.error { color: var(--danger, #d33); }
 .vocabulary-test-modal {
   position: fixed;
   inset: 0;
