@@ -63,7 +63,7 @@ from ..api_support import (
     vocab,
 )
 from ..db import SessionLocal, is_sqlite_busy_error, reserve_sqlite_write
-from ..models import AnkiReviewLog, SentenceRefreshPreference
+from ..models import AnkiReviewLog
 from ..schemas import (
     CardsBatchDeleteIn,
     CardStudioCreateIn,
@@ -75,7 +75,6 @@ from ..schemas import (
 )
 from ..sentence_refresh import (
     find_cards_for_manual_refresh,
-    find_due_cards,
     get_preference,
     refresh_cards,
     set_preference,
@@ -2189,6 +2188,18 @@ def review_cards_batch(
                 }
             )
     db.commit()
+    if errors:
+        # 批量评分单条失败整体仍返回 HTTP 200（前端按 errors 处理），
+        # 访问日志无法体现；这里显式记录，避免“评分失败”无从排查。
+        logger.warning(
+            "batch review partial errors user_id=%s count=%d errors=%s",
+            user.id,
+            len(errors),
+            [
+                {"card_id": e["card_id"], "status": e["status"], "detail": e["detail"]}
+                for e in errors
+            ],
+        )
     return {
         "ok": True,
         "cards": results,

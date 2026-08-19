@@ -1286,9 +1286,20 @@
   async function loadRealReview(preserveOnError = false, preferredHeadId = null) {
     const loadVersion = realReviewQueueVersion;
     try {
-      const res = await fetch("/api/cards", {
-        headers: { "Content-Type": "application/json" },
-      });
+      // 队列加载必须有超时：评分链上可能 await 本函数（如卡片不在本地队列、
+      // 409 后重拉对齐），若 /api/cards 挂起会让整条评分链无限等待，
+      // 后续所有评分点击都排队、看起来“点了没反应”。
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 15000);
+      let res;
+      try {
+        res = await fetch("/api/cards", {
+          headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timer);
+      }
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.detail || "加载失败");
       // 如果等待期间用户已经评分/撤回/加学，本地队列已更新，
@@ -1438,6 +1449,14 @@
 
   let reviewActionChain = Promise.resolve();
   const reviewRetryDelays = [250, 750];
+  // 评分链看门狗：当确有评分请求在途且已远超预期时长仍未完成时，
+  // 说明链被挂起的请求卡死（如网络黑洞、服务器无响应），此时不再
+  // 把新点击追加到队列尾部等待——直接丢弃旧链并重拉队列对齐，
+  // 保证评分按钮点击永远立即生效，而不是“点了没反应”。
+  const REVIEW_CHAIN_STALL_MS = 12000;
+  // 在途评分请求的最早开始时间；仅当 realReviewInFlight > 0 时有效。
+  // 基于在途任务而非“上次入队时间”判断，避免正常慢速评分被误判卡死。
+  let reviewChainBusySince = 0;
 
   function reviewErrorMessage(data, fallback) {
     if (data && typeof data.detail === "string") return data.detail;
@@ -1462,8 +1481,10 @@
       // 评分请求必须带超时：网络/服务器长时间无响应时主动失败，
       // 否则 reviewActionChain 串行链会被挂起请求永久卡住，
       // 之后所有评分点击都会排队、看起来“点了没反应”。
+      // 单次 8s：正常评分请求毫秒级返回，8s 足以覆盖慢网络；
+      // 超过即失败，配合幂等 action_id 自动重试，不无限等待。
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 15000);
+      const timer = setTimeout(() => controller.abort(), 8000);
       try {
         const res = await fetch("/api/cards/reviews/batch", {
           method: "POST",
@@ -1503,6 +1524,27 @@
     // 换成其他评分（如困难后改点认识）仍排队执行，避免点不动。
     if (heldReviewAction && heldReviewAction.id === id && heldReviewAction.rating === rating) {
       return;
+    }
+    // 评分链看门狗：当有评分请求在途且已远超预期时长（网络黑洞、
+    // 服务器长时间无响应），链已被挂起请求卡死，之后所有点击都会
+    // 排队“点了没反应”。此时不再把新点击追加到队列尾部，而是
+    // 丢弃旧链直接执行本次评分；旧请求会因服务端 revision 冲突
+    // 返回 409，由评分成功路径重拉队列对齐，不会重复计分。
+    const chainStallMs =
+      realReviewInFlight > 0 && reviewChainBusySince > 0
+        ? Date.now() - reviewChainBusySince
+        : 0;
+    if (chainStallMs > REVIEW_CHAIN_STALL_MS) {
+      const status = document.getElementById("real-undo-status");
+      if (status) {
+        status.textContent = "上次评分未响应，正在同步队列…";
+        clearTimeout(realUndoStatusTimer);
+        realUndoStatusTimer = setTimeout(() => {
+          status.textContent = "";
+        }, 6000);
+      }
+      reviewActionChain = Promise.resolve();
+      loadRealReview(true);
     }
     // 连续点击时串行处理：先完成上一次评分，再处理下一次，
     // 避免多个响应乱序把已评过的卡重新顶回队首。
@@ -1545,6 +1587,9 @@
       const heldEl = document.querySelector("#real-review-cards .home-review-card");
       if (heldEl) heldEl.classList.remove("flipped");
     }
+    // 记录在途请求开始时间（首个在途请求）；看门狗据此判断链是否卡死。
+    // 任务完成时 realReviewInFlight 归零，下次新任务重新计时。
+    if (realReviewInFlight === 0) reviewChainBusySince = Date.now();
     realReviewInFlight += 1;
     realReviewQueueVersion += 1;
     try {
@@ -1660,6 +1705,11 @@
     }
     finally {
       realReviewInFlight -= 1;
+      // 在途请求全部结束时清除看门狗计时，下次评分重新开始。
+      if (realReviewInFlight <= 0) {
+        realReviewInFlight = 0;
+        reviewChainBusySince = 0;
+      }
       heldReviewAction = null;
       // 最后一张卡毕业时，成功路径渲染发生在 in-flight 归零之前，
       // “今日完成”会被暂时压住；归零后补一次空队列渲染。

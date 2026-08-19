@@ -627,6 +627,19 @@ button.landing-login-btn { border: none; cursor: pointer; }
 }
 .demo-card.flipped .demo-card-face.front { pointer-events: none; }
 .demo-card.flipped .demo-card-face.back { pointer-events: auto; }
+/* 复习卡统一瞬时换面（电脑/手机一致）：3D 翻面过渡期间，按钮虽已可见
+   但浏览器的命中层仍可能停在正面/卡片容器，快速点评分只会把卡片翻回去
+   或点不中。改为 transform/display 瞬时切换后，评分按钮一出现就能收到
+   点击，从根上消灭“评分点了没反应”。演示卡等其他 .demo-card 不受影响。 */
+#real-review .home-review-cards .demo-card-inner,
+#real-review .home-review-cards .demo-card.flipped .demo-card-inner {
+  transform: none;
+  transition: none;
+}
+#real-review .home-review-cards .demo-card-face { transform: none; }
+#real-review .home-review-cards .demo-card-face.back { display: none; }
+#real-review .home-review-cards .demo-card.flipped .demo-card-face.front { display: none; }
+#real-review .home-review-cards .demo-card.flipped .demo-card-face.back { display: flex; }
 /* 复习卡内容过长时在卡内滚动，评分区保持可见，不溢出到卡片外 */
 #real-review .home-review-cards .demo-card-face.front {
   overflow-y: auto;
@@ -3148,18 +3161,7 @@ button.ghost.small {
   /* 手机端无翻转按钮：点击卡片本身翻面 */
   #real-review .home-review-cards .demo-flip { display: none; }
   #real-review .home-review-cards .demo-card { cursor: pointer; }
-  /* 3D 翻面过渡期间，按钮虽已可见但浏览器的触摸命中层仍可能停在
-     正面/卡片容器，快速点评分只会把卡片翻回去。手机端改为瞬时换面，
-     保证评分按钮一出现就能收到触摸。 */
-  #real-review .home-review-cards .demo-card-inner,
-  #real-review .home-review-cards .demo-card.flipped .demo-card-inner {
-    transform: none;
-    transition: none;
-  }
-  #real-review .home-review-cards .demo-card-face { transform: none; }
-  #real-review .home-review-cards .demo-card-face.back { display: none; }
-  #real-review .home-review-cards .demo-card.flipped .demo-card-face.front { display: none; }
-  #real-review .home-review-cards .demo-card.flipped .demo-card-face.back { display: flex; }
+  /* 瞬时换面规则已提升为全局（见 .demo-card 定义处），电脑/手机行为一致 */
   /* 手机端卡片管理菜单：屏幕底部弹层，避免从按钮向左溢出被裁掉 */
   #real-review-manage-toggle { width: 100%; justify-content: center; }
   .review-manage-menu {
