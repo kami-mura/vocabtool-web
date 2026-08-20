@@ -38,11 +38,15 @@ assert.ok(source.includes("dictation-user-tag"), "包含用户输入对比tag");
 assert.ok(source.includes("dictation-sentence-wrap"), "包含阅读卡风格例句");
 assert.ok(!source.includes("dictation-sentence-row"), "例句不再单独有框");
 
-// 6. 海报使用 VocabTool 品牌，包含50/50双语格言与打卡数据
+// 6. 海报使用 VocabTool 品牌，包含日间文言格言与4项核心打卡数据
 assert.ok(source.includes('ctx.fillText("VocabTool"'), "海报品牌名使用 VocabTool");
 assert.ok(source.includes("VocabTool-打卡海报-"), "海报下载文件名为 VocabTool");
 assert.ok(source.includes("REAL_FAMOUS_QUOTES"), "海报使用真实名人格言库");
 assert.ok(source.includes("getRandomPosterQuote"), "海报随机抽取名言");
+assert.ok(source.includes("学而时习之，不亦说乎？"), "包含孔子论语文言文原句");
+assert.ok(source.includes("温故而知新，可以为师矣。"), "包含温故而知新原文");
+assert.ok(source.includes("splitEnglishIntoLines"), "包含英文自适应折行防溢出引擎");
+assert.ok(source.includes("splitCjkIntoLines"), "包含中文自适应折行防溢出引擎");
 assert.ok(!source.includes("recent112"), "海报不再绘制热力图");
 
 console.log("dictation frontend checks passed");
