@@ -48,9 +48,10 @@ assert.ok(source.includes("温故而知新，可以为师矣。"), "包含温故
 assert.ok(source.includes("splitEnglishIntoLines"), "包含英文自适应折行防溢出引擎");
 assert.ok(source.includes("splitCjkIntoLines"), "包含中文自适应折行防溢出引擎");
 assert.ok(source.includes("drawLogoV"), "包含经典V字品牌Logo");
-assert.ok(source.includes("vocabtool.com"), "包含底部网站 vocabtool.com");
-assert.ok(source.includes("POSTER_BG_THEMES"), "包含多套自然背景主题库");
-assert.ok(source.includes("study-poster-switch-theme"), "包含单独切换背景主题按钮");
+assert.ok(source.includes("POSTER_COLOR_THEMES"), "包含多套色彩主题库");
+assert.ok(source.includes("POSTER_PATTERNS"), "包含多套艺术图案库");
+assert.ok(source.includes("study-poster-switch-theme"), "包含单独切换色彩主题按钮");
+assert.ok(source.includes("study-poster-switch-pattern"), "包含单独切换背景图案按钮");
 assert.ok(!source.includes("recent112"), "海报不再绘制热力图");
 
 console.log("dictation frontend checks passed");

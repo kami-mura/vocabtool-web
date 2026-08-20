@@ -2023,7 +2023,8 @@
     }
   ];
 
-  const POSTER_BG_THEMES = [
+  // 色彩主题库（6 套高质感渐变与光晕色调）
+  const POSTER_COLOR_THEMES = [
     {
       name: "晨曦晴空",
       bgStops: [
@@ -2034,11 +2035,10 @@
         [1, "#dceafd"]
       ],
       sun: { x: 0.82, y: 280, color0: "rgba(251, 191, 36, 0.45)", color1: "rgba(245, 158, 11, 0.16)" },
-      mountains: [
-        { fill: "rgba(186, 215, 252, 0.55)", y0: 1100, peaks: [[180, 930], [380, 1030], [620, 870], [860, 1010], [1080, 890]] },
-        { fill: "rgba(147, 197, 253, 0.4)", y0: 1220, peaks: [[260, 1070], [520, 1160], [760, 1040], [1080, 1130]] }
-      ],
-      birdColor: "rgba(37, 99, 235, 0.65)"
+      accentColor: "#007AFF",
+      artFill1: "rgba(186, 215, 252, 0.55)",
+      artFill2: "rgba(147, 197, 253, 0.4)",
+      artStroke: "rgba(37, 99, 235, 0.65)"
     },
     {
       name: "晚霞落日",
@@ -2050,11 +2050,10 @@
         [1, "#e0e7ff"]
       ],
       sun: { x: 0.85, y: 320, color0: "rgba(249, 115, 22, 0.42)", color1: "rgba(244, 63, 94, 0.18)" },
-      mountains: [
-        { fill: "rgba(203, 213, 225, 0.6)", y0: 1080, peaks: [[200, 910], [420, 1010], [650, 880], [880, 990], [1080, 890]] },
-        { fill: "rgba(196, 181, 253, 0.45)", y0: 1200, peaks: [[280, 1060], [540, 1150], [780, 1030], [1080, 1120]] }
-      ],
-      birdColor: "rgba(194, 65, 12, 0.65)"
+      accentColor: "#ea580c",
+      artFill1: "rgba(203, 213, 225, 0.6)",
+      artFill2: "rgba(196, 181, 253, 0.45)",
+      artStroke: "rgba(194, 65, 12, 0.65)"
     },
     {
       name: "青山晨雾",
@@ -2066,14 +2065,13 @@
         [1, "#e0f2fe"]
       ],
       sun: { x: 0.8, y: 270, color0: "rgba(52, 211, 153, 0.4)", color1: "rgba(16, 185, 129, 0.15)" },
-      mountains: [
-        { fill: "rgba(167, 243, 208, 0.55)", y0: 1100, peaks: [[190, 920], [400, 1020], [640, 860], [870, 1000], [1080, 880]] },
-        { fill: "rgba(110, 231, 183, 0.4)", y0: 1210, peaks: [[250, 1060], [510, 1150], [750, 1030], [1080, 1120]] }
-      ],
-      birdColor: "rgba(5, 150, 105, 0.65)"
+      accentColor: "#059669",
+      artFill1: "rgba(167, 243, 208, 0.55)",
+      artFill2: "rgba(110, 231, 183, 0.4)",
+      artStroke: "rgba(5, 150, 105, 0.65)"
     },
     {
-      name: "浩瀚海天",
+      name: "深邃浩瀚",
       bgStops: [
         [0, "#f8fafc"],
         [0.25, "#e0f2fe"],
@@ -2082,16 +2080,266 @@
         [1, "#ddd6fe"]
       ],
       sun: { x: 0.83, y: 290, color0: "rgba(56, 189, 248, 0.45)", color1: "rgba(14, 165, 233, 0.18)" },
-      mountains: [
-        { fill: "rgba(186, 230, 253, 0.6)", y0: 1090, peaks: [[180, 930], [390, 1040], [630, 870], [850, 1010], [1080, 900]] },
-        { fill: "rgba(165, 180, 252, 0.45)", y0: 1210, peaks: [[270, 1070], [530, 1160], [770, 1040], [1080, 1130]] }
+      accentColor: "#0284c7",
+      artFill1: "rgba(186, 230, 253, 0.6)",
+      artFill2: "rgba(165, 180, 252, 0.45)",
+      artStroke: "rgba(3, 105, 161, 0.65)"
+    },
+    {
+      name: "暮紫星辉",
+      bgStops: [
+        [0, "#faf5ff"],
+        [0.25, "#f3e8ff"],
+        [0.55, "#fdf4ff"],
+        [0.8, "#fce7f3"],
+        [1, "#fed7aa"]
       ],
-      birdColor: "rgba(3, 105, 161, 0.65)"
+      sun: { x: 0.82, y: 280, color0: "rgba(168, 85, 247, 0.35)", color1: "rgba(236, 72, 153, 0.15)" },
+      accentColor: "#7c3aed",
+      artFill1: "rgba(216, 180, 254, 0.55)",
+      artFill2: "rgba(244, 114, 182, 0.35)",
+      artStroke: "rgba(124, 58, 237, 0.65)"
+    },
+    {
+      name: "极简雅白",
+      bgStops: [
+        [0, "#ffffff"],
+        [0.3, "#f8fafc"],
+        [0.65, "#f1f5f9"],
+        [0.85, "#e2e8f0"],
+        [1, "#cbd5e1"]
+      ],
+      sun: { x: 0.85, y: 260, color0: "rgba(148, 163, 184, 0.35)", color1: "rgba(203, 213, 225, 0.15)" },
+      accentColor: "#475569",
+      artFill1: "rgba(203, 213, 225, 0.55)",
+      artFill2: "rgba(148, 163, 184, 0.35)",
+      artStroke: "rgba(71, 85, 105, 0.65)"
+    }
+  ];
+
+  // 艺术图案库（6 种不同意境的矢量艺术构图）
+  const POSTER_PATTERNS = [
+    {
+      id: "mountains",
+      name: "俊秀重峦",
+      draw: (ctx, theme, W, H) => {
+        // 远景雪山群峰
+        ctx.fillStyle = theme.artFill1;
+        ctx.beginPath();
+        ctx.moveTo(0, H);
+        ctx.lineTo(0, 1100);
+        ctx.lineTo(180, 930);
+        ctx.lineTo(380, 1030);
+        ctx.lineTo(620, 870);
+        ctx.lineTo(860, 1010);
+        ctx.lineTo(W, 890);
+        ctx.lineTo(W, H);
+        ctx.closePath();
+        ctx.fill();
+
+        // 中景山峦
+        ctx.fillStyle = theme.artFill2;
+        ctx.beginPath();
+        ctx.moveTo(0, H);
+        ctx.lineTo(0, 1220);
+        ctx.lineTo(260, 1070);
+        ctx.lineTo(520, 1160);
+        ctx.lineTo(760, 1040);
+        ctx.lineTo(W, 1130);
+        ctx.lineTo(W, H);
+        ctx.closePath();
+        ctx.fill();
+
+        // 灵动飞鸟
+        ctx.strokeStyle = theme.artStroke;
+        ctx.lineWidth = 3;
+        const birds = [[190, 260], [240, 240], [290, 265], [780, 500], [830, 480]];
+        birds.forEach(([bx, by]) => {
+          ctx.beginPath();
+          ctx.arc(bx - 12, by, 12, Math.PI, 0, false);
+          ctx.arc(bx + 12, by, 12, Math.PI, 0, false);
+          ctx.stroke();
+        });
+      }
+    },
+    {
+      id: "waves",
+      name: "浩瀚层波",
+      draw: (ctx, theme, W, H) => {
+        // 远景层叠波浪
+        ctx.fillStyle = theme.artFill1;
+        ctx.beginPath();
+        ctx.moveTo(0, H);
+        ctx.lineTo(0, 1020);
+        ctx.bezierCurveTo(240, 960, 360, 1080, 600, 1000);
+        ctx.bezierCurveTo(800, 920, 950, 1060, W, 980);
+        ctx.lineTo(W, H);
+        ctx.closePath();
+        ctx.fill();
+
+        // 近景波浪
+        ctx.fillStyle = theme.artFill2;
+        ctx.beginPath();
+        ctx.moveTo(0, H);
+        ctx.lineTo(0, 1140);
+        ctx.bezierCurveTo(200, 1220, 450, 1080, 700, 1180);
+        ctx.bezierCurveTo(880, 1250, 980, 1120, W, 1160);
+        ctx.lineTo(W, H);
+        ctx.closePath();
+        ctx.fill();
+
+        // 海天飞鸥
+        ctx.strokeStyle = theme.artStroke;
+        ctx.lineWidth = 3.2;
+        const gulls = [[210, 270], [260, 250], [750, 470], [800, 450], [850, 475]];
+        gulls.forEach(([gx, gy]) => {
+          ctx.beginPath();
+          ctx.arc(gx - 14, gy, 14, Math.PI, 0, false);
+          ctx.arc(gx + 14, gy, 14, Math.PI, 0, false);
+          ctx.stroke();
+        });
+      }
+    },
+    {
+      id: "forest_hills",
+      name: "苍翠群丘",
+      draw: (ctx, theme, W, H) => {
+        // 远景柔和丘陵
+        ctx.fillStyle = theme.artFill1;
+        ctx.beginPath();
+        ctx.moveTo(0, H);
+        ctx.lineTo(0, 1060);
+        ctx.quadraticCurveTo(300, 920, 600, 1040);
+        ctx.quadraticCurveTo(850, 1120, W, 960);
+        ctx.lineTo(W, H);
+        ctx.closePath();
+        ctx.fill();
+
+        // 近景丘陵
+        ctx.fillStyle = theme.artFill2;
+        ctx.beginPath();
+        ctx.moveTo(0, H);
+        ctx.lineTo(0, 1200);
+        ctx.quadraticCurveTo(350, 1080, 720, 1180);
+        ctx.quadraticCurveTo(900, 1240, W, 1120);
+        ctx.lineTo(W, H);
+        ctx.closePath();
+        ctx.fill();
+
+        // 飞鸟剪影
+        ctx.strokeStyle = theme.artStroke;
+        ctx.lineWidth = 3;
+        const birds = [[180, 250], [230, 230], [780, 480], [830, 460]];
+        birds.forEach(([bx, by]) => {
+          ctx.beginPath();
+          ctx.arc(bx - 12, by, 12, Math.PI, 0, false);
+          ctx.arc(bx + 12, by, 12, Math.PI, 0, false);
+          ctx.stroke();
+        });
+      }
+    },
+    {
+      id: "geometric_flow",
+      name: "几何光流",
+      draw: (ctx, theme, W, H) => {
+        // 科技流光环与同心流线
+        ctx.save();
+        ctx.strokeStyle = theme.artFill1;
+        ctx.lineWidth = 48;
+        ctx.beginPath();
+        ctx.arc(W / 2, 1150, 420, Math.PI * 0.9, Math.PI * 2.1, false);
+        ctx.stroke();
+
+        ctx.strokeStyle = theme.artFill2;
+        ctx.lineWidth = 28;
+        ctx.beginPath();
+        ctx.arc(W / 2, 1150, 320, Math.PI * 0.85, Math.PI * 2.15, false);
+        ctx.stroke();
+
+        ctx.strokeStyle = theme.artStroke;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(W / 2, 1150, 520, Math.PI * 0.95, Math.PI * 2.05, false);
+        ctx.stroke();
+
+        // 空间光点
+        const points = [[180, 260], [240, 290], [820, 460], [870, 500], [540, 720]];
+        points.forEach(([px, py]) => {
+          ctx.fillStyle = theme.artStroke;
+          ctx.beginPath();
+          ctx.arc(px, py, 4, 0, Math.PI * 2);
+          ctx.fill();
+        });
+        ctx.restore();
+      }
+    },
+    {
+      id: "celestial_orbits",
+      name: "璀璨星轨",
+      draw: (ctx, theme, W, H) => {
+        ctx.save();
+        // 优雅天体星轨弧线
+        ctx.strokeStyle = theme.artFill1;
+        ctx.lineWidth = 2.5;
+        ctx.setLineDash([8, 8]);
+        ctx.beginPath();
+        ctx.arc(W * 0.85, 300, 650, Math.PI * 0.5, Math.PI * 1.2, false);
+        ctx.stroke();
+
+        ctx.strokeStyle = theme.artFill2;
+        ctx.lineWidth = 3.5;
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.arc(W * 0.85, 300, 850, Math.PI * 0.55, Math.PI * 1.15, false);
+        ctx.stroke();
+
+        // 璀璨四芒星
+        const stars = [[180, 260, 14], [250, 230, 9], [780, 480, 12], [840, 520, 8], [320, 400, 10]];
+        stars.forEach(([sx, sy, sr]) => {
+          ctx.fillStyle = theme.artStroke;
+          ctx.beginPath();
+          ctx.moveTo(sx, sy - sr);
+          ctx.quadraticCurveTo(sx, sy, sx + sr, sy);
+          ctx.quadraticCurveTo(sx, sy, sx, sy + sr);
+          ctx.quadraticCurveTo(sx, sy, sx - sr, sy);
+          ctx.quadraticCurveTo(sx, sy, sx, sy - sr);
+          ctx.closePath();
+          ctx.fill();
+        });
+        ctx.restore();
+      }
+    },
+    {
+      id: "minimal_horizon",
+      name: "纯净留白",
+      draw: (ctx, theme, W, H) => {
+        // 极简微弧地平线
+        ctx.save();
+        ctx.strokeStyle = theme.artFill1;
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(60, 1080);
+        ctx.quadraticCurveTo(W / 2, 1040, W - 60, 1080);
+        ctx.stroke();
+
+        // 高远双飞鸟
+        ctx.strokeStyle = theme.artStroke;
+        ctx.lineWidth = 3;
+        const birds = [[210, 250], [260, 230], [800, 480]];
+        birds.forEach(([bx, by]) => {
+          ctx.beginPath();
+          ctx.arc(bx - 12, by, 12, Math.PI, 0, false);
+          ctx.arc(bx + 12, by, 12, Math.PI, 0, false);
+          ctx.stroke();
+        });
+        ctx.restore();
+      }
     }
   ];
 
   let currentPosterQuote = null;
   let currentPosterThemeIdx = 0;
+  let currentPosterPatternIdx = 0;
 
   function getRandomPosterQuote() {
     const idx = Math.floor(Math.random() * REAL_FAMOUS_QUOTES.length);
@@ -2180,9 +2428,11 @@
     }
     const quote = currentPosterQuote;
 
-    // 1. 全画幅艺术风景大背景 (支持多套唯美主题动态流转)
-    const theme = POSTER_BG_THEMES[currentPosterThemeIdx % POSTER_BG_THEMES.length];
+    // 1. 全画幅艺术风景大背景 (独立色彩主题 + 独立艺术图案)
+    const theme = POSTER_COLOR_THEMES[currentPosterThemeIdx % POSTER_COLOR_THEMES.length];
+    const pattern = POSTER_PATTERNS[currentPosterPatternIdx % POSTER_PATTERNS.length];
 
+    // 绘制色彩渐变大底
     const bgGrad = ctx.createLinearGradient(0, 0, 0, H);
     theme.bgStops.forEach(([stop, color]) => {
       bgGrad.addColorStop(stop, color);
@@ -2190,7 +2440,7 @@
     ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, W, H);
 
-    // 阳光光晕
+    // 绘制阳光光晕
     const sunGrad = ctx.createRadialGradient(W * theme.sun.x, theme.sun.y, 50, W * theme.sun.x, theme.sun.y, 700);
     sunGrad.addColorStop(0, theme.sun.color0);
     sunGrad.addColorStop(0.4, theme.sun.color1);
@@ -2198,30 +2448,10 @@
     ctx.fillStyle = sunGrad;
     ctx.fillRect(0, 0, W, H);
 
-    // 层叠山峦群峰 (远景与中景)
-    theme.mountains.forEach((m) => {
-      ctx.fillStyle = m.fill;
-      ctx.beginPath();
-      ctx.moveTo(0, H);
-      ctx.lineTo(0, m.y0);
-      m.peaks.forEach(([px, py]) => {
-        ctx.lineTo(px, py);
-      });
-      ctx.lineTo(W, H);
-      ctx.closePath();
-      ctx.fill();
-    });
-
-    // 灵动飞鸟剪影
-    ctx.strokeStyle = theme.birdColor;
-    ctx.lineWidth = 3;
-    const birds = [[190, 260], [240, 240], [290, 265], [780, 500], [830, 480]];
-    birds.forEach(([bx, by]) => {
-      ctx.beginPath();
-      ctx.arc(bx - 12, by, 12, Math.PI, 0, false);
-      ctx.arc(bx + 12, by, 12, Math.PI, 0, false);
-      ctx.stroke();
-    });
+    // 绘制当前选中的独立艺术图案
+    if (pattern && typeof pattern.draw === "function") {
+      pattern.draw(ctx, theme, W, H);
+    }
 
     // 2. 顶部 Header (y: 65 ~ 140) - 极简小鱼 Logo + VocabTool，右边日期含英文星期
     const now = new Date();
@@ -2420,7 +2650,8 @@
     const modal = document.getElementById("study-poster-modal");
     if (!modal) return;
     currentPosterQuote = getRandomPosterQuote();
-    currentPosterThemeIdx = Math.floor(Math.random() * POSTER_BG_THEMES.length);
+    currentPosterThemeIdx = Math.floor(Math.random() * POSTER_COLOR_THEMES.length);
+    currentPosterPatternIdx = Math.floor(Math.random() * POSTER_PATTERNS.length);
     modal.hidden = false;
     const status = document.getElementById("study-poster-status");
     if (status) status.textContent = "";
@@ -2464,12 +2695,27 @@
     const switchThemeBtn = document.getElementById("study-poster-switch-theme");
     if (switchThemeBtn) {
       switchThemeBtn.addEventListener("click", () => {
-        currentPosterThemeIdx = (currentPosterThemeIdx + 1) % POSTER_BG_THEMES.length;
+        currentPosterThemeIdx = (currentPosterThemeIdx + 1) % POSTER_COLOR_THEMES.length;
         renderStudyPoster();
         const status = document.getElementById("study-poster-status");
         if (status) {
-          const theme = POSTER_BG_THEMES[currentPosterThemeIdx];
-          status.textContent = "🎨 已切换背景：" + theme.name;
+          const theme = POSTER_COLOR_THEMES[currentPosterThemeIdx];
+          status.textContent = "🎨 色彩主题：" + theme.name;
+          setTimeout(() => {
+            status.textContent = "";
+          }, 2000);
+        }
+      });
+    }
+    const switchPatternBtn = document.getElementById("study-poster-switch-pattern");
+    if (switchPatternBtn) {
+      switchPatternBtn.addEventListener("click", () => {
+        currentPosterPatternIdx = (currentPosterPatternIdx + 1) % POSTER_PATTERNS.length;
+        renderStudyPoster();
+        const status = document.getElementById("study-poster-status");
+        if (status) {
+          const pattern = POSTER_PATTERNS[currentPosterPatternIdx];
+          status.textContent = "🖼️ 背景图案：" + pattern.name;
           setTimeout(() => {
             status.textContent = "";
           }, 2000);
