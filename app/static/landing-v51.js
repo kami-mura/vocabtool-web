@@ -2023,7 +2023,75 @@
     }
   ];
 
+  const POSTER_BG_THEMES = [
+    {
+      name: "晨曦晴空",
+      bgStops: [
+        [0, "#f3f8fd"],
+        [0.25, "#e5f1fb"],
+        [0.55, "#fef6e4"],
+        [0.8, "#edf5fd"],
+        [1, "#dceafd"]
+      ],
+      sun: { x: 0.82, y: 280, color0: "rgba(251, 191, 36, 0.45)", color1: "rgba(245, 158, 11, 0.16)" },
+      mountains: [
+        { fill: "rgba(186, 215, 252, 0.55)", y0: 1100, peaks: [[180, 930], [380, 1030], [620, 870], [860, 1010], [1080, 890]] },
+        { fill: "rgba(147, 197, 253, 0.4)", y0: 1220, peaks: [[260, 1070], [520, 1160], [760, 1040], [1080, 1130]] }
+      ],
+      birdColor: "rgba(37, 99, 235, 0.65)"
+    },
+    {
+      name: "晚霞落日",
+      bgStops: [
+        [0, "#fff7ed"],
+        [0.28, "#fed7aa"],
+        [0.6, "#fce7f3"],
+        [0.82, "#ede9fe"],
+        [1, "#e0e7ff"]
+      ],
+      sun: { x: 0.85, y: 320, color0: "rgba(249, 115, 22, 0.42)", color1: "rgba(244, 63, 94, 0.18)" },
+      mountains: [
+        { fill: "rgba(203, 213, 225, 0.6)", y0: 1080, peaks: [[200, 910], [420, 1010], [650, 880], [880, 990], [1080, 890]] },
+        { fill: "rgba(196, 181, 253, 0.45)", y0: 1200, peaks: [[280, 1060], [540, 1150], [780, 1030], [1080, 1120]] }
+      ],
+      birdColor: "rgba(194, 65, 12, 0.65)"
+    },
+    {
+      name: "青山晨雾",
+      bgStops: [
+        [0, "#f0fdf4"],
+        [0.25, "#dcfce7"],
+        [0.55, "#ecfdf5"],
+        [0.8, "#f0fdfa"],
+        [1, "#e0f2fe"]
+      ],
+      sun: { x: 0.8, y: 270, color0: "rgba(52, 211, 153, 0.4)", color1: "rgba(16, 185, 129, 0.15)" },
+      mountains: [
+        { fill: "rgba(167, 243, 208, 0.55)", y0: 1100, peaks: [[190, 920], [400, 1020], [640, 860], [870, 1000], [1080, 880]] },
+        { fill: "rgba(110, 231, 183, 0.4)", y0: 1210, peaks: [[250, 1060], [510, 1150], [750, 1030], [1080, 1120]] }
+      ],
+      birdColor: "rgba(5, 150, 105, 0.65)"
+    },
+    {
+      name: "浩瀚海天",
+      bgStops: [
+        [0, "#f8fafc"],
+        [0.25, "#e0f2fe"],
+        [0.55, "#bae6fd"],
+        [0.8, "#c7d2fe"],
+        [1, "#ddd6fe"]
+      ],
+      sun: { x: 0.83, y: 290, color0: "rgba(56, 189, 248, 0.45)", color1: "rgba(14, 165, 233, 0.18)" },
+      mountains: [
+        { fill: "rgba(186, 230, 253, 0.6)", y0: 1090, peaks: [[180, 930], [390, 1040], [630, 870], [850, 1010], [1080, 900]] },
+        { fill: "rgba(165, 180, 252, 0.45)", y0: 1210, peaks: [[270, 1070], [530, 1160], [770, 1040], [1080, 1130]] }
+      ],
+      birdColor: "rgba(3, 105, 161, 0.65)"
+    }
+  ];
+
   let currentPosterQuote = null;
+  let currentPosterThemeIdx = 0;
 
   function getRandomPosterQuote() {
     const idx = Math.floor(Math.random() * REAL_FAMOUS_QUOTES.length);
@@ -2112,53 +2180,40 @@
     }
     const quote = currentPosterQuote;
 
-    // 1. 全画幅日间艺术风景大背景 (贯穿全画布 1080 × 1920，无边框、充分利用全画幅空间)
+    // 1. 全画幅艺术风景大背景 (支持多套唯美主题动态流转)
+    const theme = POSTER_BG_THEMES[currentPosterThemeIdx % POSTER_BG_THEMES.length];
+
     const bgGrad = ctx.createLinearGradient(0, 0, 0, H);
-    bgGrad.addColorStop(0, "#f3f8fd");
-    bgGrad.addColorStop(0.25, "#e5f1fb");
-    bgGrad.addColorStop(0.55, "#fef6e4");
-    bgGrad.addColorStop(0.8, "#edf5fd");
-    bgGrad.addColorStop(1, "#dceafd");
+    theme.bgStops.forEach(([stop, color]) => {
+      bgGrad.addColorStop(stop, color);
+    });
     ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, W, H);
 
-    // 晨曦金阳光晕
-    const sunGrad = ctx.createRadialGradient(W * 0.82, 280, 50, W * 0.82, 280, 700);
-    sunGrad.addColorStop(0, "rgba(251, 191, 36, 0.45)");
-    sunGrad.addColorStop(0.4, "rgba(245, 158, 11, 0.16)");
-    sunGrad.addColorStop(1, "rgba(254, 243, 199, 0)");
+    // 阳光光晕
+    const sunGrad = ctx.createRadialGradient(W * theme.sun.x, theme.sun.y, 50, W * theme.sun.x, theme.sun.y, 700);
+    sunGrad.addColorStop(0, theme.sun.color0);
+    sunGrad.addColorStop(0.4, theme.sun.color1);
+    sunGrad.addColorStop(1, "rgba(255, 255, 255, 0)");
     ctx.fillStyle = sunGrad;
     ctx.fillRect(0, 0, W, H);
 
-    // 远景水墨雪山群峰 (贯穿中下部)
-    ctx.fillStyle = "rgba(186, 215, 252, 0.55)";
-    ctx.beginPath();
-    ctx.moveTo(0, H);
-    ctx.lineTo(0, 1100);
-    ctx.lineTo(180, 930);
-    ctx.lineTo(380, 1030);
-    ctx.lineTo(620, 870);
-    ctx.lineTo(860, 1010);
-    ctx.lineTo(W, 890);
-    ctx.lineTo(W, H);
-    ctx.closePath();
-    ctx.fill();
-
-    // 中景俊秀山峦
-    ctx.fillStyle = "rgba(147, 197, 253, 0.4)";
-    ctx.beginPath();
-    ctx.moveTo(0, H);
-    ctx.lineTo(0, 1220);
-    ctx.lineTo(260, 1070);
-    ctx.lineTo(520, 1160);
-    ctx.lineTo(760, 1040);
-    ctx.lineTo(W, 1130);
-    ctx.lineTo(W, H);
-    ctx.closePath();
-    ctx.fill();
+    // 层叠山峦群峰 (远景与中景)
+    theme.mountains.forEach((m) => {
+      ctx.fillStyle = m.fill;
+      ctx.beginPath();
+      ctx.moveTo(0, H);
+      ctx.lineTo(0, m.y0);
+      m.peaks.forEach(([px, py]) => {
+        ctx.lineTo(px, py);
+      });
+      ctx.lineTo(W, H);
+      ctx.closePath();
+      ctx.fill();
+    });
 
     // 灵动飞鸟剪影
-    ctx.strokeStyle = "rgba(37, 99, 235, 0.65)";
+    ctx.strokeStyle = theme.birdColor;
     ctx.lineWidth = 3;
     const birds = [[190, 260], [240, 240], [290, 265], [780, 500], [830, 480]];
     birds.forEach(([bx, by]) => {
@@ -2306,11 +2361,11 @@
     const readingCenterY = 730 + (1770 - 730) / 2;
     let cursorY = readingCenterY - totalTextBlockH / 2;
 
-    // 居中成对双引号 (Logo 蓝)
+    // 居中双引号 (Logo 蓝经典大标引)
     ctx.textAlign = "center";
     ctx.fillStyle = "#007AFF";
-    ctx.font = "bold 96px Georgia, serif";
-    ctx.fillText("“  ”", W / 2, cursorY + 40);
+    ctx.font = "bold 92px Georgia, serif";
+    ctx.fillText("“", W / 2, cursorY + 40);
     cursorY += quoteMarkH + 20;
 
     // 英文名言 (经典直体人文衬线/刊物大字，典雅厚重)
@@ -2365,6 +2420,7 @@
     const modal = document.getElementById("study-poster-modal");
     if (!modal) return;
     currentPosterQuote = getRandomPosterQuote();
+    currentPosterThemeIdx = Math.floor(Math.random() * POSTER_BG_THEMES.length);
     modal.hidden = false;
     const status = document.getElementById("study-poster-status");
     if (status) status.textContent = "";
@@ -2395,6 +2451,7 @@
     if (refreshQuoteBtn) {
       refreshQuoteBtn.addEventListener("click", () => {
         currentPosterQuote = getRandomPosterQuote();
+        currentPosterThemeIdx = (currentPosterThemeIdx + 1) % POSTER_BG_THEMES.length;
         renderStudyPoster();
         const status = document.getElementById("study-poster-status");
         if (status) {
