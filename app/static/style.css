@@ -4448,8 +4448,9 @@ svg {
 }
 .dictation-meaning-box {
   color: var(--text);
-  font-size: 15px;
-  line-height: 1.5;
+  font-size: 17px;
+  line-height: 1.45;
+  font-weight: 600;
   max-width: 90%;
   margin: 4px 0 8px;
   padding: 6px 14px;
@@ -4475,7 +4476,7 @@ svg {
   border-radius: 12px;
   background: var(--bg);
   color: var(--text);
-  font-size: 16px;
+  font-size: 17px;
   font-family: inherit;
   outline: none;
   text-align: center;
@@ -4510,7 +4511,7 @@ svg {
   margin-bottom: 4px;
 }
 .dictation-word-row mark {
-  font-size: 22px;
+  font-size: 26px;
 }
 .dictation-word-row .demo-audio {
   margin-top: 0;
@@ -4522,7 +4523,7 @@ svg {
   gap: 2px;
   padding: 2px 8px;
   border-radius: 6px;
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1.4;
   vertical-align: middle;
 }
@@ -4534,7 +4535,7 @@ svg {
 .dictation-user-tag.is-empty {
   background: rgba(156, 163, 175, 0.12);
   color: var(--muted);
-  font-size: 14px;
+  font-size: 15px;
 }
 .dictation-user-tag.is-wrong {
   background: rgba(239, 68, 68, 0.1);
@@ -4543,12 +4544,12 @@ svg {
 }
 .dictation-user-tag .diff-prefix {
   color: var(--muted);
-  font-size: 14px;
+  font-size: 15px;
 }
 .dictation-user-tag .diff-char {
   display: inline-block;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 700;
   padding: 0 1px;
 }
@@ -4570,8 +4571,9 @@ svg {
 }
 .dictation-meaning-text,
 .dictation-meaning-text p {
-  font-size: 15px !important;
-  line-height: 1.5;
+  font-size: 17px !important;
+  font-weight: 700;
+  line-height: 1.45;
   color: var(--text);
   margin: 4px 0 2px;
   text-align: center;
@@ -4584,10 +4586,10 @@ svg {
 .dictation-sentence-text,
 .dictation-sentence-wrap p {
   margin: 0;
-  font-size: 15px !important;
-  font-weight: 500;
-  color: var(--muted);
-  line-height: 1.5;
+  font-size: 17px !important;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.45;
 }
 .dictation-sentence-text mark,
 .dictation-sentence-wrap mark {
