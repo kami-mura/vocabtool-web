@@ -239,6 +239,47 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
             or 0
         )
 
+    # 学习热力图：起始日 = max(今天-364, 注册日)，按站点时区统计每日新学/复习去重卡数。
+    year_start_day = dt.date.fromisoformat(learning_day) - dt.timedelta(days=364)
+    heat_start_day = year_start_day
+    if user.created_at is not None:
+        registered_day, _registered_start, _registered_end = _learning_day(
+            user.created_at
+        )
+        registered_date = dt.date.fromisoformat(registered_day)
+        if registered_date > year_start_day:
+            heat_start_day = registered_date
+    today_day = dt.date.fromisoformat(learning_day)
+    heatmap_days = []
+    for offset in range((today_day - heat_start_day).days + 1):
+        day = (heat_start_day + dt.timedelta(days=offset)).isoformat()
+        heatmap_days.append(
+            {"date": day, "total": 0, "new_count": 0, "review_count": 0}
+        )
+    heatmap_index = {d["date"]: d for d in heatmap_days}
+    heat_rows = (
+        db.query(ReviewLog.reviewed_at, ReviewLog.card_id, ReviewLog.is_new)
+        .filter(
+            ReviewLog.user_id == user.id,
+            ReviewLog.reviewed_at >= start_of_today - dt.timedelta(days=365),
+        )
+        .all()
+    )
+    heat_new: dict[str, set[int]] = {}
+    heat_review: dict[str, set[int]] = {}
+    for reviewed_at, card_id, is_new in heat_rows:
+        day, _day_start, _day_end = _learning_day(reviewed_at)
+        if day not in heatmap_index:
+            continue
+        bucket = heat_new if is_new else heat_review
+        bucket.setdefault(day, set()).add(card_id)
+    for entry in heatmap_days:
+        new_ids = heat_new.get(entry["date"], set())
+        review_ids = heat_review.get(entry["date"], set()) - new_ids
+        entry["new_count"] = len(new_ids)
+        entry["review_count"] = len(review_ids)
+        entry["total"] = len(new_ids) + len(review_ids)
+
     return {
         "library_counts": {
             "saved": int(saved_word_count),
@@ -272,4 +313,5 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
         if today_unique_cards
         else 0.0,
         "memory_curve": srs.memory_curve(srs_cards, days=30, now=now),
+        "heatmap_days": heatmap_days,
     }
