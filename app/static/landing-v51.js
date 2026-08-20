@@ -1254,7 +1254,7 @@
         ' <button class="demo-audio" data-real-audio="' + escapeHtml(target) + '" type="button">▶</button>' +
         ' <span class="dictation-user-tag is-empty">（未输入）</span>' +
         "</div>" +
-        (cleanMeaning ? '<div class="dictation-meaning-text">' + renderMarkdown(cleanMeaning, target) + "</div>" : "") +
+        (cleanMeaning ? '<p class="demo-front-text dictation-meaning-text">' + renderMarkdown(cleanMeaning, target) + "</p>" : "") +
         sentenceHtml +
         "</div>";
     } else {
