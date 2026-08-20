@@ -149,12 +149,18 @@
 #real-review .home-review-cards .reading-sentence-text,
 #real-review .home-review-cards .reading-front-wrap .reading-sentence-text,
 #real-review .home-review-cards .reading-answer,
-#real-review .home-review-cards .reading-answer .reading-word-row mark,
 #real-review .home-review-cards .reading-answer .reading-meaning-text,
+#real-review .home-review-cards .reading-answer .reading-meaning-text *,
 #guest-demo-cards .reading-sentence-wrap .demo-front-text {
   font-size: 22px;
   line-height: 1.6;
   font-weight: 600;
+  color: var(--text);
+}
+#real-review .home-review-cards .reading-answer .reading-word-row mark {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--accent);
 }
 #real-review .home-review-cards .reading-sentence-audio,
 #real-review .home-review-cards .reading-word-row .demo-audio {

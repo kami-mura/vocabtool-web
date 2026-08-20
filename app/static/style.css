@@ -782,17 +782,26 @@ button.landing-login-btn { border: none; cursor: pointer; }
   justify-content: center;
   text-align: center;
   gap: 8px;
+  width: 100%;
 }
 .reading-answer .reading-word-row {
   margin-bottom: 6px;
 }
 .reading-answer .reading-word-row mark {
   font-size: 22px;
-  font-weight: 750;
+  font-weight: 700;
+  color: var(--accent);
 }
-.reading-answer .reading-meaning-text {
+.reading-answer .reading-meaning-text,
+.reading-answer .reading-meaning-text * {
+  font-family: var(--font-sans);
   font-size: 22px;
   line-height: 1.6;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.01em;
+  text-align: center;
+  margin: 0;
 }
 .sentence-refresh-panel {
   align-items: center;
