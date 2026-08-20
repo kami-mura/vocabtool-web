@@ -321,7 +321,7 @@ def build_cards(
             back = f"{definition}\n\n{rank_line}"
         elif card_type == "dictation":
             front = definition
-            back = f"{word}\n\n{definition}\n\n{rank_line}" + (f"\n\n{sentence}" if sentence else "")
+            back = f"{definition}\n\n{rank_line}"
         else:  # cloze
             front = sentence_front(sentence, word, cloze=True)
             back = "\n\n".join(

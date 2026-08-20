@@ -995,7 +995,7 @@ def create_cards_from_studio(
                     str(content.get("e") or "").strip()
                 )
                 front = meaning
-                back = f"{display_word}\n\n{meaning}" + (f"\n\n{sentence}" if sentence else "")
+                back = meaning
                 context = sentence if sentence else ""
             else:
                 sentence = card_builder.complete_sentence(

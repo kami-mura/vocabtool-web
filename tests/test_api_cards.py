@@ -71,7 +71,7 @@ def test_generated_card_types_keep_their_front_formats(client):
         card = queue["new"][0]
         if card_type == "dictation":
             assert card["front"] == "n. | a test meaning | 测试释义"
-            assert "quasar" in card["back"]
+            assert card["back"] == "n. | a test meaning | 测试释义"
         elif card_type == "general":
             assert not card["back"].lower().startswith("quasar\n")
             assert card["front"] == "quasar"
@@ -110,7 +110,7 @@ def test_studio_ai_cards_follow_old_streamlit_formats(client):
         "/api/cards", params={"card_type": "dictation"}
     ).json()["new"][0]
     assert dictation_card["front"] == "n. | a test meaning | 测试释义"
-    assert "opportunity" in dictation_card["back"]
+    assert dictation_card["back"] == "n. | a test meaning | 测试释义"
 
     reading = client.post(
         "/api/card-studio/cards",

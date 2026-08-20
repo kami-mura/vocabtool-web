@@ -661,7 +661,8 @@ button.landing-login-btn { border: none; cursor: pointer; }
   overflow: hidden;
   justify-content: safe center;
 }
-#real-review .home-review-cards .card-answer {
+#real-review .home-review-cards .card-answer,
+#real-review .home-review-cards .dictation-back-wrap {
   flex: 1 1 auto;
   min-height: 0;
   width: 100%;
@@ -673,7 +674,8 @@ button.landing-login-btn { border: none; cursor: pointer; }
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
 }
-#real-review .home-review-cards .card-answer > * {
+#real-review .home-review-cards .card-answer > *,
+#real-review .home-review-cards .dictation-back-wrap > * {
   min-width: 0;
   max-width: 100%;
 }
@@ -4511,6 +4513,16 @@ svg {
 .dictation-diff-box {
   width: 100%;
   margin: 4px 0 6px;
+}
+.dictation-meaning-section {
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 2px 0;
+  max-width: 100%;
+}
+.dictation-meaning-section p {
+  margin: 2px 0 !important;
 }
 .dictation-diff-status {
   padding: 8px 14px;

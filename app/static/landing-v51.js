@@ -1229,6 +1229,20 @@
         "</div></div>"
       ).join("") + "</div>";
     } else if (isDictation) {
+      const rawBack = (card.back || "").trim();
+      const lines = rawBack.split("\n").map((l) => l.trim()).filter(Boolean);
+      const filteredLines = lines.filter((line) => {
+        const lower = line.toLowerCase();
+        if (lower === target.toLowerCase() || lower === ("**" + target.toLowerCase() + "**")) {
+          return false;
+        }
+        if (sentence && (line === sentence.trim() || line === sentence)) {
+          return false;
+        }
+        return true;
+      });
+      const cleanMeaning = filteredLines.join("\n\n");
+
       const sentenceHtml =
         sentence && sentence !== target
           ? '<div class="dictation-sentence-row">' +
@@ -1245,7 +1259,7 @@
         ' <button class="demo-audio" data-real-audio="' + escapeHtml(target) + '" type="button">▶</button>' +
         "</div>" +
         '<div class="dictation-diff-box" data-dictation-diff-for="' + card.id + '"></div>' +
-        '<div class="card-answer">' + renderMarkdown(card.back, target) + "</div>" +
+        (cleanMeaning ? '<div class="dictation-meaning-section">' + renderMarkdown(cleanMeaning, target) + "</div>" : "") +
         sentenceHtml +
         "</div>";
     } else {
