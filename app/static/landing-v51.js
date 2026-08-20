@@ -1487,14 +1487,10 @@
     return 4;
   }
 
-  const WEEKDAY_NAMES = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
-
   function heatTooltipText(day) {
     const total = Number(day.total) || 0;
     const parts = day.date.split("-").map(Number);
-    const d = new Date(parts[0], parts[1] - 1, parts[2]);
-    const weekday = WEEKDAY_NAMES[d.getDay()] || "";
-    const label = parts[1] + "月" + parts[2] + "日 " + weekday;
+    const label = parts[1] + "月" + parts[2] + "日";
     if (total <= 0) return label + "：未学习";
     return (
       label +
@@ -1508,7 +1504,8 @@
     const total = Number(day.total) || 0;
     const parts = day.date.split("-").map(Number);
     const d = new Date(parts[0], parts[1] - 1, parts[2]);
-    const weekday = WEEKDAY_NAMES[d.getDay()] || "";
+    const weekdayNames = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
+    const weekday = weekdayNames[d.getDay()] || "";
     const dateStr = parts[0] + "年" + parts[1] + "月" + parts[2] + "日";
     const newCount = Number(day.new_count) || 0;
     const revCount = Number(day.review_count) || 0;
@@ -1566,17 +1563,12 @@
     if (!days || !days.length) return [];
     const labels = [];
     let lastMonth = -1;
-    const first = new Date(days[0].date + "T00:00:00");
-    const leading = (first.getDay() + 6) % 7;
     days.forEach((day, index) => {
       const parts = day.date.split("-").map(Number);
       const month = parts[1];
       if (month !== lastMonth) {
-        const col = Math.floor((index + leading) / 7);
-        if (labels.length === 0 || col - labels[labels.length - 1].col >= 2) {
-          labels.push({ month: month, col: col });
-          lastMonth = month;
-        }
+        labels.push({ month: month, col: Math.floor(index / 7) });
+        lastMonth = month;
       }
     });
     return labels;
