@@ -664,6 +664,7 @@ def test_landing_groups_target_sources_and_offers_one_ngsl_filter(client):
     assert 'id="real-card-list-id"' in page.text
     assert page.text.count('id="real-card-ngsl-filter"') == 1
     assert page.text.count('id="real-card-ngsl-filter-fields"') == 1
+    assert 'id="real-card-exclude-easy" type="checkbox" checked' in page.text
     assert 'id="real-card-list-filter"' not in page.text
 
 

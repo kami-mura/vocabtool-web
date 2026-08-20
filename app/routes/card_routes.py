@@ -264,6 +264,21 @@ def _parse_expression_needs(text: str) -> list[str]:
     )
 
 
+def _exclude_easy_targets(
+    db: Session, user_id: int, candidates: list[tuple[str, int | None, int]]
+) -> list[tuple[str, int | None, int]]:
+    easy_words = {
+        str(row[0] or "").strip().casefold()
+        for row in db.query(SavedWord.word).filter(
+            SavedWord.user_id == user_id,
+            SavedWord.status == "easy",
+        )
+    }
+    return [
+        item for item in candidates if str(item[0] or "").strip().casefold() not in easy_words
+    ]
+
+
 @router.post("/card-studio/targets")
 def card_studio_targets(
     body: CardTargetsIn, request: Request, db: Session = Depends(get_db)
@@ -370,6 +385,8 @@ def card_studio_targets(
             if item[1] is not None and body.from_rank <= item[1] <= body.to_rank
         ]
         candidates.sort(key=lambda item: item[1] or 999_999)
+    if body.exclude_easy and body.source != "expressions":
+        candidates = _exclude_easy_targets(db, user.id, candidates)
     if body.randomize:
         random.shuffle(candidates)
     words = [item[0] for item in candidates]
@@ -427,6 +444,7 @@ async def card_studio_targets_file(
     to_rank: int = 31_000,
     count: int = 100,
     include_unknown: bool = True,
+    exclude_easy: bool = True,
     card_type: str = "reading",
     db: Session = Depends(get_db),
 ):
@@ -477,6 +495,8 @@ async def card_studio_targets_file(
     candidates.sort(
         key=lambda item: (item[1] is None, item[1] or 999_999, -item[2])
     )
+    if exclude_easy:
+        candidates = _exclude_easy_targets(db, user.id, candidates)
     candidates = candidates[:count]
     words = [item[0] for item in candidates]
     card_words = _words_with_cards(db, user.id, words)

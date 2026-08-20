@@ -1,6 +1,6 @@
 "use strict";
 
-const VERSION = "20260820.7";
+const VERSION = "20260820.8";
 const CACHE_NAME = "vocabtool-shell-" + VERSION;
 const OFFLINE_URL = "/static/offline.html";
 

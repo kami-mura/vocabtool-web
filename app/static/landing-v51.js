@@ -3343,6 +3343,7 @@
   const realNeedsFields = document.getElementById("real-needs-fields");
   const realCardListFields = document.getElementById("real-card-list-fields");
   const realCardNgslFilterRow = document.getElementById("real-card-ngsl-filter-row");
+  const realCardExcludeEasy = document.getElementById("real-card-exclude-easy");
   const realCardNgslFilter = document.getElementById("real-card-ngsl-filter");
   const realCardNgslFilterFields = document.getElementById("real-card-ngsl-filter-fields");
   const realCardNgslFilterHint = document.getElementById("real-card-ngsl-filter-hint");
@@ -3423,6 +3424,7 @@
       fromRank: enabled ? Number(document.getElementById("real-card-rank-from").value) || 1 : 1,
       toRank: enabled ? Number(document.getElementById("real-card-rank-to").value) || 31000 : 31000,
       includeUnknown: !enabled,
+      excludeEasy: Boolean(realCardExcludeEasy && realCardExcludeEasy.checked),
     };
   }
 
@@ -3442,6 +3444,7 @@
         count: 5000,
         include_unknown: !options.enabled,
         ngsl_filter: options.enabled,
+        exclude_easy: options.excludeEasy,
         card_type: realCardType,
       }),
     });
@@ -3701,6 +3704,7 @@
               count: 5000,
               include_unknown: ngslOptions.includeUnknown,
               ngsl_filter: ngslOptions.enabled,
+              exclude_easy: ngslOptions.excludeEasy,
               card_type: realCardType,
             }),
           });
@@ -3718,6 +3722,7 @@
             to_rank: String(ngslOptions.toRank),
             count: "5000",
             include_unknown: String(ngslOptions.includeUnknown),
+            exclude_easy: String(ngslOptions.excludeEasy),
             card_type: realCardType,
           });
           const res = await fetch("/api/card-studio/targets-file?" + params.toString(), {
@@ -3769,6 +3774,7 @@
               randomize,
               include_unknown: ngslOptions.includeUnknown,
               ngsl_filter: ngslOptions.enabled,
+              exclude_easy: ngslOptions.excludeEasy,
               card_type: realCardType,
             }),
           });
@@ -3793,6 +3799,7 @@
               randomize,
               include_unknown: ngslOptions.includeUnknown,
               ngsl_filter: ngslOptions.enabled,
+              exclude_easy: ngslOptions.excludeEasy,
               card_type: realCardType,
             }),
           });

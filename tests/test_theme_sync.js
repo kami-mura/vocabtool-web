@@ -207,9 +207,10 @@ assert.ok(
 );
 assert.match(
   glassStyleSource,
-  /\.general-card \.demo-front-text\s*\{[^}]*font-size\s*:\s*34px/,
-  "通用卡正面单词使用 34px 大字号"
+  /\.general-card \.demo-front-text\s*\{[^}]*font-size\s*:\s*28px/,
+  "通用卡正面单词使用适中的 28px 字号"
 );
+assert.ok(landingSource.includes("exclude_easy: options.excludeEasy"), "提取请求携带 Easy 过滤选项");
 assert.ok(landingSource.includes("result.limit_notice"), "制卡截断提示会显示给用户");
 assert.ok(
   landingSource.includes('fetch("/api/card-studio/quota"'),

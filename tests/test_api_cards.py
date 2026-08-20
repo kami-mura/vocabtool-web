@@ -470,6 +470,33 @@ def test_card_studio_saved_source_excludes_easy_and_mid_words(client):
     assert words == ["run"]
 
 
+def test_card_studio_targets_exclude_easy_by_default(client):
+    register(client, "studio-default-exclude-easy@example.com")
+    marked = client.post(
+        "/api/words/batch-status", json={"words": ["point"], "status": "easy"}
+    )
+    assert marked.status_code == 200
+
+    default_filtered = client.post(
+        "/api/card-studio/targets",
+        json={"source": "wordlist", "text": "point\nrun", "count": 10},
+    )
+    assert default_filtered.status_code == 200
+    assert [item["word"] for item in default_filtered.json()["words"]] == ["run"]
+
+    included = client.post(
+        "/api/card-studio/targets",
+        json={
+            "source": "wordlist",
+            "text": "point\nrun",
+            "count": 10,
+            "exclude_easy": False,
+        },
+    )
+    assert included.status_code == 200
+    assert [item["word"] for item in included.json()["words"]] == ["point", "run"]
+
+
 def test_card_studio_wordlist_and_saved_sources_support_ngsl_filter(client):
     register(client, "studio-ngsl-filter@example.com")
     pasted = client.post(

@@ -59,6 +59,7 @@ class CardTargetsIn(BaseModel):
     randomize: bool = False
     include_unknown: bool = False
     ngsl_filter: bool = False
+    exclude_easy: bool = True
     card_type: str = "reading"
 
 
