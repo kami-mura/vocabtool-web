@@ -4449,7 +4449,14 @@ svg {
   font-size: 15px;
   line-height: 1.5;
   max-width: 90%;
-  margin: 2px 0 6px;
+  margin: 4px 0 8px;
+  padding: 6px 14px;
+  border-radius: 10px;
+  background: var(--bg-soft, rgba(0, 0, 0, 0.03));
+  border: 1px dashed var(--line);
+}
+.dictation-meaning-box[hidden] {
+  display: none !important;
 }
 .dictation-input-row {
   display: flex;
@@ -4558,6 +4565,47 @@ svg {
 .diff-correct-text {
   color: #10b981;
   font-size: 14px;
+}
+.dictation-sentence-row {
+  width: 100%;
+  margin-top: 10px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--bg-soft, rgba(0, 0, 0, 0.03));
+  border: 1px dashed var(--line);
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+[data-theme="dark"] .dictation-sentence-row {
+  background: rgba(255, 255, 255, 0.03);
+}
+.dictation-sentence-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.dictation-sentence-tag {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--accent-soft, rgba(16, 185, 129, 0.15));
+  color: var(--accent, #10b981);
+}
+.dictation-sentence-body {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.dictation-sentence-text {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+  flex: 1;
 }
 
 /* ---------- 学习打卡海报 (Study Share Poster Modal) ---------- */

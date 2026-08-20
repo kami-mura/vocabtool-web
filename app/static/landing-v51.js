@@ -1192,10 +1192,10 @@
         '<div class="dictation-audio-wrap">' +
         '<button class="demo-audio dictation-audio-btn" data-real-audio="' + escapeHtml(target) + '" type="button">▶ 播放发音</button>' +
         "</div>" +
-        '<div class="dictation-meaning-box">' + frontInner + "</div>" +
+        '<div class="dictation-meaning-box" hidden>' + frontInner + "</div>" +
         '<div class="dictation-input-row">' +
         '<input type="text" class="dictation-input" data-real-dictation-target="' + escapeHtml(target) + '" placeholder="输入英文拼写..." autocomplete="off" spellcheck="false" autocapitalize="none">' +
-        '<button type="button" class="dictation-hint-btn" data-real-dictation-hint="' + escapeHtml(target) + '" title="提示首字母">💡 提示</button>' +
+        '<button type="button" class="dictation-hint-btn" data-real-dictation-hint="' + escapeHtml(target) + '" title="点击提示释义或首字母">💡 提示释义</button>' +
         "</div>" +
         "</div>";
     } else if (card.card_type === "reading") {
@@ -1229,6 +1229,15 @@
         "</div></div>"
       ).join("") + "</div>";
     } else if (isDictation) {
+      const sentenceHtml =
+        sentence && sentence !== target
+          ? '<div class="dictation-sentence-row">' +
+            '<div class="dictation-sentence-header"><span class="dictation-sentence-tag">例句</span></div>' +
+            '<div class="dictation-sentence-body">' +
+            '<p class="dictation-sentence-text">' + renderMarkdown(sentence, target) + "</p>" +
+            '<button class="demo-audio small" data-real-audio="' + escapeHtml(sentence) + '" type="button" title="播放例句">▶</button>' +
+            "</div></div>"
+          : "";
       backInner =
         '<div class="dictation-back-wrap">' +
         '<div class="dictation-word-header">' +
@@ -1237,6 +1246,7 @@
         "</div>" +
         '<div class="dictation-diff-box" data-dictation-diff-for="' + card.id + '"></div>' +
         '<div class="card-answer">' + renderMarkdown(card.back, target) + "</div>" +
+        sentenceHtml +
         "</div>";
     } else {
       backInner = '<div class="card-answer">' + renderMarkdown(card.back, target) + "</div>";
@@ -1972,15 +1982,15 @@
     ctx.fillText("V", 116, 136);
     ctx.restore();
 
-    // App Name
+    // App Name: VocabTool
     ctx.textAlign = "left";
     ctx.fillStyle = isDark ? "#f9fafb" : "#0f172a";
     ctx.font = "bold 40px -apple-system, BlinkMacSystemFont, sans-serif";
-    ctx.fillText("VocabFlow", 172, 128);
+    ctx.fillText("VocabTool", 172, 128);
 
     ctx.fillStyle = isDark ? "#94a3b8" : "#64748b";
     ctx.font = "500 22px -apple-system, BlinkMacSystemFont, sans-serif";
-    ctx.fillText("每日词汇复利 · 间隔重复", 172, 162);
+    ctx.fillText("每日词汇复利 · 今日学习战报", 172, 162);
 
     // Date (Right-aligned)
     ctx.textAlign = "right";
@@ -1992,9 +2002,21 @@
     ctx.font = "500 20px -apple-system, BlinkMacSystemFont, sans-serif";
     ctx.fillText(weekdayStr, W - 80, 162);
 
+    // 数据提取
+    const stats = realTodayStats || {};
+    const studiedFromStats = Number(stats.unique_cards) || 0;
+    const studiedFromDash = (todayDashboardData && Number(todayDashboardData.today_studied)) || 0;
+    const todayStudied = studiedFromStats || studiedFromDash || 0;
+
+    const todayNew = Number(stats.new_learned) || (todayDashboardData && Number(todayDashboardData.today_new)) || 0;
+    const todayReview = Number(stats.reviews) || (todayDashboardData && Number(todayDashboardData.today_reviews)) || Math.max(0, todayStudied - todayNew);
+
+    const totalCards = (todayDashboardData && (Number(todayDashboardData.card_count) || Number(todayDashboardData.total_cards))) || (realReviewTotalCards || 0);
+    const streak = (todayDashboardData && Number(todayDashboardData.consecutive_study_days)) || 0;
+
     // 3. 核心打卡成就主卡片 (Streak Card)
     const cardY = 220;
-    const cardH = 480;
+    const cardH = 460;
     ctx.save();
     roundRect(80, cardY, W - 160, cardH, 32);
     ctx.fillStyle = isDark ? "rgba(30, 41, 59, 0.85)" : "#ffffff";
@@ -2011,70 +2033,66 @@
     ctx.stroke();
     ctx.restore();
 
-    const streak = (todayDashboardData && todayDashboardData.consecutive_study_days) || 0;
-    const studied = (todayDashboardData && todayDashboardData.today_studied_cards) || 0;
-    const totalCards = (todayDashboardData && todayDashboardData.total_cards) || 0;
-
     // 胶囊标签
     ctx.save();
-    roundRect(W / 2 - 140, cardY + 44, 280, 46, 23);
+    roundRect(W / 2 - 140, cardY + 40, 280, 46, 23);
     ctx.fillStyle = isDark ? "rgba(16, 185, 129, 0.18)" : "rgba(16, 185, 129, 0.12)";
     ctx.fill();
     ctx.fillStyle = isDark ? "#34d399" : "#059669";
     ctx.font = "bold 22px -apple-system, BlinkMacSystemFont, sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("🔥 坚持的力量 · 每日打卡", W / 2, cardY + 75);
+    ctx.fillText("🔥 坚持的力量 · 每日打卡", W / 2, cardY + 71);
     ctx.restore();
 
     // 连续天数大字
     ctx.textAlign = "center";
     ctx.fillStyle = isDark ? "#94a3b8" : "#64748b";
     ctx.font = "500 28px -apple-system, BlinkMacSystemFont, sans-serif";
-    ctx.fillText("已连续高效学习", W / 2, cardY + 145);
+    ctx.fillText("已连续高效学习", W / 2, cardY + 138);
 
     ctx.save();
-    const streakGrad = ctx.createLinearGradient(W / 2 - 150, cardY + 160, W / 2 + 150, cardY + 290);
+    const streakGrad = ctx.createLinearGradient(W / 2 - 150, cardY + 150, W / 2 + 150, cardY + 280);
     streakGrad.addColorStop(0, isDark ? "#34d399" : "#10b981");
     streakGrad.addColorStop(1, isDark ? "#10b981" : "#047857");
     ctx.fillStyle = streakGrad;
     ctx.font = "bold 130px -apple-system, BlinkMacSystemFont, sans-serif";
-    ctx.fillText(String(streak), W / 2, cardY + 275);
+    ctx.fillText(String(streak), W / 2, cardY + 265);
     ctx.restore();
 
     ctx.fillStyle = isDark ? "#e2e8f0" : "#334155";
     ctx.font = "bold 30px -apple-system, BlinkMacSystemFont, sans-serif";
-    ctx.fillText("DAYS / 天", W / 2, cardY + 325);
+    ctx.fillText("DAYS / 天", W / 2, cardY + 312);
 
     // 分割线
     ctx.strokeStyle = isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(226, 232, 240, 0.8)";
     ctx.beginPath();
-    ctx.moveTo(120, cardY + 365);
-    ctx.lineTo(W - 120, cardY + 365);
+    ctx.moveTo(120, cardY + 350);
+    ctx.lineTo(W - 120, cardY + 350);
     ctx.stroke();
 
     // 底部 3 项指标
-    const stats = [
-      { label: "今日学习", val: studied + " 张" },
+    const statsRow = [
+      { label: "今日已学", val: todayStudied + " 张" },
       { label: "词库总量", val: totalCards + " 词" },
       { label: "今日达成", val: "100%" }
     ];
     const colW = (W - 160) / 3;
-    stats.forEach((st, idx) => {
+    statsRow.forEach((st, idx) => {
       const cx = 80 + colW * idx + colW / 2;
       ctx.fillStyle = isDark ? "#f9fafb" : "#0f172a";
       ctx.font = "bold 34px -apple-system, BlinkMacSystemFont, sans-serif";
-      ctx.fillText(st.val, cx, cardY + 418);
+      ctx.fillText(st.val, cx, cardY + 400);
 
       ctx.fillStyle = isDark ? "#94a3b8" : "#64748b";
       ctx.font = "500 20px -apple-system, BlinkMacSystemFont, sans-serif";
-      ctx.fillText(st.label, cx, cardY + 452);
+      ctx.fillText(st.label, cx, cardY + 434);
     });
 
-    // 4. 热力图轨迹卡片 (Heatmap Matrix Card)
-    const hmY = 735;
-    const hmH = 630;
+    // 4. 今日详细学习数据战报大卡片 (Today's Stats Card)
+    const statsCardY = 710;
+    const statsCardH = 670;
     ctx.save();
-    roundRect(80, hmY, W - 160, hmH, 32);
+    roundRect(80, statsCardY, W - 160, statsCardH, 32);
     ctx.fillStyle = isDark ? "rgba(30, 41, 59, 0.85)" : "#ffffff";
     ctx.shadowColor = isDark ? "rgba(0, 0, 0, 0.4)" : "rgba(15, 23, 42, 0.08)";
     ctx.shadowBlur = 32;
@@ -2083,80 +2101,112 @@
     ctx.restore();
 
     ctx.save();
-    roundRect(80, hmY, W - 160, hmH, 32);
+    roundRect(80, statsCardY, W - 160, statsCardH, 32);
     ctx.strokeStyle = isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(226, 232, 240, 0.9)";
     ctx.lineWidth = 2;
     ctx.stroke();
     ctx.restore();
 
-    // 热力图标题
+    // 战报标题
     ctx.textAlign = "left";
     ctx.fillStyle = isDark ? "#f9fafb" : "#0f172a";
     ctx.font = "bold 32px -apple-system, BlinkMacSystemFont, sans-serif";
-    ctx.fillText("学习热力轨迹", 130, hmY + 65);
+    ctx.fillText("今日学习数据战报", 130, statsCardY + 65);
 
     ctx.fillStyle = isDark ? "#94a3b8" : "#64748b";
     ctx.font = "500 20px -apple-system, BlinkMacSystemFont, sans-serif";
-    ctx.fillText("近 16 周（112天）每日复习与新词足迹", 130, hmY + 100);
+    ctx.fillText("基于 FSRS 间隔重复算法的高效抗遗忘记录", 130, statsCardY + 100);
 
-    // 绘制 16 列 × 7 行热力格子
-    const heatDays = (todayDashboardData && todayDashboardData.heatmap_days) || [];
-    const fullYearDays = buildYearHeatmapDays(heatDays);
-    const recent112 = fullYearDays.slice(-112);
-
-    const gridStartX = 130;
-    const gridStartY = hmY + 140;
-    const dotSize = 42;
-    const dotGap = 13;
-    const dotRadius = 9;
-
-    const colorsLight = ["#e2e8f0", "#86efac", "#4ade80", "#22c55e", "#15803d"];
-    const colorsDark = ["#1e293b", "#064e3b", "#047857", "#10b981", "#34d399"];
-    const colors = isDark ? colorsDark : colorsLight;
-
-    for (let c = 0; c < 16; c += 1) {
-      for (let r = 0; r < 7; r += 1) {
-        const idx = c * 7 + r;
-        const item = recent112[idx];
-        const count = item ? (Number(item.total) || 0) : 0;
-        const level = heatLevelForDay(count);
-        const x = gridStartX + c * (dotSize + dotGap);
-        const y = gridStartY + r * (dotSize + dotGap);
-
-        roundRect(x, y, dotSize, dotSize, dotRadius);
-        ctx.fillStyle = colors[level];
-        ctx.fill();
-
-        // 如果是今天，绘制高亮圆环
-        if (idx === recent112.length - 1) {
-          ctx.save();
-          roundRect(x - 2, y - 2, dotSize + 4, dotSize + 4, dotRadius + 2);
-          ctx.strokeStyle = isDark ? "#60a5fa" : "#2563eb";
-          ctx.lineWidth = 3;
-          ctx.stroke();
-          ctx.restore();
-        }
+    // 4 个数据格子 (2 行 × 2 列)
+    const gridItems = [
+      {
+        icon: "📚",
+        label: "今日已学卡片",
+        val: String(todayStudied),
+        unit: " 张",
+        hint: "完成今日复习与新卡",
+        color: isDark ? "#34d399" : "#059669"
+      },
+      {
+        icon: "✨",
+        label: "今日新学单词",
+        val: String(todayNew),
+        unit: " 词",
+        hint: "拓展核心词汇边界",
+        color: isDark ? "#60a5fa" : "#2563eb"
+      },
+      {
+        icon: "🔄",
+        label: "今日复习巩固",
+        val: String(todayReview),
+        unit: " 次",
+        hint: "抗遗忘记忆强化",
+        color: isDark ? "#f59e0b" : "#d97706"
+      },
+      {
+        icon: "📖",
+        label: "累计词库总量",
+        val: String(totalCards),
+        unit: " 词",
+        hint: "构建终身语言资产",
+        color: isDark ? "#a78bfa" : "#7c3aed"
       }
-    }
+    ];
 
-    // 热力图图例
-    const legendY = hmY + 560;
-    ctx.textAlign = "left";
-    ctx.fillStyle = isDark ? "#94a3b8" : "#64748b";
-    ctx.font = "500 18px -apple-system, BlinkMacSystemFont, sans-serif";
-    ctx.fillText("少", gridStartX, legendY + 16);
+    const boxW = 420;
+    const boxH = 200;
+    const gridStartX = 120;
+    const gridStartY = statsCardY + 135;
+    const gapX = 40;
+    const gapY = 30;
 
-    for (let l = 0; l <= 4; l += 1) {
-      const lx = gridStartX + 35 + l * 32;
-      roundRect(lx, legendY, 22, 22, 5);
-      ctx.fillStyle = colors[l];
+    gridItems.forEach((item, i) => {
+      const row = Math.floor(i / 2);
+      const col = i % 2;
+      const bx = gridStartX + col * (boxW + gapX);
+      const by = gridStartY + row * (boxH + gapY);
+
+      // 格子背景
+      ctx.save();
+      roundRect(bx, by, boxW, boxH, 20);
+      ctx.fillStyle = isDark ? "rgba(15, 23, 42, 0.6)" : "rgba(241, 245, 249, 0.8)";
       ctx.fill();
-    }
-    ctx.fillText("多", gridStartX + 35 + 5 * 32 + 5, legendY + 16);
+      ctx.strokeStyle = isDark ? "rgba(255, 255, 255, 0.05)" : "rgba(226, 232, 240, 0.8)";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.restore();
+
+      // 格子内容
+      ctx.textAlign = "left";
+      ctx.fillStyle = isDark ? "#94a3b8" : "#64748b";
+      ctx.font = "600 22px -apple-system, BlinkMacSystemFont, sans-serif";
+      ctx.fillText(item.icon + " " + item.label, bx + 24, by + 48);
+
+      ctx.save();
+      ctx.fillStyle = item.color;
+      ctx.font = "bold 56px -apple-system, BlinkMacSystemFont, sans-serif";
+      ctx.fillText(item.val, bx + 24, by + 124);
+      const valWidth = ctx.measureText(item.val).width;
+
+      ctx.fillStyle = isDark ? "#cbd5e1" : "#475569";
+      ctx.font = "bold 24px -apple-system, BlinkMacSystemFont, sans-serif";
+      ctx.fillText(item.unit, bx + 24 + valWidth + 4, by + 122);
+      ctx.restore();
+
+      ctx.fillStyle = isDark ? "#64748b" : "#94a3b8";
+      ctx.font = "500 18px -apple-system, BlinkMacSystemFont, sans-serif";
+      ctx.fillText(item.hint, bx + 24, by + 168);
+    });
+
+    // 战报底部提示
+    ctx.textAlign = "center";
+    ctx.fillStyle = isDark ? "#34d399" : "#059669";
+    ctx.font = "600 20px -apple-system, BlinkMacSystemFont, sans-serif";
+    ctx.fillText("⚡ FSRS 智能记忆调度已为你规划最佳复习时机，保护记忆留存率达 90%+", W / 2, statsCardY + 625);
 
     // 5. 今日金句卡片 (Quote Card)
-    const quoteY = 1395;
-    const quoteH = 340;
+    const quoteY = 1410;
+    const quoteH = 360;
     ctx.save();
     roundRect(80, quoteY, W - 160, quoteH, 32);
     ctx.fillStyle = isDark ? "rgba(30, 41, 59, 0.85)" : "#ffffff";
@@ -2185,14 +2235,14 @@
     const maxWidth = W - 260;
     const words = quote.en.split(" ");
     let line = "";
-    let qLineY = quoteY + 125;
+    let qLineY = quoteY + 130;
     for (let n = 0; n < words.length; n += 1) {
       const testLine = line + words[n] + " ";
       const metrics = ctx.measureText(testLine);
       if (metrics.width > maxWidth && n > 0) {
         ctx.fillText(line.trim(), W / 2, qLineY);
         line = words[n] + " ";
-        qLineY += 42;
+        qLineY += 44;
       } else {
         line = testLine;
       }
@@ -2201,13 +2251,13 @@
 
     ctx.fillStyle = isDark ? "#94a3b8" : "#64748b";
     ctx.font = "500 22px -apple-system, BlinkMacSystemFont, sans-serif";
-    ctx.fillText(quote.zh, W / 2, qLineY + 52);
+    ctx.fillText(quote.zh, W / 2, qLineY + 54);
 
     // 6. 底部 Footer
     ctx.textAlign = "center";
     ctx.fillStyle = isDark ? "#64748b" : "#94a3b8";
     ctx.font = "500 20px -apple-system, BlinkMacSystemFont, sans-serif";
-    ctx.fillText("用间隔重复，让词汇真正留在脑海中 · VocabFlow", W / 2, 1820);
+    ctx.fillText("用间隔重复，让词汇真正留在脑海中 · VocabTool", W / 2, 1835);
 
     const dataUrl = canvas.toDataURL("image/png");
     img.src = dataUrl;
@@ -2268,7 +2318,7 @@
         const m = String(now.getMonth() + 1).padStart(2, "0");
         const d = String(now.getDate()).padStart(2, "0");
         const link = document.createElement("a");
-        link.download = "VocabFlow-打卡海报-" + y + m + d + ".png";
+        link.download = "VocabTool-打卡海报-" + y + m + d + ".png";
         link.href = canvas.toDataURL("image/png");
         link.click();
         const status = document.getElementById("study-poster-status");
@@ -2908,6 +2958,12 @@
       if (hintBtn) {
         const target = hintBtn.dataset.realDictationHint || "";
         const cardEl = hintBtn.closest(".home-review-card");
+        const meaningBox = cardEl ? cardEl.querySelector(".dictation-meaning-box") : null;
+        if (meaningBox && meaningBox.hidden) {
+          meaningBox.hidden = false;
+          hintBtn.textContent = "💡 提示首字母";
+          return;
+        }
         const input = cardEl ? cardEl.querySelector(".dictation-input") : null;
         if (input && target) {
           const current = input.value || "";
