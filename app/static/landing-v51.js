@@ -1253,11 +1253,11 @@
         sentenceHtml +
         "</div>";
     } else if (card.card_type === "reading") {
-      // 阅读卡反面：增加目标词汇行以及语音播放（22px），下方为释义（22px）
+      // 阅读卡反面：增加目标词汇行以及语音播放（无高亮无特殊色），下方为柔和释义（22px）
       backInner =
         '<div class="card-answer reading-answer">' +
         '<div class="reading-word-row">' +
-        '<mark class="word-highlight">' + escapeHtml(target) + "</mark>" +
+        '<span class="reading-back-word">' + escapeHtml(target) + "</span>" +
         ' <button class="demo-audio" data-real-audio="' + escapeHtml(target) + '" type="button">▶</button>' +
         "</div>" +
         '<div class="reading-meaning-text">' + renderMarkdown(card.back, target) + "</div>" +

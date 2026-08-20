@@ -787,21 +787,24 @@ button.landing-login-btn { border: none; cursor: pointer; }
 .reading-answer .reading-word-row {
   margin-bottom: 6px;
 }
+.reading-answer .reading-back-word,
 .reading-answer .reading-word-row mark {
   font-size: 22px;
   font-weight: 700;
-  color: var(--accent);
+  color: var(--text);
+  background: transparent;
 }
 .reading-answer .reading-meaning-text,
 .reading-answer .reading-meaning-text * {
   font-family: var(--font-sans);
   font-size: 22px;
   line-height: 1.6;
-  font-weight: 600;
-  color: var(--text);
-  letter-spacing: -0.01em;
+  font-weight: 500;
+  color: var(--muted);
+  letter-spacing: normal;
   text-align: center;
   margin: 0;
+  background: transparent;
 }
 .sentence-refresh-panel {
   align-items: center;
