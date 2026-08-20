@@ -2451,14 +2451,28 @@
     if (refreshQuoteBtn) {
       refreshQuoteBtn.addEventListener("click", () => {
         currentPosterQuote = getRandomPosterQuote();
+        renderStudyPoster();
+        const status = document.getElementById("study-poster-status");
+        if (status) {
+          status.textContent = "✨ 已换一句格言！";
+          setTimeout(() => {
+            status.textContent = "";
+          }, 2000);
+        }
+      });
+    }
+    const switchThemeBtn = document.getElementById("study-poster-switch-theme");
+    if (switchThemeBtn) {
+      switchThemeBtn.addEventListener("click", () => {
         currentPosterThemeIdx = (currentPosterThemeIdx + 1) % POSTER_BG_THEMES.length;
         renderStudyPoster();
         const status = document.getElementById("study-poster-status");
         if (status) {
-          status.textContent = "✨ 已换一句真实名人格言！";
+          const theme = POSTER_BG_THEMES[currentPosterThemeIdx];
+          status.textContent = "🎨 已切换背景：" + theme.name;
           setTimeout(() => {
             status.textContent = "";
-          }, 2500);
+          }, 2000);
         }
       });
     }
