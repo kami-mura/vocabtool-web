@@ -1104,13 +1104,13 @@
   }
 
   function renderDictationDiff(userText, targetWord) {
+    const t = (targetWord || "").trim();
     if (!userText || !userText.trim()) {
-      return '<div class="dictation-diff-status is-empty">未输入拼写</div>';
+      return '<span class="dictation-user-tag is-empty">（未输入）</span>';
     }
     const u = userText.trim();
-    const t = (targetWord || "").trim();
     if (u.toLowerCase() === t.toLowerCase()) {
-      return '<div class="dictation-diff-status is-correct">✨ 拼写完全正确：<b>' + escapeHtml(t) + "</b></div>";
+      return '<span class="dictation-user-tag is-correct">✨ 拼写正确</span>';
     }
     let diffHtml = "";
     const maxLen = Math.max(u.length, t.length);
@@ -1127,12 +1127,7 @@
         diffHtml += '<span class="diff-char is-wrong" title="应为 ' + escapeHtml(tc) + '">' + escapeHtml(uc) + "</span>";
       }
     }
-    return (
-      '<div class="dictation-diff-status is-wrong">' +
-      '<div class="dictation-diff-line"><span class="diff-label">你的输入：</span>' + diffHtml + "</div>" +
-      '<div class="dictation-diff-line"><span class="diff-label">正确拼写：</span><b class="diff-correct-text">' + escapeHtml(t) + "</b></div>" +
-      "</div>"
-    );
+    return '<span class="dictation-user-tag is-wrong"><span class="diff-prefix">输入：</span>' + diffHtml + "</span>";
   }
 
   function flipReviewCard(cardEl) {
@@ -1140,9 +1135,9 @@
     const input = cardEl.querySelector(".dictation-input");
     if (input) {
       const target = input.dataset.realDictationTarget || "";
-      const diffBox = cardEl.querySelector(".dictation-diff-box");
-      if (diffBox) {
-        diffBox.innerHTML = renderDictationDiff(input.value, target);
+      const tagEl = cardEl.querySelector(".dictation-user-tag");
+      if (tagEl) {
+        tagEl.outerHTML = renderDictationDiff(input.value, target);
       }
     }
     cardEl.classList.toggle("flipped");
@@ -1245,21 +1240,21 @@
 
       const sentenceHtml =
         sentence && sentence !== target
-          ? '<div class="dictation-sentence-row">' +
-            '<div class="dictation-sentence-header"><span class="dictation-sentence-tag">例句</span></div>' +
-            '<div class="dictation-sentence-body">' +
-            '<p class="dictation-sentence-text">' + renderMarkdown(sentence, target) + "</p>" +
-            '<button class="demo-audio small" data-real-audio="' + escapeHtml(sentence) + '" type="button" title="播放例句">▶</button>' +
+          ? '<div class="reading-sentence-wrap dictation-sentence-wrap">' +
+            '<div class="reading-sentence-content">' +
+            '<p class="demo-front-text dictation-sentence-text">' + renderMarkdown(sentence, target) + "</p>" +
+            '<div class="demo-audio-row"><button class="demo-audio" data-real-audio="' +
+            escapeHtml(sentence) + '" type="button">▶</button></div>' +
             "</div></div>"
           : "";
       backInner =
-        '<div class="dictation-back-wrap">' +
-        '<div class="dictation-word-header">' +
+        '<div class="card-answer dictation-answer">' +
+        '<div class="reading-word-row dictation-word-row">' +
         '<mark class="word-highlight">' + escapeHtml(target) + "</mark>" +
         ' <button class="demo-audio" data-real-audio="' + escapeHtml(target) + '" type="button">▶</button>' +
+        ' <span class="dictation-user-tag is-empty">（未输入）</span>' +
         "</div>" +
-        '<div class="dictation-diff-box" data-dictation-diff-for="' + card.id + '"></div>' +
-        (cleanMeaning ? '<div class="dictation-meaning-section">' + renderMarkdown(cleanMeaning, target) + "</div>" : "") +
+        (cleanMeaning ? '<div class="dictation-meaning-text">' + renderMarkdown(cleanMeaning, target) + "</div>" : "") +
         sentenceHtml +
         "</div>";
     } else {

@@ -4501,123 +4501,97 @@ svg {
   color: var(--accent);
   border-color: var(--accent);
 }
-.dictation-word-header {
-  font-size: 26px;
-  font-weight: 700;
+.dictation-word-row {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 2px;
+  margin-bottom: 4px;
 }
-.dictation-diff-box {
-  width: 100%;
-  margin: 4px 0 6px;
+.dictation-word-row mark {
+  font-size: 24px;
 }
-.dictation-meaning-section {
-  color: var(--text);
-  font-size: 14px;
-  line-height: 1.5;
-  margin: 2px 0;
-  max-width: 100%;
+.dictation-word-row .demo-audio {
+  margin-top: 0;
+  padding: 2px 10px;
 }
-.dictation-meaning-section p {
-  margin: 2px 0 !important;
+.dictation-user-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+  vertical-align: middle;
 }
-.dictation-diff-status {
-  padding: 8px 14px;
-  border-radius: 10px;
-  font-size: 13px;
-  line-height: 1.5;
-}
-.dictation-diff-status.is-correct {
-  background: rgba(16, 185, 129, 0.12);
+.dictation-user-tag.is-correct {
+  background: rgba(16, 185, 129, 0.15);
   color: var(--accent, #10b981);
   font-weight: 600;
 }
-.dictation-diff-status.is-empty {
+.dictation-user-tag.is-empty {
   background: rgba(156, 163, 175, 0.12);
   color: var(--muted);
 }
-.dictation-diff-status.is-wrong {
-  background: rgba(239, 68, 68, 0.08);
-  border: 1px solid rgba(239, 68, 68, 0.2);
-  text-align: left;
+.dictation-user-tag.is-wrong {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  color: var(--text);
 }
-.dictation-diff-line {
-  margin: 3px 0;
-}
-.diff-label {
+.dictation-user-tag .diff-prefix {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 11px;
 }
-.diff-char {
+.dictation-user-tag .diff-char {
   display: inline-block;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 700;
   padding: 0 1px;
 }
-.diff-char.is-match {
+.dictation-user-tag .diff-char.is-match {
   color: #10b981;
 }
-.diff-char.is-wrong {
+.dictation-user-tag .diff-char.is-wrong {
   color: #ef4444;
-  background: rgba(239, 68, 68, 0.15);
-  border-radius: 3px;
+  background: rgba(239, 68, 68, 0.18);
+  border-radius: 2px;
 }
-.diff-char.is-missing {
+.dictation-user-tag .diff-char.is-missing {
   color: #f59e0b;
   text-decoration: underline;
 }
-.diff-char.is-extra {
+.dictation-user-tag .diff-char.is-extra {
   color: #ef4444;
   text-decoration: line-through;
 }
-.diff-correct-text {
-  color: #10b981;
-  font-size: 14px;
+.dictation-meaning-text {
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--text);
+  margin: 4px 0 2px;
+  text-align: center;
+  max-width: 100%;
 }
-.dictation-sentence-row {
-  width: 100%;
-  margin-top: 10px;
-  padding: 10px 14px;
-  border-radius: 12px;
-  background: var(--bg-soft, rgba(0, 0, 0, 0.03));
-  border: 1px dashed var(--line);
-  text-align: left;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+.dictation-meaning-text p {
+  margin: 2px 0 !important;
 }
-[data-theme="dark"] .dictation-sentence-row {
-  background: rgba(255, 255, 255, 0.03);
-}
-.dictation-sentence-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.dictation-sentence-tag {
-  font-size: 11px;
-  font-weight: 700;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: var(--accent-soft, rgba(16, 185, 129, 0.15));
-  color: var(--accent, #10b981);
-}
-.dictation-sentence-body {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+.dictation-sentence-wrap {
+  margin-top: 8px;
+  text-align: center;
 }
 .dictation-sentence-text {
   margin: 0;
   font-size: 14px;
+  font-weight: 500;
+  color: var(--muted);
   line-height: 1.5;
-  color: var(--text);
-  flex: 1;
+}
+.dictation-sentence-text mark {
+  color: var(--accent);
+  font-weight: 700;
 }
 
 /* ---------- 学习打卡海报 (Study Share Poster Modal) ---------- */
