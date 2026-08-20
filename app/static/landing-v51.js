@@ -1487,10 +1487,14 @@
     return 4;
   }
 
+  const WEEKDAY_NAMES = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
+
   function heatTooltipText(day) {
     const total = Number(day.total) || 0;
     const parts = day.date.split("-").map(Number);
-    const label = parts[1] + "月" + parts[2] + "日";
+    const d = new Date(parts[0], parts[1] - 1, parts[2]);
+    const weekday = WEEKDAY_NAMES[d.getDay()] || "";
+    const label = parts[1] + "月" + parts[2] + "日 " + weekday;
     if (total <= 0) return label + "：未学习";
     return (
       label +
@@ -1498,6 +1502,33 @@
       (Number(day.new_count) || 0) + " · 复习 " +
       (Number(day.review_count) || 0) + "）"
     );
+  }
+
+  function heatTooltipHtml(day, isToday) {
+    const total = Number(day.total) || 0;
+    const parts = day.date.split("-").map(Number);
+    const d = new Date(parts[0], parts[1] - 1, parts[2]);
+    const weekday = WEEKDAY_NAMES[d.getDay()] || "";
+    const dateStr = parts[0] + "年" + parts[1] + "月" + parts[2] + "日";
+    const newCount = Number(day.new_count) || 0;
+    const revCount = Number(day.review_count) || 0;
+
+    let html = '<div class="hm-tip-header">' +
+      '<span class="hm-tip-date">' + dateStr + '</span>' +
+      '<span class="hm-tip-weekday">' + weekday + '</span>' +
+      (isToday ? '<span class="hm-tip-badge-today">今天</span>' : '') +
+      '</div>';
+
+    if (total <= 0) {
+      html += '<div class="hm-tip-empty">当日暂无学习记录</div>';
+    } else {
+      html += '<div class="hm-tip-total">共学习 <strong>' + total + '</strong> 张卡片</div>' +
+        '<div class="hm-tip-details">' +
+        '<span class="hm-tip-item hm-tip-new"><i class="hm-tip-dot"></i>新学 <b>' + newCount + '</b></span>' +
+        '<span class="hm-tip-item hm-tip-review"><i class="hm-tip-dot"></i>复习 <b>' + revCount + '</b></span>' +
+        '</div>';
+    }
+    return html;
   }
 
   function heatMonthLabels(days) {
@@ -1531,14 +1562,15 @@
         todayDashboardData.heatmap_days &&
         todayDashboardData.heatmap_days.find((d) => d.date === day);
       if (!entry) return;
-      heatTooltipEl.textContent = heatTooltipText(entry);
+      const isToday = cell.classList.contains("is-today");
+      heatTooltipEl.innerHTML = heatTooltipHtml(entry, isToday);
       heatTooltipEl.hidden = false;
       const rect = cell.getBoundingClientRect();
       const tooltipRect = heatTooltipEl.getBoundingClientRect();
       let left = rect.left + rect.width / 2 - tooltipRect.width / 2;
-      left = Math.max(8, Math.min(left, window.innerWidth - tooltipRect.width - 8));
-      let top = rect.top - tooltipRect.height - 8;
-      if (top < 8) top = rect.bottom + 8;
+      left = Math.max(12, Math.min(left, window.innerWidth - tooltipRect.width - 12));
+      let top = rect.top - tooltipRect.height - 10;
+      if (top < 12) top = rect.bottom + 10;
       heatTooltipEl.style.left = left + "px";
       heatTooltipEl.style.top = top + "px";
     };
@@ -1556,6 +1588,30 @@
         hide();
       }
     });
+
+    const legend = document.getElementById("study-heatmap-legend");
+    if (legend) {
+      legend.querySelectorAll(".hm-swatch").forEach((swatch) => {
+        const lvl = swatch.dataset.level;
+        swatch.addEventListener("mouseenter", () => {
+          grid.classList.add("hm-filtering");
+          grid.querySelectorAll(".hm-cell:not(.hm-empty)").forEach((cell) => {
+            const cellLvl = cell.dataset.level || "0";
+            if (cellLvl === lvl) {
+              cell.classList.add("hm-highlighted");
+            } else {
+              cell.classList.remove("hm-highlighted");
+            }
+          });
+        });
+        swatch.addEventListener("mouseleave", () => {
+          grid.classList.remove("hm-filtering");
+          grid.querySelectorAll(".hm-cell").forEach((cell) => {
+            cell.classList.remove("hm-highlighted");
+          });
+        });
+      });
+    }
   }
 
   function renderHeatmap(days) {
@@ -1564,34 +1620,70 @@
     const grid = document.getElementById("study-heatmap-grid");
     const months = document.getElementById("study-heatmap-months");
     const summary = document.getElementById("study-heatmap-summary");
-    if (!grid || !months || !summary) return;
+    const statsEl = document.getElementById("study-heatmap-stats");
+    if (!grid || !months) return;
     if (!Array.isArray(days) || !days.length) {
       section.hidden = true;
       return;
     }
     const totalCards = days.reduce((sum, day) => sum + (Number(day.total) || 0), 0);
     const activeDays = days.filter((day) => (Number(day.total) || 0) > 0).length;
-    summary.textContent = days.length < 365
-      ? "注册以来共学 " + totalCards + " 张卡 · " + activeDays + " 天有学习"
-      : "近一年共学 " + totalCards + " 张卡 · " + activeDays + " 天有学习";
+
+    let maxStreak = 0;
+    let currentStreakCounter = 0;
+    days.forEach((d) => {
+      if ((Number(d.total) || 0) > 0) {
+        currentStreakCounter += 1;
+        if (currentStreakCounter > maxStreak) maxStreak = currentStreakCounter;
+      } else {
+        currentStreakCounter = 0;
+      }
+    });
+
+    const consecutiveDays = (todayDashboardData && todayDashboardData.consecutive_study_days) || 0;
+
+    if (summary) {
+      summary.textContent = days.length < 365
+        ? "注册以来共学 " + totalCards + " 张卡 · " + activeDays + " 天有学习"
+        : "近一年共学 " + totalCards + " 张卡 · " + activeDays + " 天有学习";
+    }
+
+    if (statsEl) {
+      statsEl.innerHTML =
+        '<div class="hm-stat-pill"><span class="hm-stat-icon">📚</span><span class="hm-stat-text">累计 <b>' +
+        totalCards + '</b> 张</span></div>' +
+        '<div class="hm-stat-pill"><span class="hm-stat-icon">📅</span><span class="hm-stat-text">打卡 <b>' +
+        activeDays + '</b> 天</span></div>' +
+        '<div class="hm-stat-pill"><span class="hm-stat-icon">⚡</span><span class="hm-stat-text">连续 <b>' +
+        consecutiveDays + '</b> 天</span></div>' +
+        '<div class="hm-stat-pill"><span class="hm-stat-icon">🏆</span><span class="hm-stat-text">最长 <b>' +
+        maxStreak + '</b> 天</span></div>';
+    }
+
+    const todayStr = days[days.length - 1].date;
+
     // 网格从周一列开始：起始日前用不可见占位格补齐。
     const first = new Date(days[0].date + "T00:00:00");
     const leading = (first.getDay() + 6) % 7;
     const html = [];
     for (let i = 0; i < leading; i += 1) {
-      html.push('<i class="hm-cell hm-empty"></i>');
+      html.push('<i class="hm-cell hm-empty" aria-hidden="true"></i>');
     }
     days.forEach((day) => {
       const level = heatLevelForDay(day.total);
-      const cls = level > 0 ? "hm-cell lv-" + level : "hm-cell";
+      const isToday = day.date === todayStr;
+      let cls = "hm-cell";
+      if (level > 0) cls += " lv-" + level;
+      if (isToday) cls += " is-today";
       html.push(
         '<i class="' + cls + '" data-heat-date="' + day.date +
+        '" data-level="' + level +
         '" title="' + heatTooltipText(day).replace(/"/g, "&quot;") + '"></i>'
       );
     });
     const trailing = (7 - ((leading + days.length) % 7)) % 7;
     for (let i = 0; i < trailing; i += 1) {
-      html.push('<i class="hm-cell hm-empty"></i>');
+      html.push('<i class="hm-cell hm-empty" aria-hidden="true"></i>');
     }
     grid.innerHTML = html.join("");
     months.innerHTML = heatMonthLabels(days)
@@ -1599,6 +1691,13 @@
       .join("");
     wireHeatmapCells();
     section.hidden = false;
+
+    const scrollEl = document.getElementById("study-heatmap-scroll");
+    if (scrollEl) {
+      requestAnimationFrame(() => {
+        scrollEl.scrollLeft = scrollEl.scrollWidth;
+      });
+    }
   }
 
   async function loadTodayOverview() {

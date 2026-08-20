@@ -206,18 +206,50 @@
     <section class="landing-section study-heatmap" id="study-heatmap"{% if not logged_in %} hidden{% endif %}>
       <div class="study-heatmap-card">
         <div class="study-heatmap-head">
-          <h2>学习热力图</h2>
-          <p class="study-heatmap-summary" id="study-heatmap-summary">–</p>
+          <div class="study-heatmap-title-wrap">
+            <div class="study-heatmap-title-row">
+              <span class="study-heatmap-icon" aria-hidden="true">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                  <line x1="16" y1="2" x2="16" y2="6"></line>
+                  <line x1="8" y1="2" x2="8" y2="6"></line>
+                  <line x1="3" y1="10" x2="21" y2="10"></line>
+                </svg>
+              </span>
+              <h2>学习热力图</h2>
+            </div>
+            <p class="study-heatmap-summary" id="study-heatmap-summary">–</p>
+          </div>
+          <div class="study-heatmap-stats" id="study-heatmap-stats"></div>
         </div>
-        <div class="study-heatmap-scroll">
+        <div class="study-heatmap-scroll" id="study-heatmap-scroll">
           <div class="study-heatmap-wrap">
             <div class="study-heatmap-months" id="study-heatmap-months"></div>
-            <div class="study-heatmap-grid" id="study-heatmap-grid"></div>
+            <div class="study-heatmap-body">
+              <div class="study-heatmap-weekdays" aria-hidden="true">
+                <span>一</span>
+                <span></span>
+                <span>三</span>
+                <span></span>
+                <span>五</span>
+                <span></span>
+                <span>日</span>
+              </div>
+              <div class="study-heatmap-grid" id="study-heatmap-grid"></div>
+            </div>
           </div>
         </div>
         <div class="study-heatmap-foot">
-          <span class="study-heatmap-legend" aria-hidden="true"><span>少</span><i class="hm-swatch"></i><i class="hm-swatch lv-1"></i><i class="hm-swatch lv-2"></i><i class="hm-swatch lv-3"></i><i class="hm-swatch lv-4"></i><span>多</span></span>
-          <span class="study-heatmap-hint">点按格子查看当天明细</span>
+          <div class="study-heatmap-legend" id="study-heatmap-legend" aria-hidden="true">
+            <span class="hm-legend-label">少</span>
+            <i class="hm-swatch" data-level="0" title="0 张卡"></i>
+            <i class="hm-swatch lv-1" data-level="1" title="1-4 张卡"></i>
+            <i class="hm-swatch lv-2" data-level="2" title="5-9 张卡"></i>
+            <i class="hm-swatch lv-3" data-level="3" title="10-19 张卡"></i>
+            <i class="hm-swatch lv-4" data-level="4" title="20+ 张卡"></i>
+            <span class="hm-legend-label">多</span>
+          </div>
+          <span class="study-heatmap-hint">点按或悬停格子查看当天明细</span>
         </div>
       </div>
     </section>

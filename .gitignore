@@ -16,6 +16,7 @@ backups/
 
 # 内部实施计划与过程文档，不随仓库公开
 docs/superpowers/
+docs/稳定性与数据安全审查报告*.md
 
 # 本地工具记忆文件
 .workbuddy/
