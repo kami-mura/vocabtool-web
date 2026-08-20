@@ -156,6 +156,21 @@
   line-height: 1.6;
   font-weight: 600;
 }
+#real-review .home-review-cards .reading-sentence-audio,
+#real-review .home-review-cards .reading-word-row .demo-audio {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  margin: 0 0 0 8px;
+  padding: 3px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  min-height: 28px;
+  height: 28px;
+  border-radius: 999px;
+}
 #real-review .home-review-cards .card-answer,
 #real-review .home-review-cards .card-answer p,
 #real-review .home-review-cards .card-answer li,

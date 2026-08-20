@@ -109,8 +109,8 @@ assert.ok(
 );
 assert.match(
   source,
-  /card\.card_type === "reading"[\s\S]*?reading-front-wrap[\s\S]*?demo-front-text reading-sentence-text[\s\S]*?frontInner/,
-  "阅读卡正面直接渲染例句内容与上方发音按钮"
+  /card\.card_type === "reading"[\s\S]*?reading-sentence-audio[\s\S]*?reading-front-wrap[\s\S]*?demo-front-text reading-sentence-text[\s\S]*?frontInner/,
+  "阅读卡正面直接渲染例句内容与末尾发音按钮"
 );
 assert.match(
   source,

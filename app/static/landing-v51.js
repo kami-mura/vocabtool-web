@@ -1194,15 +1194,15 @@
         "</div>" +
         "</div>";
     } else if (card.card_type === "reading") {
-      // 阅读卡正面：不放单独目标词，例句播放按钮放在上方，正文为完整例句（22px）
+      // 阅读卡正面：不放单独目标词，正文为完整例句（22px），例句播放按钮放在例句末尾，与目标词发音按钮大小样式一致
       const audioText = sentence || target;
+      const audioBtn = audioText
+        ? ' <button class="demo-audio reading-sentence-audio" data-real-audio="' +
+          escapeHtml(audioText) + '" type="button">▶</button>'
+        : "";
       frontHtml =
         '<div class="reading-front-wrap">' +
-        (audioText
-          ? '<div class="demo-audio-row reading-audio-top"><button class="demo-audio" data-real-audio="' +
-            escapeHtml(audioText) + '" type="button">▶</button></div>'
-          : "") +
-        '<p class="demo-front-text reading-sentence-text">' + frontInner + "</p>" +
+        '<p class="demo-front-text reading-sentence-text">' + frontInner + audioBtn + "</p>" +
         "</div>";
     } else {
       frontHtml =
