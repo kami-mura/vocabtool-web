@@ -2100,59 +2100,57 @@
     return lines;
   }
 
-  function drawWhaleLogo(ctx, x, y, size) {
+  function drawFishLogo(ctx, x, y, size) {
     ctx.save();
-    roundRect(ctx, x, y, size, size, size * 0.26);
+    roundRect(ctx, x, y, size, size, size * 0.28);
     const logoGrad = ctx.createLinearGradient(x, y, x + size, y + size);
     logoGrad.addColorStop(0, "#007AFF");
-    logoGrad.addColorStop(1, "#0052b3");
+    logoGrad.addColorStop(1, "#0056b3");
     ctx.fillStyle = logoGrad;
     ctx.fill();
 
-    // 绘制白色灵动小鲸鱼 (类似 DeepSeek 跃水鲸鱼矢量)
+    // 绘制纯白平游可爱小鱼 (参考海报极简小鱼)
     const s = size / 64;
-    const ox = x + 10 * s;
-    const oy = y + 15 * s;
+    const cx = x + size / 2;
+    const cy = y + size / 2;
 
     ctx.fillStyle = "#ffffff";
     ctx.beginPath();
-    // 头部圆润起点
-    ctx.moveTo(ox + 4 * s, oy + 18 * s);
-    // 向上跃起的光滑背部弧线
-    ctx.bezierCurveTo(ox + 8 * s, oy + 4 * s, ox + 24 * s, oy + 3 * s, ox + 34 * s, oy + 9 * s);
-    // 翘起的尾部
-    ctx.bezierCurveTo(ox + 40 * s, oy + 12 * s, ox + 43 * s, oy + 6 * s, ox + 46 * s, oy + 2 * s);
+    // 鱼身主体 (饱满流线型椭圆鱼身，面向左侧)
+    ctx.moveTo(cx - 18 * s, cy);
+    // 背部平滑圆弧
+    ctx.bezierCurveTo(cx - 14 * s, cy - 11 * s, cx + 4 * s, cy - 11 * s, cx + 13 * s, cy - 2 * s);
+    // 尾柄收窄
+    ctx.lineTo(cx + 17 * s, cy);
     // 上尾鳍
-    ctx.bezierCurveTo(ox + 48 * s, oy + 0 * s, ox + 49 * s, oy + 4 * s, ox + 47 * s, oy + 8 * s);
-    // 尾中凹点
-    ctx.lineTo(ox + 44 * s, oy + 11 * s);
+    ctx.lineTo(cx + 23 * s, cy - 8 * s);
+    // 尾鳍后缘凹弧
+    ctx.quadraticCurveTo(cx + 20 * s, cy, cx + 23 * s, cy + 8 * s);
     // 下尾鳍
-    ctx.bezierCurveTo(ox + 47 * s, oy + 16 * s, ox + 49 * s, oy + 19 * s, ox + 48 * s, oy + 21 * s);
-    ctx.bezierCurveTo(ox + 45 * s, oy + 20 * s, ox + 42 * s, oy + 16 * s, ox + 38 * s, oy + 15 * s);
-    // 饱满腹部曲线
-    ctx.bezierCurveTo(ox + 28 * s, oy + 23 * s, ox + 14 * s, oy + 28 * s, ox + 4 * s, oy + 18 * s);
+    ctx.lineTo(cx + 17 * s, cy);
+    // 腹部饱满圆弧
+    ctx.bezierCurveTo(cx + 4 * s, cy + 11 * s, cx - 14 * s, cy + 11 * s, cx - 18 * s, cy);
     ctx.closePath();
     ctx.fill();
 
-    // 萌动小胸鳍
+    // 背鳍 (顶部小弧鳍)
     ctx.beginPath();
-    ctx.moveTo(ox + 16 * s, oy + 18 * s);
-    ctx.quadraticCurveTo(ox + 22 * s, oy + 24 * s, ox + 19 * s, oy + 27 * s);
-    ctx.quadraticCurveTo(ox + 15 * s, oy + 25 * s, ox + 15 * s, oy + 19 * s);
+    ctx.moveTo(cx - 3 * s, cy - 9 * s);
+    ctx.quadraticCurveTo(cx + 2 * s, cy - 14 * s, cx + 7 * s, cy - 8 * s);
     ctx.closePath();
     ctx.fill();
 
-    // 鲸鱼眼睛 (深蓝小圆点)
-    ctx.fillStyle = "#0052b3";
+    // 腹鳍 (底部小弧鳍)
     ctx.beginPath();
-    ctx.arc(ox + 11 * s, oy + 14 * s, 1.8 * s, 0, Math.PI * 2);
+    ctx.moveTo(cx - 2 * s, cy + 9 * s);
+    ctx.quadraticCurveTo(cx + 3 * s, cy + 14 * s, cx + 7 * s, cy + 8 * s);
+    ctx.closePath();
     ctx.fill();
 
-    // 头顶晶莹喷水水珠
-    ctx.fillStyle = "rgba(255, 255, 255, 0.95)";
+    // 鱼眼 (深蓝小圆点)
+    ctx.fillStyle = "#0056b3";
     ctx.beginPath();
-    ctx.arc(ox + 20 * s, oy + 1 * s, 2 * s, 0, Math.PI * 2);
-    ctx.arc(ox + 25 * s, oy - 1 * s, 2.4 * s, 0, Math.PI * 2);
+    ctx.arc(cx - 12 * s, cy - 2 * s, 1.8 * s, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.restore();
@@ -2244,7 +2242,7 @@
       ctx.stroke();
     });
 
-    // 2. 顶部 Header (y: 65 ~ 140) - 灵动小鲸鱼 Logo + VocabTool，右边日期含英文星期
+    // 2. 顶部 Header (y: 65 ~ 140) - 极简小鱼 Logo + VocabTool，右边日期含英文星期
     const now = new Date();
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, "0");
@@ -2252,8 +2250,8 @@
     const weekdaysEn = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
     const dateStr = year + "." + month + "." + day + " · " + weekdaysEn[now.getDay()];
 
-    // 动物 Logo (跃水小蓝鲸)
-    drawWhaleLogo(ctx, 65, 65, 66);
+    // 动物 Logo (平游小蓝鱼)
+    drawFishLogo(ctx, 65, 65, 66);
 
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
