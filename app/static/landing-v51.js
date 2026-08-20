@@ -2013,33 +2013,122 @@
     }
     const quote = currentPosterQuote;
 
-    // 1. 全局底色与柔光
+    // 1. 全局一体化通透底色与背景艺术画卷 (贯穿全画布，无生硬切分)
     if (isDark) {
       const bgGrad = ctx.createLinearGradient(0, 0, 0, H);
-      bgGrad.addColorStop(0, "#080c14");
-      bgGrad.addColorStop(0.5, "#0f172a");
-      bgGrad.addColorStop(1, "#07090e");
+      bgGrad.addColorStop(0, "#070b14");
+      bgGrad.addColorStop(0.4, "#0b1426");
+      bgGrad.addColorStop(0.8, "#09101f");
+      bgGrad.addColorStop(1, "#050811");
       ctx.fillStyle = bgGrad;
       ctx.fillRect(0, 0, W, H);
 
-      const glow1 = ctx.createRadialGradient(W * 0.8, H * 0.12, 30, W * 0.8, H * 0.12, 500);
-      glow1.addColorStop(0, "rgba(16, 185, 129, 0.16)");
-      glow1.addColorStop(1, "rgba(16, 185, 129, 0)");
+      // Logo 蓝星云柔光
+      const glow1 = ctx.createRadialGradient(W * 0.8, H * 0.15, 50, W * 0.8, H * 0.15, 550);
+      glow1.addColorStop(0, "rgba(0, 122, 255, 0.22)");
+      glow1.addColorStop(1, "rgba(0, 122, 255, 0)");
       ctx.fillStyle = glow1;
       ctx.fillRect(0, 0, W, H);
+
+      const glow2 = ctx.createRadialGradient(W * 0.2, H * 0.65, 50, W * 0.2, H * 0.65, 600);
+      glow2.addColorStop(0, "rgba(14, 165, 233, 0.15)");
+      glow2.addColorStop(1, "rgba(14, 165, 233, 0)");
+      ctx.fillStyle = glow2;
+      ctx.fillRect(0, 0, W, H);
+
+      // 星光点缀
+      ctx.fillStyle = "rgba(255, 255, 255, 0.75)";
+      const stars = [
+        [120, 300, 2], [280, 240, 2.5], [420, 180, 1.5], [820, 260, 3],
+        [940, 380, 2], [160, 1100, 2.5], [890, 1180, 2], [760, 1320, 1.5]
+      ];
+      stars.forEach(([sx, sy, sr]) => {
+        ctx.beginPath();
+        ctx.arc(sx, sy, sr, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      // 远景山影 (贯穿下半部)
+      ctx.fillStyle = "rgba(11, 20, 38, 0.75)";
+      ctx.beginPath();
+      ctx.moveTo(0, H);
+      ctx.lineTo(0, H - 380);
+      ctx.lineTo(280, H - 540);
+      ctx.lineTo(600, H - 420);
+      ctx.lineTo(880, H - 590);
+      ctx.lineTo(W, H - 400);
+      ctx.lineTo(W, H);
+      ctx.closePath();
+      ctx.fill();
+
+      // 近景山影
+      ctx.fillStyle = "rgba(6, 11, 22, 0.9)";
+      ctx.beginPath();
+      ctx.moveTo(0, H);
+      ctx.lineTo(0, H - 260);
+      ctx.lineTo(360, H - 410);
+      ctx.lineTo(720, H - 280);
+      ctx.lineTo(W, H - 360);
+      ctx.lineTo(W, H);
+      ctx.closePath();
+      ctx.fill();
     } else {
       const bgGrad = ctx.createLinearGradient(0, 0, 0, H);
       bgGrad.addColorStop(0, "#f8fafc");
-      bgGrad.addColorStop(0.5, "#f1f5f9");
-      bgGrad.addColorStop(1, "#e2e8f0");
+      bgGrad.addColorStop(0.4, "#f0f7ff");
+      bgGrad.addColorStop(0.8, "#e6f2ff");
+      bgGrad.addColorStop(1, "#dbeafe");
       ctx.fillStyle = bgGrad;
       ctx.fillRect(0, 0, W, H);
 
-      const glow1 = ctx.createRadialGradient(W * 0.85, H * 0.1, 30, W * 0.85, H * 0.1, 450);
-      glow1.addColorStop(0, "rgba(16, 185, 129, 0.12)");
-      glow1.addColorStop(1, "rgba(16, 185, 129, 0)");
+      // Logo 蓝晨光光晕
+      const glow1 = ctx.createRadialGradient(W * 0.85, H * 0.12, 50, W * 0.85, H * 0.12, 500);
+      glow1.addColorStop(0, "rgba(0, 122, 255, 0.16)");
+      glow1.addColorStop(1, "rgba(0, 122, 255, 0)");
       ctx.fillStyle = glow1;
       ctx.fillRect(0, 0, W, H);
+
+      const glow2 = ctx.createRadialGradient(W * 0.15, H * 0.6, 50, W * 0.15, H * 0.6, 550);
+      glow2.addColorStop(0, "rgba(56, 189, 248, 0.14)");
+      glow2.addColorStop(1, "rgba(56, 189, 248, 0)");
+      ctx.fillStyle = glow2;
+      ctx.fillRect(0, 0, W, H);
+
+      // 远景水墨山峦 (贯穿下半部)
+      ctx.fillStyle = "rgba(191, 219, 254, 0.45)";
+      ctx.beginPath();
+      ctx.moveTo(0, H);
+      ctx.lineTo(0, H - 360);
+      ctx.lineTo(300, H - 520);
+      ctx.lineTo(580, H - 410);
+      ctx.lineTo(860, H - 560);
+      ctx.lineTo(W, H - 380);
+      ctx.lineTo(W, H);
+      ctx.closePath();
+      ctx.fill();
+
+      // 近景山影
+      ctx.fillStyle = "rgba(147, 197, 253, 0.35)";
+      ctx.beginPath();
+      ctx.moveTo(0, H);
+      ctx.lineTo(0, H - 240);
+      ctx.lineTo(380, H - 380);
+      ctx.lineTo(700, H - 260);
+      ctx.lineTo(W, H - 340);
+      ctx.lineTo(W, H);
+      ctx.closePath();
+      ctx.fill();
+
+      // 灵动飞鸟
+      ctx.strokeStyle = "rgba(37, 99, 235, 0.45)";
+      ctx.lineWidth = 3;
+      const birds = [[160, 1120], [210, 1090], [260, 1130]];
+      birds.forEach(([bx, by]) => {
+        ctx.beginPath();
+        ctx.arc(bx - 12, by, 12, Math.PI, 0, false);
+        ctx.arc(bx + 12, by, 12, Math.PI, 0, false);
+        ctx.stroke();
+      });
     }
 
     function roundRect(x, y, w, h, r) {
@@ -2066,12 +2155,12 @@
     const dateStr = year + "." + month + "." + day;
     const weekdayStr = weekdaysZh[now.getDay()] + " · " + weekdaysEn[now.getDay()];
 
-    // Logo & App Name: VocabTool
+    // Logo (Logo 蓝)
     ctx.save();
     roundRect(70, 85, 64, 64, 16);
     const logoGrad = ctx.createLinearGradient(70, 85, 134, 149);
-    logoGrad.addColorStop(0, "#10b981");
-    logoGrad.addColorStop(1, "#059669");
+    logoGrad.addColorStop(0, "#007AFF");
+    logoGrad.addColorStop(1, "#0056b3");
     ctx.fillStyle = logoGrad;
     ctx.fill();
     ctx.fillStyle = "#ffffff";
@@ -2082,306 +2171,160 @@
     ctx.restore();
 
     ctx.textAlign = "left";
-    ctx.fillStyle = isDark ? "#f9fafb" : "#0f172a";
-    ctx.font = "bold 38px -apple-system, BlinkMacSystemFont, sans-serif";
+    ctx.fillStyle = isDark ? "#ffffff" : "#0f172a";
+    ctx.font = "bold 40px -apple-system, BlinkMacSystemFont, sans-serif";
     ctx.fillText("VocabTool", 152, 112);
 
-    ctx.fillStyle = isDark ? "#94a3b8" : "#64748b";
-    ctx.font = "500 20px -apple-system, BlinkMacSystemFont, sans-serif";
-    ctx.fillText("科学间隔重复 · 今日学习战报", 152, 144);
+    ctx.fillStyle = isDark ? "#38bdf8" : "#007AFF";
+    ctx.font = "600 22px -apple-system, BlinkMacSystemFont, sans-serif";
+    ctx.fillText("每日词汇复利 · 学习打卡", 152, 144);
 
     // Date (Right-aligned)
     ctx.textAlign = "right";
-    ctx.fillStyle = isDark ? "#f9fafb" : "#0f172a";
+    ctx.fillStyle = isDark ? "#ffffff" : "#0f172a";
     ctx.font = "bold 32px ui-monospace, SFMono-Regular, Menlo, monospace";
     ctx.fillText(dateStr, W - 70, 112);
 
     ctx.fillStyle = isDark ? "#94a3b8" : "#64748b";
-    ctx.font = "500 19px -apple-system, BlinkMacSystemFont, sans-serif";
+    ctx.font = "500 20px -apple-system, BlinkMacSystemFont, sans-serif";
     ctx.fillText(weekdayStr, W - 70, 144);
 
-    // 3. 数据提取 (6 项数据)
+    // 3. 数据提取 (4 项数据)
     const stats = realTodayStats || {};
     const studiedFromStats = Number(stats.unique_cards) || 0;
     const studiedFromDash = (todayDashboardData && Number(todayDashboardData.today_studied)) || 0;
     const todayStudied = studiedFromStats || studiedFromDash || 0;
 
-    const todayNew = Number(stats.new_learned) || (todayDashboardData && Number(todayDashboardData.today_new)) || 0;
-    const todayReview = Number(stats.reviews) || (todayDashboardData && Number(todayDashboardData.today_reviews)) || Math.max(0, todayStudied - todayNew);
-
-    const totalReviews = (todayDashboardData && (Number(todayDashboardData.total_reviews) || Number(todayDashboardData.total_reps))) || Number(stats.reviews) || 0;
-    const totalCards = (todayDashboardData && (Number(todayDashboardData.attempted_cards) || Number(todayDashboardData.card_count) || Number(todayDashboardData.total_cards))) || (realReviewTotalCards || 0);
+    const todayMemoryReps = Number(stats.reviews) || (todayDashboardData && Number(todayDashboardData.today_reviews)) || todayStudied;
+    const totalLearned = (todayDashboardData && (Number(todayDashboardData.attempted_cards) || Number(todayDashboardData.card_count) || Number(todayDashboardData.total_cards))) || (realReviewTotalCards || 0);
     const streak = (todayDashboardData && Number(todayDashboardData.consecutive_study_days)) || 0;
 
-    // 4. 上半部分：打卡数据面板 (y: 180 ~ 940, 高度 760px，占约一半)
-    const dataCardY = 180;
-    const dataCardH = 760;
-    const cardW = W - 140;
+    // 4. 上半部分：4 项核心打卡数据面板 (y: 180 ~ 930)
     const cardX = 70;
+    const cardW = W - 140;
+    const dataCardY = 180;
+    const dataCardH = 750;
 
     ctx.save();
     roundRect(cardX, dataCardY, cardW, dataCardH, 32);
-    ctx.fillStyle = isDark ? "rgba(17, 24, 39, 0.88)" : "rgba(255, 255, 255, 0.92)";
-    ctx.shadowColor = isDark ? "rgba(0, 0, 0, 0.45)" : "rgba(15, 23, 42, 0.08)";
-    ctx.shadowBlur = 30;
-    ctx.shadowOffsetY = 10;
+    ctx.fillStyle = isDark ? "rgba(15, 23, 42, 0.72)" : "rgba(255, 255, 255, 0.82)";
+    ctx.shadowColor = isDark ? "rgba(0, 0, 0, 0.35)" : "rgba(0, 122, 255, 0.06)";
+    ctx.shadowBlur = 28;
+    ctx.shadowOffsetY = 8;
     ctx.fill();
     ctx.restore();
 
     ctx.save();
     roundRect(cardX, dataCardY, cardW, dataCardH, 32);
-    ctx.strokeStyle = isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(226, 232, 240, 0.9)";
+    ctx.strokeStyle = isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 122, 255, 0.12)";
     ctx.lineWidth = 1.5;
     ctx.stroke();
     ctx.restore();
 
     // 连续天数 Hero
     ctx.save();
-    roundRect(W / 2 - 120, dataCardY + 36, 240, 42, 21);
-    ctx.fillStyle = isDark ? "rgba(16, 185, 129, 0.18)" : "rgba(16, 185, 129, 0.12)";
+    roundRect(W / 2 - 120, dataCardY + 36, 240, 44, 22);
+    ctx.fillStyle = isDark ? "rgba(0, 122, 255, 0.2)" : "rgba(0, 122, 255, 0.1)";
     ctx.fill();
-    ctx.fillStyle = isDark ? "#34d399" : "#059669";
-    ctx.font = "bold 20px -apple-system, BlinkMacSystemFont, sans-serif";
+    ctx.fillStyle = isDark ? "#38bdf8" : "#007AFF";
+    ctx.font = "bold 22px -apple-system, BlinkMacSystemFont, sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("🔥 连续高效打卡", W / 2, dataCardY + 63);
+    ctx.fillText("🔥 连续高效打卡", W / 2, dataCardY + 65);
     ctx.restore();
 
-    // 连续天数大字
+    // 连续天数大字 (150px)
     ctx.save();
-    const streakGrad = ctx.createLinearGradient(W / 2 - 100, dataCardY + 110, W / 2 + 100, dataCardY + 230);
-    streakGrad.addColorStop(0, isDark ? "#34d399" : "#10b981");
-    streakGrad.addColorStop(1, isDark ? "#10b981" : "#047857");
+    const streakGrad = ctx.createLinearGradient(W / 2 - 100, dataCardY + 110, W / 2 + 100, dataCardY + 250);
+    streakGrad.addColorStop(0, isDark ? "#38bdf8" : "#007AFF");
+    streakGrad.addColorStop(1, isDark ? "#007AFF" : "#0052b3");
     ctx.fillStyle = streakGrad;
-    ctx.font = "bold 130px -apple-system, BlinkMacSystemFont, sans-serif";
+    ctx.font = "bold 150px -apple-system, BlinkMacSystemFont, sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText(String(streak), W / 2, dataCardY + 225);
+    ctx.fillText(String(streak), W / 2, dataCardY + 235);
     ctx.restore();
 
     ctx.fillStyle = isDark ? "#e2e8f0" : "#334155";
-    ctx.font = "bold 26px -apple-system, BlinkMacSystemFont, sans-serif";
+    ctx.font = "bold 28px -apple-system, BlinkMacSystemFont, sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("DAYS / 连续学习天数", W / 2, dataCardY + 270);
+    ctx.fillText("连续学习天数", W / 2, dataCardY + 288);
 
     // 分割线
-    ctx.strokeStyle = isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(226, 232, 240, 0.8)";
+    ctx.strokeStyle = isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 122, 255, 0.1)";
     ctx.beginPath();
-    ctx.moveTo(cardX + 40, dataCardY + 305);
-    ctx.lineTo(cardX + cardW - 40, dataCardY + 305);
+    ctx.moveTo(cardX + 40, dataCardY + 325);
+    ctx.lineTo(cardX + cardW - 40, dataCardY + 325);
     ctx.stroke();
 
-    // 5 项数据网格 (Row 1: 3列, Row 2: 2列)
-    const grid1 = [
-      { label: "今日总学", val: String(todayStudied), unit: "张", color: isDark ? "#34d399" : "#059669" },
-      { label: "今日新学", val: String(todayNew), unit: "词", color: isDark ? "#60a5fa" : "#2563eb" },
-      { label: "今日复习", val: String(todayReview), unit: "次", color: isDark ? "#fbbf24" : "#d97706" }
-    ];
-    const grid2 = [
-      { label: "记忆次数", val: String(totalReviews), unit: "次", color: isDark ? "#a78bfa" : "#7c3aed" },
-      { label: "累计卡片", val: String(totalCards), unit: "张", color: isDark ? "#f472b6" : "#db2777" }
+    // 3 项并排大字数据 (今日学习、记忆次数、累计学习)
+    const stats3 = [
+      { label: "今日学习", val: String(todayStudied), unit: "张", color: isDark ? "#38bdf8" : "#007AFF" },
+      { label: "记忆次数", val: String(todayMemoryReps), unit: "次", color: isDark ? "#818cf8" : "#4f46e5" },
+      { label: "累计学习", val: String(totalLearned), unit: "张", color: isDark ? "#38bdf8" : "#0284c7" }
     ];
 
-    const row1Y = dataCardY + 335;
-    const row1H = 180;
-    const col3W = (cardW - 80 - 32) / 3;
+    const col3W = (cardW - 60 - 32) / 3;
+    const col3Y = dataCardY + 365;
+    const col3H = 340;
 
-    grid1.forEach((item, idx) => {
-      const bx = cardX + 40 + idx * (col3W + 16);
+    stats3.forEach((item, idx) => {
+      const bx = cardX + 30 + idx * (col3W + 16);
       ctx.save();
-      roundRect(bx, row1Y, col3W, row1H, 20);
-      ctx.fillStyle = isDark ? "rgba(15, 23, 42, 0.6)" : "rgba(241, 245, 249, 0.85)";
+      roundRect(bx, col3Y, col3W, col3H, 24);
+      ctx.fillStyle = isDark ? "rgba(15, 23, 42, 0.65)" : "rgba(240, 247, 255, 0.85)";
       ctx.fill();
-      ctx.strokeStyle = isDark ? "rgba(255, 255, 255, 0.05)" : "rgba(226, 232, 240, 0.8)";
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 122, 255, 0.12)";
+      ctx.lineWidth = 1.5;
       ctx.stroke();
       ctx.restore();
 
+      // 大数字 (76px)
       ctx.textAlign = "center";
       ctx.fillStyle = item.color;
-      ctx.font = "bold 52px -apple-system, BlinkMacSystemFont, sans-serif";
-      ctx.fillText(item.val, bx + col3W / 2 - 12, row1Y + 85);
+      ctx.font = "bold 76px -apple-system, BlinkMacSystemFont, sans-serif";
+      ctx.fillText(item.val, bx + col3W / 2 - 14, col3Y + 160);
       const valW = ctx.measureText(item.val).width;
 
+      // 单位
       ctx.fillStyle = isDark ? "#cbd5e1" : "#475569";
-      ctx.font = "bold 22px -apple-system, BlinkMacSystemFont, sans-serif";
-      ctx.fillText(item.unit, bx + col3W / 2 + valW / 2 + 4, row1Y + 83);
+      ctx.font = "bold 26px -apple-system, BlinkMacSystemFont, sans-serif";
+      ctx.fillText(item.unit, bx + col3W / 2 + valW / 2 + 6, col3Y + 158);
 
-      ctx.fillStyle = isDark ? "#94a3b8" : "#64748b";
-      ctx.font = "600 22px -apple-system, BlinkMacSystemFont, sans-serif";
-      ctx.fillText(item.label, bx + col3W / 2, row1Y + 140);
+      // 大标签 (28px 加粗)
+      ctx.fillStyle = isDark ? "#ffffff" : "#0f172a";
+      ctx.font = "bold 28px -apple-system, BlinkMacSystemFont, sans-serif";
+      ctx.fillText(item.label, bx + col3W / 2, col3Y + 260);
     });
 
-    const row2Y = row1Y + row1H + 20;
-    const row2H = 170;
-    const col2W = (cardW - 80 - 20) / 2;
+    // 5. 下半部分：真实双语名言 (y: 965 ~ 1815, 高度 850px)
+    const quoteCardY = 965;
+    const quoteCardH = 850;
 
-    grid2.forEach((item, idx) => {
-      const bx = cardX + 40 + idx * (col2W + 20);
-      ctx.save();
-      roundRect(bx, row2Y, col2W, row2H, 20);
-      ctx.fillStyle = isDark ? "rgba(15, 23, 42, 0.6)" : "rgba(241, 245, 249, 0.85)";
-      ctx.fill();
-      ctx.strokeStyle = isDark ? "rgba(255, 255, 255, 0.05)" : "rgba(226, 232, 240, 0.8)";
-      ctx.lineWidth = 1;
-      ctx.stroke();
-      ctx.restore();
-
-      ctx.textAlign = "center";
-      ctx.fillStyle = item.color;
-      ctx.font = "bold 52px -apple-system, BlinkMacSystemFont, sans-serif";
-      ctx.fillText(item.val, bx + col2W / 2 - 12, row2Y + 80);
-      const valW = ctx.measureText(item.val).width;
-
-      ctx.fillStyle = isDark ? "#cbd5e1" : "#475569";
-      ctx.font = "bold 22px -apple-system, BlinkMacSystemFont, sans-serif";
-      ctx.fillText(item.unit, bx + col2W / 2 + valW / 2 + 4, row2Y + 78);
-
-      ctx.fillStyle = isDark ? "#94a3b8" : "#64748b";
-      ctx.font = "600 22px -apple-system, BlinkMacSystemFont, sans-serif";
-      ctx.fillText(item.label, bx + col2W / 2, row2Y + 132);
-    });
-
-    // 5. 下半部分：双语格言与精美艺术画境 (y: 970 ~ 1810, 高度 840px，占约一半)
-    const quoteCardY = 970;
-    const quoteCardH = 840;
-
-    // 绘制艺术画境背景卡片
     ctx.save();
     roundRect(cardX, quoteCardY, cardW, quoteCardH, 32);
-    ctx.clip(); // 限制在圆角卡片内部
-
-    if (isDark) {
-      // 暗色艺术背景：深蓝紫星空 + 极光与雪山
-      const nightGrad = ctx.createLinearGradient(cardX, quoteCardY, cardX, quoteCardY + quoteCardH);
-      nightGrad.addColorStop(0, "#0f172a");
-      nightGrad.addColorStop(0.5, "#1e1b4b");
-      nightGrad.addColorStop(1, "#090d16");
-      ctx.fillStyle = nightGrad;
-      ctx.fillRect(cardX, quoteCardY, cardW, quoteCardH);
-
-      // 极光柔光
-      const aurora = ctx.createRadialGradient(cardX + cardW * 0.5, quoteCardY + 200, 50, cardX + cardW * 0.5, quoteCardY + 200, 450);
-      aurora.addColorStop(0, "rgba(16, 185, 129, 0.25)");
-      aurora.addColorStop(0.5, "rgba(59, 130, 246, 0.18)");
-      aurora.addColorStop(1, "rgba(15, 23, 42, 0)");
-      ctx.fillStyle = aurora;
-      ctx.fillRect(cardX, quoteCardY, cardW, quoteCardH);
-
-      // 星光
-      ctx.fillStyle = "rgba(255, 255, 255, 0.75)";
-      const stars = [
-        [cardX + 80, quoteCardY + 100, 2], [cardX + 220, quoteCardY + 60, 2.5],
-        [cardX + 450, quoteCardY + 90, 1.5], [cardX + 700, quoteCardY + 70, 3],
-        [cardX + 850, quoteCardY + 120, 2], [cardX + 150, quoteCardY + 220, 1.5],
-        [cardX + 800, quoteCardY + 240, 2.5]
-      ];
-      stars.forEach(([sx, sy, sr]) => {
-        ctx.beginPath();
-        ctx.arc(sx, sy, sr, 0, Math.PI * 2);
-        ctx.fill();
-      });
-
-      // 远景山影
-      ctx.fillStyle = "rgba(15, 23, 42, 0.7)";
-      ctx.beginPath();
-      ctx.moveTo(cardX, quoteCardY + quoteCardH);
-      ctx.lineTo(cardX, quoteCardY + quoteCardH - 180);
-      ctx.lineTo(cardX + 280, quoteCardY + quoteCardH - 290);
-      ctx.lineTo(cardX + 540, quoteCardY + quoteCardH - 210);
-      ctx.lineTo(cardX + 780, quoteCardY + quoteCardH - 320);
-      ctx.lineTo(cardX + cardW, quoteCardY + quoteCardH - 190);
-      ctx.lineTo(cardX + cardW, quoteCardY + quoteCardH);
-      ctx.closePath();
-      ctx.fill();
-
-      // 近景山影
-      ctx.fillStyle = "rgba(7, 10, 18, 0.9)";
-      ctx.beginPath();
-      ctx.moveTo(cardX, quoteCardY + quoteCardH);
-      ctx.lineTo(cardX, quoteCardY + quoteCardH - 120);
-      ctx.lineTo(cardX + 380, quoteCardY + quoteCardH - 220);
-      ctx.lineTo(cardX + 680, quoteCardY + quoteCardH - 140);
-      ctx.lineTo(cardX + cardW, quoteCardY + quoteCardH - 180);
-      ctx.lineTo(cardX + cardW, quoteCardY + quoteCardH);
-      ctx.closePath();
-      ctx.fill();
-    } else {
-      // 亮色艺术背景：朝阳晨曦 + 金色云晖与优雅远山
-      const dawnGrad = ctx.createLinearGradient(cardX, quoteCardY, cardX, quoteCardY + quoteCardH);
-      dawnGrad.addColorStop(0, "#fefbf6");
-      dawnGrad.addColorStop(0.4, "#fdf4e7");
-      dawnGrad.addColorStop(1, "#edf2f7");
-      ctx.fillStyle = dawnGrad;
-      ctx.fillRect(cardX, quoteCardY, cardW, quoteCardH);
-
-      // 晨曦金辉
-      const sun = ctx.createRadialGradient(cardX + cardW * 0.75, quoteCardY + 160, 40, cardX + cardW * 0.75, quoteCardY + 160, 400);
-      sun.addColorStop(0, "rgba(251, 191, 36, 0.35)");
-      sun.addColorStop(0.5, "rgba(245, 158, 11, 0.15)");
-      sun.addColorStop(1, "rgba(254, 243, 199, 0)");
-      ctx.fillStyle = sun;
-      ctx.fillRect(cardX, quoteCardY, cardW, quoteCardH);
-
-      // 远景水墨山影
-      ctx.fillStyle = "rgba(203, 213, 225, 0.55)";
-      ctx.beginPath();
-      ctx.moveTo(cardX, quoteCardY + quoteCardH);
-      ctx.lineTo(cardX, quoteCardY + quoteCardH - 170);
-      ctx.lineTo(cardX + 260, quoteCardY + quoteCardH - 270);
-      ctx.lineTo(cardX + 520, quoteCardY + quoteCardH - 190);
-      ctx.lineTo(cardX + 760, quoteCardY + quoteCardH - 290);
-      ctx.lineTo(cardX + cardW, quoteCardY + quoteCardH - 160);
-      ctx.lineTo(cardX + cardW, quoteCardY + quoteCardH);
-      ctx.closePath();
-      ctx.fill();
-
-      // 近景山影
-      ctx.fillStyle = "rgba(148, 163, 184, 0.35)";
-      ctx.beginPath();
-      ctx.moveTo(cardX, quoteCardY + quoteCardH);
-      ctx.lineTo(cardX, quoteCardY + quoteCardH - 110);
-      ctx.lineTo(cardX + 360, quoteCardY + quoteCardH - 200);
-      ctx.lineTo(cardX + 660, quoteCardY + quoteCardH - 130);
-      ctx.lineTo(cardX + cardW, quoteCardY + quoteCardH - 170);
-      ctx.lineTo(cardX + cardW, quoteCardY + quoteCardH);
-      ctx.closePath();
-      ctx.fill();
-
-      // 飞鸟
-      ctx.strokeStyle = "rgba(100, 116, 139, 0.6)";
-      ctx.lineWidth = 2.5;
-      const birds = [[cardX + 200, quoteCardY + 120], [cardX + 235, quoteCardY + 105], [cardX + 270, quoteCardY + 125]];
-      birds.forEach(([bx, by]) => {
-        ctx.beginPath();
-        ctx.arc(bx - 10, by, 10, Math.PI, 0, false);
-        ctx.arc(bx + 10, by, 10, Math.PI, 0, false);
-        ctx.stroke();
-      });
-    }
-
-    // 磨砂半透明中央阅读层，保证名言对比度
-    ctx.fillStyle = isDark ? "rgba(17, 24, 39, 0.45)" : "rgba(255, 255, 255, 0.45)";
-    ctx.fillRect(cardX, quoteCardY, cardW, quoteCardH);
+    ctx.fillStyle = isDark ? "rgba(15, 23, 42, 0.72)" : "rgba(255, 255, 255, 0.82)";
+    ctx.shadowColor = isDark ? "rgba(0, 0, 0, 0.35)" : "rgba(0, 122, 255, 0.06)";
+    ctx.shadowBlur = 28;
+    ctx.shadowOffsetY = 8;
+    ctx.fill();
     ctx.restore();
 
-    // 卡片边框
     ctx.save();
     roundRect(cardX, quoteCardY, cardW, quoteCardH, 32);
-    ctx.strokeStyle = isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(226, 232, 240, 0.9)";
+    ctx.strokeStyle = isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 122, 255, 0.12)";
     ctx.lineWidth = 1.5;
     ctx.stroke();
     ctx.restore();
 
-    // 格言文字排版
-    // 大引号
+    // 大引号 (Logo 蓝)
     ctx.textAlign = "center";
-    ctx.fillStyle = isDark ? "#34d399" : "#10b981";
-    ctx.font = "bold 80px Georgia, serif";
+    ctx.fillStyle = isDark ? "#38bdf8" : "#007AFF";
+    ctx.font = "bold 96px Georgia, serif";
     ctx.fillText("“", W / 2, quoteCardY + 120);
 
-    // 英文名言原句 (Georgia / 经典衬线体)
+    // 英文名言原句 (46px 加粗经典衬线体)
     ctx.fillStyle = isDark ? "#ffffff" : "#0f172a";
-    ctx.font = "italic 600 38px Georgia, serif";
-    const maxQuoteW = cardW - 140;
+    ctx.font = "italic 700 46px Georgia, serif";
+    const maxQuoteW = cardW - 120;
     const words = quote.en.split(" ");
     let line = "";
     const lines = [];
@@ -2397,27 +2340,27 @@
     }
     lines.push(line.trim());
 
-    let qTextY = quoteCardY + 220;
-    const lineStep = 54;
+    let qTextY = quoteCardY + 230;
+    const lineStep = 64;
     lines.forEach((l) => {
       ctx.fillText(l, W / 2, qTextY);
       qTextY += lineStep;
     });
 
-    // 中文翻译
-    ctx.fillStyle = isDark ? "#e2e8f0" : "#334155";
-    ctx.font = "600 28px -apple-system, BlinkMacSystemFont, sans-serif";
-    ctx.fillText(quote.zh, W / 2, qTextY + 30);
+    // 中文翻译 (34px 加粗)
+    ctx.fillStyle = isDark ? "#e2e8f0" : "#1e293b";
+    ctx.font = "700 34px -apple-system, BlinkMacSystemFont, sans-serif";
+    ctx.fillText(quote.zh, W / 2, qTextY + 50);
 
-    // 作者签名
+    // 作者签名 (28px)
     ctx.fillStyle = isDark ? "#94a3b8" : "#64748b";
-    ctx.font = "italic 500 24px Georgia, -apple-system, sans-serif";
-    ctx.fillText("—— " + quote.author, W / 2, qTextY + 86);
+    ctx.font = "italic 500 28px Georgia, -apple-system, sans-serif";
+    ctx.fillText("—— " + quote.author, W / 2, qTextY + 120);
 
     // 6. 底部 Footer (y: 1865)
     ctx.textAlign = "center";
     ctx.fillStyle = isDark ? "#64748b" : "#94a3b8";
-    ctx.font = "500 20px -apple-system, BlinkMacSystemFont, sans-serif";
+    ctx.font = "500 22px -apple-system, BlinkMacSystemFont, sans-serif";
     ctx.fillText("用间隔重复，让词汇真正留在脑海中 · VocabTool", W / 2, 1865);
 
     const dataUrl = canvas.toDataURL("image/png");
