@@ -697,18 +697,18 @@ button.landing-login-btn { border: none; cursor: pointer; }
   font-weight: 700;
   letter-spacing: .04em;
 }
-.demo-front-text { margin: 0; font-size: 18px; font-weight: 700; color: var(--text); line-height: 1.45; }
+.demo-front-text { margin: 0; font-size: 21px; font-weight: 700; color: var(--text); line-height: 1.5; }
 .reading-word-row {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 6px;
   margin-bottom: 8px;
 }
-.reading-word-row mark { font-size: 26px; }
-.reading-word-row .demo-audio { margin-top: 0; padding: 2px 10px; }
-.demo-back-word { margin: 0; font-size: 16px; font-weight: 800; color: var(--accent); }
-.demo-card-face.back p:not(.demo-front-text) { margin: 4px 0 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+.reading-word-row mark { font-size: 28px; }
+.reading-word-row .demo-audio { margin-top: 0; padding: 3px 12px; }
+.demo-back-word { margin: 0; font-size: 18px; font-weight: 800; color: var(--accent); }
+.demo-card-face.back p:not(.demo-front-text) { margin: 4px 0 0; color: var(--muted); font-size: 15px; line-height: 1.5; }
 .demo-card-face mark {
   background: transparent;
   color: var(--accent);
@@ -3623,7 +3623,7 @@ button.ghost.small {
   }
   #real-review .home-review-cards .demo-card { height: 300px; }
   #real-review .home-review-cards .demo-card-face { padding: 20px 16px; }
-  #real-review .home-review-cards .demo-front-text { font-size: 18px; }
+  #real-review .home-review-cards .demo-front-text { font-size: 20px; }
   #real-review .home-review-cards .demo-audio {
     padding: 7px 14px;
     font-size: 13px;
@@ -4448,12 +4448,12 @@ svg {
 }
 .dictation-meaning-box {
   color: var(--text);
-  font-size: 17px;
-  line-height: 1.45;
-  font-weight: 600;
+  font-size: 21px;
+  line-height: 1.5;
+  font-weight: 700;
   max-width: 90%;
   margin: 4px 0 8px;
-  padding: 6px 14px;
+  padding: 8px 16px;
   border-radius: 10px;
   background: var(--bg-soft, rgba(0, 0, 0, 0.03));
   border: 1px dashed var(--line);
@@ -4465,18 +4465,18 @@ svg {
   display: flex;
   align-items: center;
   gap: 8px;
-  width: min(340px, 92%);
+  width: min(360px, 94%);
   margin: 0 auto;
 }
 .dictation-input {
   flex: 1;
-  min-height: 42px;
+  min-height: 44px;
   padding: 8px 14px;
   border: 1.5px solid var(--line);
   border-radius: 12px;
   background: var(--bg);
   color: var(--text);
-  font-size: 17px;
+  font-size: 21px;
   font-family: inherit;
   outline: none;
   text-align: center;
@@ -4487,12 +4487,12 @@ svg {
   box-shadow: 0 0 0 3px var(--accent-soft, rgba(16, 185, 129, 0.2));
 }
 .dictation-hint-btn {
-  padding: 8px 12px;
+  padding: 8px 14px;
   border: 1px solid var(--line);
   border-radius: 10px;
   background: var(--panel);
   color: var(--muted);
-  font-size: 13px;
+  font-size: 14px;
   cursor: pointer;
   white-space: nowrap;
   transition: background 0.15s, color 0.15s;
@@ -4511,31 +4511,31 @@ svg {
   margin-bottom: 4px;
 }
 .dictation-word-row mark {
-  font-size: 26px;
+  font-size: 28px;
 }
 .dictation-word-row .demo-audio {
   margin-top: 0;
-  padding: 2px 10px;
+  padding: 3px 12px;
 }
 .dictation-user-tag {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
-  padding: 2px 8px;
-  border-radius: 6px;
-  font-size: 16px;
+  gap: 3px;
+  padding: 3px 10px;
+  border-radius: 8px;
+  font-size: 18px;
   line-height: 1.4;
   vertical-align: middle;
 }
 .dictation-user-tag.is-correct {
   background: rgba(16, 185, 129, 0.15);
   color: var(--accent, #10b981);
-  font-weight: 600;
+  font-weight: 700;
 }
 .dictation-user-tag.is-empty {
   background: rgba(156, 163, 175, 0.12);
   color: var(--muted);
-  font-size: 15px;
+  font-size: 16px;
 }
 .dictation-user-tag.is-wrong {
   background: rgba(239, 68, 68, 0.1);
@@ -4544,12 +4544,12 @@ svg {
 }
 .dictation-user-tag .diff-prefix {
   color: var(--muted);
-  font-size: 15px;
+  font-size: 16px;
 }
 .dictation-user-tag .diff-char {
   display: inline-block;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 17px;
+  font-size: 20px;
   font-weight: 700;
   padding: 0 1px;
 }
@@ -4575,9 +4575,9 @@ svg {
 .dictation-sentence-wrap p,
 #real-review .home-review-cards .demo-card-face.back .dictation-meaning-text,
 #real-review .home-review-cards .demo-card-face.back .dictation-sentence-text {
-  font-size: 18px !important;
+  font-size: 21px !important;
   font-weight: 700 !important;
-  line-height: 1.45 !important;
+  line-height: 1.5 !important;
   color: var(--text) !important;
   margin: 4px 0 2px !important;
   text-align: center;
