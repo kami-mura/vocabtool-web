@@ -18,6 +18,7 @@
   registerMobileSection("landing-hero", "search");
   registerMobileSection("real-review", "study");
   registerMobileSection("today-overview", "study");
+  registerMobileSection("study-heatmap", "study");
   registerMobileSection("guest-demo-cards", "study");
   registerMobileSection("guest-demo-article", "article");
   registerMobileSection("real-article-panel", "article");
@@ -1476,6 +1477,130 @@
     subEl.textContent = sub;
   }
 
+  /* ---------- 学习热力图 ---------- */
+  function heatLevelForDay(total) {
+    const value = Number(total) || 0;
+    if (value <= 0) return 0;
+    if (value < 5) return 1;
+    if (value < 10) return 2;
+    if (value < 20) return 3;
+    return 4;
+  }
+
+  function heatTooltipText(day) {
+    const total = Number(day.total) || 0;
+    const parts = day.date.split("-").map(Number);
+    const label = parts[1] + "月" + parts[2] + "日";
+    if (total <= 0) return label + "：未学习";
+    return (
+      label +
+      "：共学 " + total + " 张（新学 " +
+      (Number(day.new_count) || 0) + " · 复习 " +
+      (Number(day.review_count) || 0) + "）"
+    );
+  }
+
+  function heatMonthLabels(days) {
+    if (!days || !days.length) return [];
+    const labels = [];
+    let lastMonth = -1;
+    days.forEach((day, index) => {
+      const parts = day.date.split("-").map(Number);
+      const month = parts[1];
+      if (month !== lastMonth) {
+        labels.push({ month: month, col: Math.floor(index / 7) });
+        lastMonth = month;
+      }
+    });
+    return labels;
+  }
+
+  let heatTooltipEl = null;
+  function wireHeatmapCells() {
+    const grid = document.getElementById("study-heatmap-grid");
+    if (!grid) return;
+    if (!heatTooltipEl) {
+      heatTooltipEl = document.createElement("div");
+      heatTooltipEl.className = "study-heatmap-tooltip";
+      heatTooltipEl.hidden = true;
+      document.body.appendChild(heatTooltipEl);
+    }
+    const show = (cell) => {
+      const day = cell.dataset.heatDate;
+      const entry = todayDashboardData &&
+        todayDashboardData.heatmap_days &&
+        todayDashboardData.heatmap_days.find((d) => d.date === day);
+      if (!entry) return;
+      heatTooltipEl.textContent = heatTooltipText(entry);
+      heatTooltipEl.hidden = false;
+      const rect = cell.getBoundingClientRect();
+      const tooltipRect = heatTooltipEl.getBoundingClientRect();
+      let left = rect.left + rect.width / 2 - tooltipRect.width / 2;
+      left = Math.max(8, Math.min(left, window.innerWidth - tooltipRect.width - 8));
+      let top = rect.top - tooltipRect.height - 8;
+      if (top < 8) top = rect.bottom + 8;
+      heatTooltipEl.style.left = left + "px";
+      heatTooltipEl.style.top = top + "px";
+    };
+    const hide = () => {
+      if (heatTooltipEl) heatTooltipEl.hidden = true;
+    };
+    grid.querySelectorAll(".hm-cell:not(.hm-empty)").forEach((cell) => {
+      cell.addEventListener("mouseenter", () => show(cell));
+      cell.addEventListener("mouseleave", hide);
+      cell.addEventListener("click", () => show(cell));
+    });
+    document.addEventListener("click", (event) => {
+      if (heatTooltipEl && !heatTooltipEl.hidden &&
+          !event.target.closest(".hm-cell")) {
+        hide();
+      }
+    });
+  }
+
+  function renderHeatmap(days) {
+    const section = document.getElementById("study-heatmap");
+    if (!section) return;
+    const grid = document.getElementById("study-heatmap-grid");
+    const months = document.getElementById("study-heatmap-months");
+    const summary = document.getElementById("study-heatmap-summary");
+    if (!grid || !months || !summary) return;
+    if (!Array.isArray(days) || !days.length) {
+      section.hidden = true;
+      return;
+    }
+    const totalCards = days.reduce((sum, day) => sum + (Number(day.total) || 0), 0);
+    const activeDays = days.filter((day) => (Number(day.total) || 0) > 0).length;
+    summary.textContent = days.length < 365
+      ? "注册以来共学 " + totalCards + " 张卡 · " + activeDays + " 天有学习"
+      : "近一年共学 " + totalCards + " 张卡 · " + activeDays + " 天有学习";
+    // 网格从周一列开始：起始日前用不可见占位格补齐。
+    const first = new Date(days[0].date + "T00:00:00");
+    const leading = (first.getDay() + 6) % 7;
+    const html = [];
+    for (let i = 0; i < leading; i += 1) {
+      html.push('<i class="hm-cell hm-empty"></i>');
+    }
+    days.forEach((day) => {
+      const level = heatLevelForDay(day.total);
+      const cls = level > 0 ? "hm-cell lv-" + level : "hm-cell";
+      html.push(
+        '<i class="' + cls + '" data-heat-date="' + day.date +
+        '" title="' + heatTooltipText(day).replace(/"/g, "&quot;") + '"></i>'
+      );
+    });
+    const trailing = (7 - ((leading + days.length) % 7)) % 7;
+    for (let i = 0; i < trailing; i += 1) {
+      html.push('<i class="hm-cell hm-empty"></i>');
+    }
+    grid.innerHTML = html.join("");
+    months.innerHTML = heatMonthLabels(days)
+      .map((label) => '<span style="left:' + (label.col * 16) + 'px">' + label.month + "月</span>")
+      .join("");
+    wireHeatmapCells();
+    section.hidden = false;
+  }
+
   async function loadTodayOverview() {
     const wrap = document.getElementById("today-overview");
     if (!wrap || wrap.hidden) return;
@@ -1486,6 +1611,7 @@
       if (!res.ok) return;
       todayDashboardData = await res.json();
       updateTodayOverview();
+      renderHeatmap(todayDashboardData.heatmap_days);
     } catch (_) { /* 概览失败不打扰学习 */ }
   }
 
