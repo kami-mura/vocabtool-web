@@ -463,7 +463,7 @@ class AiDailyQuota(Base):
 
 
 class AiFreeDailyQuota(Base):
-    """平台 Key 的每用户每日免费查询与制卡额度。"""
+    """平台 Key 的每用户每日免费查询、制卡与短文额度。"""
 
     __tablename__ = "ai_free_daily_quota"
     __table_args__ = (
@@ -477,6 +477,7 @@ class AiFreeDailyQuota(Base):
     day = Column(String(10), nullable=False, index=True)
     query_count = Column(Integer, default=0, nullable=False)
     card_count = Column(Integer, default=0, nullable=False)
+    article_count = Column(Integer, default=0, nullable=False)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow, nullable=False)
 
 

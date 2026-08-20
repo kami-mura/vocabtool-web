@@ -1194,7 +1194,9 @@
       '<button class="rating easy" data-real-rating="easy" data-real-card="' + card.id + '" type="button"><b>Easy</b><small>' + escapeHtml(previewLabel("easy", "3d")) + "</small></button>" +
       "</div>";
     return (
-      '<div class="demo-card home-review-card" data-real-card="' + card.id +
+      '<div class="demo-card home-review-card' +
+      (card.card_type === "general" ? " general-card" : "") +
+      '" data-real-card="' + card.id +
       '" data-review-signature="' + realCardSignature(card) + '">' +
       '<div class="demo-card-inner">' +
       '<div class="demo-card-face front">' + frontHtml + "</div>" +
@@ -3850,11 +3852,16 @@
             failed.slice(0, 20).map((item) => "<li>" + escapeHtml(item) + "</li>").join("") +
             "</ul></div>";
         }
+        if (result.limit_notice) {
+          html = '<p class="card-limit-notice">' + escapeHtml(result.limit_notice) + "</p>" + html;
+        }
         resultEl.innerHTML = '<div class="empty-state">' + html + "</div>";
       }
-        setCardProgress(result.created || 0, totalWords || 0, "完成");
+      setCardProgress(result.created || 0, result.processed || totalWords || 0, "完成");
       const status = document.getElementById("real-card-status");
-      if (status) status.textContent = result.error ? "部分失败：" + result.error : "";
+      if (status) {
+        status.textContent = result.limit_notice || (result.error ? "部分失败：" + result.error : "");
+      }
       await loadRealWords();
       requestReviewRefresh();
     }

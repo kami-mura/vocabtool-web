@@ -176,6 +176,53 @@ def test_builtin_speaking_needs_are_categorized(client):
     assert all(not need["has_card"] for group in data["categories"] for need in group["needs"])
 
 
+def test_free_card_generation_truncates_to_fifty_and_warns(
+    client, monkeypatch
+):
+    from app import config
+
+    monkeypatch.setattr(config, "AI_FREE_DAILY_CARD_LIMIT", 50)
+    register(client, "free-card-cap@example.com")
+    words = [f"freeword{index}" for index in range(55)]
+
+    response = client.post(
+        "/api/card-studio/cards",
+        json={"card_type": "general", "words": words},
+    )
+
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert data["created"] == 50
+    assert data["submitted"] == 55
+    assert data["processed"] == 50
+    assert "每天最多制作 50 张" in data["limit_notice"]
+    assert client.get(
+        "/api/cards/browse", params={"card_type": "general"}
+    ).json()["total"] == 50
+
+
+def test_own_api_key_is_not_truncated_by_free_card_limit(client, monkeypatch):
+    from app import config
+
+    monkeypatch.setattr(config, "AI_FREE_DAILY_CARD_LIMIT", 50)
+    monkeypatch.setattr(
+        "app.routes.card_routes._user_ai_credential", lambda _db, _user: object()
+    )
+    register(client, "own-key-card-cap@example.com")
+    words = [f"ownword{index}" for index in range(55)]
+
+    response = client.post(
+        "/api/card-studio/cards",
+        json={"card_type": "general", "words": words},
+    )
+
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert data["created"] == 55
+    assert data["processed"] == 55
+    assert "limit_notice" not in data
+
+
 def test_speaking_cards_generate_three_expressions_and_prefetch_audio(client):
     register(client, "speaking-cards@example.com")
     needs = [

@@ -260,6 +260,12 @@ def test_old_sqlite_database_migrates_cleanly(monkeypatch, tmp_path):
         assert "024_saved_words" in versions
         assert "026_anki_exchange" in versions
         assert "028_user_api_credentials_free_quota" in versions
+        assert "029_free_article_quota" in versions
+        quota_columns = {
+            row[1]
+            for row in connection.execute("PRAGMA table_info(ai_free_daily_quota)")
+        }
+        assert "article_count" in quota_columns
     finally:
         connection.close()
 

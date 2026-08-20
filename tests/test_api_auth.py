@@ -69,7 +69,8 @@ def test_home_page_has_guest_search_demo_and_login_link(client):
     assert 'id="real-review" hidden' in page.text
     assert "游客每人可体验" not in page.text
     assert 'action="/login"' not in page.text
-    assert page.text.count('class="demo-card"') == 4
+    assert page.text.count('class="demo-card"') == 3
+    assert 'class="demo-card general-card"' in page.text
     assert "onclick=" not in page.text
     assert "data-audio=" in page.text
     assert "data-demo-rating=" in page.text
@@ -85,6 +86,9 @@ def test_ai_key_is_encrypted_never_returned_and_user_isolated(client, monkeypatc
     monkeypatch.setattr(config, "API_KEY_ENCRYPTION_SECRET", "test-encryption-secret")
     api_key = "sk-test-user-secret-1234567890"
     register(client, "key-owner@example.com")
+    page = client.get("/")
+    assert "查询 50 次、制卡 50 张、短文 1 次" in page.text
+    assert "超过时只制作前 50 张" in page.text
 
     saved = client.put(
         "/api/ai-credentials",

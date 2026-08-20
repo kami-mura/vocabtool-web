@@ -53,6 +53,7 @@ def _disable_new_free_ai_quotas_by_default(monkeypatch):
 
     monkeypatch.setattr(config, "AI_FREE_DAILY_QUERY_LIMIT", 0)
     monkeypatch.setattr(config, "AI_FREE_DAILY_CARD_LIMIT", 0)
+    monkeypatch.setattr(config, "AI_FREE_DAILY_ARTICLE_LIMIT", 0)
 
 
 @pytest.fixture(autouse=True)

@@ -105,9 +105,10 @@ AI_USAGE_RETENTION_DAYS = max(
 # 每位用户每日 AI 请求上限（按站点时区自然日计数）；0 表示不限制。
 # 默认 3000：查词 100 次、制卡 2000 张（约 200-400 次批量请求）都不会触发。
 AI_DAILY_REQUEST_LIMIT = max(0, _env_int("AI_DAILY_REQUEST_LIMIT", 3000))
-# 平台 Key 的免费用量按业务动作分别限制；用户自带 Key 不消耗这两项。
+# 平台 Key 的免费用量按业务动作分别限制；用户自带 Key 不消耗这些额度。
 AI_FREE_DAILY_QUERY_LIMIT = max(0, _env_int("AI_FREE_DAILY_QUERY_LIMIT", 50))
 AI_FREE_DAILY_CARD_LIMIT = max(0, _env_int("AI_FREE_DAILY_CARD_LIMIT", 50))
+AI_FREE_DAILY_ARTICLE_LIMIT = max(0, _env_int("AI_FREE_DAILY_ARTICLE_LIMIT", 1))
 
 # 全站未登录用户每日 AI 查词总量上限；0 表示不限制。
 GUEST_AI_DAILY_LIMIT = max(0, _env_int("GUEST_AI_DAILY_LIMIT", 500))

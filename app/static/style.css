@@ -141,6 +141,7 @@
 [data-theme="dark"] .rating.hard { border-color: rgba(255, 255, 255, .3); color: #fff; background: linear-gradient(145deg, rgba(235, 157, 43, .88), rgba(204, 112, 10, .92)); }
 [data-theme="dark"] .rating.good { border-color: rgba(255, 255, 255, .3); color: #fff; background: linear-gradient(145deg, rgba(54, 190, 72, .88), rgba(22, 145, 40, .92)); }
 [data-theme="dark"] .rating.easy { border-color: rgba(255, 255, 255, .3); color: #fff; background: linear-gradient(145deg, rgba(58, 143, 238, .88), rgba(22, 100, 200, .92)); }
+[data-theme="dark"] .card-limit-notice { color: #ffb15c; }
 [data-theme="dark"] .file-button { border-color: #3a4a6e; background: #1c2433; }
 [data-theme="dark"] .auth-body {
   background:
@@ -1770,6 +1771,7 @@ button.landing-login-btn { border: none; cursor: pointer; }
 .rating.good { border-color: rgba(255, 255, 255, .55); color: #fff; background: linear-gradient(145deg, rgba(54, 190, 72, .82), rgba(22, 145, 40, .88)); }
 .rating.easy { border-color: rgba(255, 255, 255, .55); color: #fff; background: linear-gradient(145deg, rgba(58, 143, 238, .82), rgba(22, 100, 200, .88)); }
 .rating:hover { transform: translateY(-1px); filter: brightness(1.06) saturate(1.02); }
+.card-limit-notice { margin: 0 0 8px; color: #b06a00; font-weight: 700; }
 /* ---------- 制作新卡 / Anki 队列 ---------- */
 .studio-type, .studio-grid { margin-bottom: 14px; }
 .studio-type { padding: 16px 20px; }

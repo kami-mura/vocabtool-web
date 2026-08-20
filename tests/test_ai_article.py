@@ -158,7 +158,7 @@ def _age_article(corpus_id, days=1):
 
 
 def _fake_generate_article(
-    _db, _user_id, new_words, review_words, thinking=False, effort=None
+    _db, _user_id, new_words, review_words, thinking=False, effort=None, **_kwargs
 ):
     result = {
         "title": "Test Article",
@@ -488,6 +488,57 @@ def test_article_available_without_completing_tasks(client, monkeypatch):
     )
     _response, article = _start_article_for_test(client)
     assert article["article_title"] == "Test Article"
+
+
+def test_free_user_can_generate_only_one_article_per_day(client, monkeypatch):
+    from app import config
+
+    monkeypatch.setattr(config, "AI_FREE_DAILY_ARTICLE_LIMIT", 1)
+    _prepare_article_user(client, "free-article-limit@example.com")
+    monkeypatch.setattr(
+        "app.routes.card_routes.ai_mod.generate_article", _fake_generate_article
+    )
+
+    first, _article = _start_article_for_test(client)
+    assert first.status_code == 200
+    blocked = client.post("/api/cards/article")
+    assert blocked.status_code == 429
+    assert "今日免费短文额度已用完" in blocked.json()["detail"]
+
+
+def test_own_api_key_bypasses_free_article_limit(client, monkeypatch):
+    from app import config
+    from app.models import AiFreeDailyQuota
+
+    monkeypatch.setattr(config, "AI_FREE_DAILY_ARTICLE_LIMIT", 1)
+    _prepare_article_user(client, "own-key-article-limit@example.com")
+    credential = object()
+    monkeypatch.setattr(
+        "app.routes.card_routes._user_ai_credential", lambda _db, _user: credential
+    )
+    used_credentials = []
+
+    def fake_with_own_key(
+        db, user_id, new_words, review_words, *, user_api_key=None, **kwargs
+    ):
+        used_credentials.append(user_api_key)
+        return _fake_generate_article(
+            db, user_id, new_words, review_words, **kwargs
+        )
+
+    monkeypatch.setattr(
+        "app.routes.card_routes.ai_mod.generate_article", fake_with_own_key
+    )
+
+    _start_article_for_test(client)
+    _start_article_for_test(client)
+    assert used_credentials == [credential, credential]
+
+    db = SessionLocal()
+    try:
+        assert db.query(AiFreeDailyQuota).count() == 0
+    finally:
+        db.close()
 
 
 def test_article_keeps_only_latest_with_naming_rule(client, monkeypatch):

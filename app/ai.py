@@ -47,6 +47,9 @@ _FREE_QUERY_QUOTA_EXCEEDED = (
 _FREE_CARD_QUOTA_EXCEEDED = (
     "今日免费制卡额度已用完，请明天再试或配置自己的 API Key"
 )
+_FREE_ARTICLE_QUOTA_EXCEEDED = (
+    "今日免费短文额度已用完，请明天再试或配置自己的 API Key"
+)
 
 _STREAMLIT_READING_CARD_SYSTEM_PROMPT = (
     "You generate high-quality Anki reading-recognition data. Be natural, "
@@ -1234,30 +1237,33 @@ def ai_quota_reserve(db: Session, user_id: int, need: int = 1) -> str | None:
 def free_ai_quota_reserve(
     db: Session, user_id: int, quota_type: str, need: int = 1
 ) -> str | None:
-    """原子预占平台 Key 的免费查询次数或待生成卡片数。"""
-    if quota_type not in {"query", "card"}:
+    """原子预占平台 Key 的免费查询、待生成卡片或短文次数。"""
+    if quota_type not in {"query", "card", "article"}:
         raise ValueError("unsupported free AI quota type")
-    limit = int(
-        config.AI_FREE_DAILY_QUERY_LIMIT
-        if quota_type == "query"
-        else config.AI_FREE_DAILY_CARD_LIMIT
-    )
+    limits = {
+        "query": config.AI_FREE_DAILY_QUERY_LIMIT,
+        "card": config.AI_FREE_DAILY_CARD_LIMIT,
+        "article": config.AI_FREE_DAILY_ARTICLE_LIMIT,
+    }
+    limit = int(limits[quota_type])
     if limit <= 0 or need <= 0:
         return None
     need = max(1, int(need))
-    message = (
-        _FREE_QUERY_QUOTA_EXCEEDED
-        if quota_type == "query"
-        else _FREE_CARD_QUOTA_EXCEEDED
-    )
+    messages = {
+        "query": _FREE_QUERY_QUOTA_EXCEEDED,
+        "card": _FREE_CARD_QUOTA_EXCEEDED,
+        "article": _FREE_ARTICLE_QUOTA_EXCEEDED,
+    }
+    message = messages[quota_type]
     if need > limit:
         return f"{message}（本次 {need} / 每日 {limit}）"
     day = _quota_day()
-    column = (
-        AiFreeDailyQuota.query_count
-        if quota_type == "query"
-        else AiFreeDailyQuota.card_count
-    )
+    columns = {
+        "query": AiFreeDailyQuota.query_count,
+        "card": AiFreeDailyQuota.card_count,
+        "article": AiFreeDailyQuota.article_count,
+    }
+    column = columns[quota_type]
 
     def _try_update() -> bool:
         updated = db.execute(
@@ -1279,6 +1285,7 @@ def free_ai_quota_reserve(
         "day": day,
         "query_count": need if quota_type == "query" else 0,
         "card_count": need if quota_type == "card" else 0,
+        "article_count": need if quota_type == "article" else 0,
     }
     try:
         db.execute(insert(AiFreeDailyQuota).values(**values))
@@ -2251,6 +2258,7 @@ def generate_article(
     *,
     thinking: bool = False,
     effort: str | None = None,
+    user_api_key: api_keys.UserAiCredential | str | None = None,
 ) -> tuple[dict | None, str | None]:
     """为一组不超过 12 个目标词生成一篇自然短文并加高亮。
 
@@ -2269,8 +2277,9 @@ def generate_article(
     total = len(new_words) + len(review_words)
     if total > AI_ARTICLE_TARGET_LIMIT:
         return None, f"每篇最多使用 {AI_ARTICLE_TARGET_LIMIT} 个目标词"
-    if not ai_enabled():
-        return None, "服务器尚未配置 DEEPSEEK_API_KEY"
+    enabled = ai_enabled(user_api_key) if user_api_key else ai_enabled()
+    if not enabled:
+        return None, "服务器尚未配置 AI API Key"
     quota_error = ai_quota_reserve(db, user_id, need=1)
     if quota_error:
         return None, quota_error
@@ -2278,7 +2287,8 @@ def generate_article(
     if effort not in {"low", "high", "max"}:
         effort = "low"
     try:
-        client = _new_ai_client()
+        client = _new_ai_client(user_api_key) if user_api_key else _new_ai_client()
+        model = _active_model(user_api_key)
         profile = (
             db.query(VocabularyProfile)
             .filter(VocabularyProfile.user_id == user_id)
@@ -2289,7 +2299,7 @@ def generate_article(
         )
         prompt = _build_article_prompt(new_words, review_words, known_rank)
         max_tokens = _article_max_tokens(len(new_words) + len(review_words))
-        last_error = f"{_active_model()} 生成文章失败，请稍后重试"
+        last_error = f"{model} 生成文章失败，请稍后重试"
         repair_instruction = ""
         _preferred, minimum_words, maximum_words = _article_length_guidance(total)
         started = time.monotonic()
@@ -2300,7 +2310,7 @@ def generate_article(
             try:
                 response = _chat_completion(
                     client,
-                    model=_active_model(),
+                    model=model,
                     temperature=(
                         AI_ARTICLE_TEMPERATURE
                         if attempt == 0
@@ -2323,7 +2333,7 @@ def generate_article(
                 content = str(response.choices[0].message.content or "").strip()
                 parsed = _parse_article_json(content)
                 if not parsed:
-                    last_error = f"{_active_model()} 返回的文章格式异常，请重新生成"
+                    last_error = f"{model} 返回的文章格式异常，请重新生成"
                     repair_instruction = (
                         "\n\nYour previous response was not a valid JSON object like "
                         '{"title": "...", "paragraphs": [...]}. '
@@ -2333,7 +2343,7 @@ def generate_article(
                 title, paragraphs = parsed
                 joined = "\n".join(paragraphs)
                 if len(joined) > AI_ARTICLE_TARGET_CHARS:
-                    last_error = f"{_active_model()} 返回的文章过长，请重新生成"
+                    last_error = f"{model} 返回的文章过长，请重新生成"
                     repair_instruction = (
                         "\n\nRewrite the COMPLETE article from scratch. The previous "
                         "article was far too long. Do not continue or append to it."
@@ -2343,7 +2353,7 @@ def generate_article(
                     new_words, review_words, joined
                 )
                 if missing_words:
-                    last_error = f"{_active_model()} 未包含全部目标词，请重新生成"
+                    last_error = f"{model} 未包含全部目标词，请重新生成"
                     repair_instruction = (
                         "\n\nYour previous article omitted these target words: "
                         + ", ".join(missing_words)
@@ -2355,7 +2365,7 @@ def generate_article(
                     continue
                 word_count = _article_word_count(paragraphs)
                 if word_count < minimum_words or word_count > maximum_words:
-                    last_error = f"{_active_model()} 返回的文章长度明显不合适，请重新生成"
+                    last_error = f"{model} 返回的文章长度明显不合适，请重新生成"
                     repair_instruction = (
                         "\n\nRewrite the COMPLETE article from scratch. Do not continue "
                         f"or append to it. The previous draft had {word_count} words; "
@@ -2385,7 +2395,7 @@ def generate_article(
                 }, None
             except Exception as exc:
                 db.rollback()
-                last_error = _safe_api_error(exc, "article generation")
+                last_error = _safe_api_error(exc, "article generation", user_api_key)
                 status = getattr(exc, "status_code", None)
                 retryable = status in {500, 502, 503, 504} or type(exc).__name__ in {
                     "APIConnectionError",
@@ -2404,4 +2414,4 @@ def generate_article(
         return None, last_error
     except Exception as exc:
         db.rollback()
-        return None, _safe_api_error(exc, "article generation")
+        return None, _safe_api_error(exc, "article generation", user_api_key)

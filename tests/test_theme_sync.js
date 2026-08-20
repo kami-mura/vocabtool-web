@@ -127,6 +127,10 @@ const styleSource = fs.readFileSync(
   path.join(__dirname, "..", "app", "static", "style.css"),
   "utf8"
 );
+const glassStyleSource = fs.readFileSync(
+  path.join(__dirname, "..", "app", "static", "style-glass.css"),
+  "utf8"
+);
 const qaRichRule = styleSource.match(/\.qa-rich\s*\{[^}]*\}/);
 assert.ok(qaRichRule, "存在查询问答结果 .qa-rich 样式");
 assert.match(
@@ -197,6 +201,16 @@ const landingSource = fs.readFileSync(
 for (const label of ["Again", "Hard", "Good", "Easy"]) {
   assert.ok(landingSource.includes(`<b>${label}</b>`), `真实评分按钮使用英文名称 ${label}`);
 }
+assert.ok(
+  landingSource.includes('card.card_type === "general" ? " general-card"'),
+  "真实通用卡带有独立字号类"
+);
+assert.match(
+  glassStyleSource,
+  /\.general-card \.demo-front-text\s*\{[^}]*font-size\s*:\s*34px/,
+  "通用卡正面单词使用 34px 大字号"
+);
+assert.ok(landingSource.includes("result.limit_notice"), "制卡截断提示会显示给用户");
 assert.ok(landingSource.includes("<b>Again</b><small>1m</small>"), "Again 下方显示 1m");
 assert.ok(landingSource.includes("<b>Hard</b><small>1m</small>"), "Hard 下方显示 1m");
 assert.ok(landingSource.includes('previewLabel("good", "2d")'), "Good 使用 2d 格式的间隔");

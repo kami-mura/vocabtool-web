@@ -184,6 +184,26 @@ def _migrate_user_api_credentials_and_free_quota() -> None:
     AiFreeDailyQuota.__table__.create(bind=engine, checkfirst=True)
 
 
+def _migrate_free_article_quota() -> None:
+    """为存量免费额度表增加每日短文计数，兼容 SQLite/PostgreSQL。"""
+    from .models import AiFreeDailyQuota
+
+    AiFreeDailyQuota.__table__.create(bind=engine, checkfirst=True)
+    inspector = inspect(engine)
+    columns = {
+        column["name"]
+        for column in inspector.get_columns(AiFreeDailyQuota.__tablename__)
+    }
+    if "article_count" not in columns:
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "ALTER TABLE ai_free_daily_quota "
+                    "ADD COLUMN article_count INTEGER NOT NULL DEFAULT 0"
+                )
+            )
+
+
 def _migrate_graduate_one_day_to_midnight() -> None:
     """把存量卡到期时间对齐到站点时区所在日期 0 点（Anki 日界风格）。
 
@@ -1171,6 +1191,7 @@ _SCHEMA_MIGRATIONS: list[tuple[str, Callable[[], None]]] = [
     ("026_anki_exchange", _migrate_anki_exchange),
     ("027_anki_multi_template_cards", _migrate_anki_multi_template_cards),
     ("028_user_api_credentials_free_quota", _migrate_user_api_credentials_and_free_quota),
+    ("029_free_article_quota", _migrate_free_article_quota),
 ]
 
 

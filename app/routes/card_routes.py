@@ -765,6 +765,24 @@ def create_cards_from_studio(
     """唯一的站内制卡入口；查词和阅读页只能把词送到这里。"""
     user = _require_user(db, request)
     user_credential = _user_ai_credential(db, user)
+    submitted_count = len(body.words)
+    input_words = list(body.words)
+    free_card_limit = int(config.AI_FREE_DAILY_CARD_LIMIT)
+    limit_notice = ""
+    if not user_credential and free_card_limit > 0 and len(input_words) > free_card_limit:
+        input_words = input_words[:free_card_limit]
+        limit_notice = (
+            f"免费用户每天最多制作 {free_card_limit} 张，"
+            f"本次只制作前 {free_card_limit} 张。"
+        )
+
+    def _with_limit_notice(result: dict) -> dict:
+        result["submitted"] = submitted_count
+        result["processed"] = len(input_words)
+        if limit_notice:
+            result["limit_notice"] = limit_notice
+        return result
+
     if not check_request_rate(
         db,
         action="card-studio-cards",
@@ -777,7 +795,9 @@ def create_cards_from_studio(
         raise HTTPException(status_code=400, detail="无效卡片类型")
     try:
         if body.card_type == "speaking":
-            result = _create_speaking_cards(db, user, body.words, user_credential)
+            result = _with_limit_notice(
+                _create_speaking_cards(db, user, input_words, user_credential)
+            )
             ai_mod.mark_card_generation_done(
                 user.id,
                 {
@@ -785,6 +805,7 @@ def create_cards_from_studio(
                     "existing": result.get("existing", 0),
                     "failed": result.get("failed", []),
                     "error": result.get("error", ""),
+                    "limit_notice": result.get("limit_notice", ""),
                     "total": result.get("created", 0)
                     + result.get("existing", 0)
                     + len(result.get("failed", [])),
@@ -796,7 +817,7 @@ def create_cards_from_studio(
     except Exception:
         ai_mod.mark_card_generation_done(user.id, {"error": "制卡内部错误，请稍后刷新查看"})
         raise
-    words = _parse_card_target_list("\n".join(body.words))[: config.MAX_CARDS_PER_RUN]
+    words = _parse_card_target_list("\n".join(input_words))[: config.MAX_CARDS_PER_RUN]
     if not words:
         raise HTTPException(status_code=400, detail="没有可用于制卡的词条")
     try:
@@ -827,7 +848,7 @@ def create_cards_from_studio(
                 _mark_saved_word_mid(db, user.id, word)
             db.commit()
             db_write_seconds = round(time.time() - db_write_started, 1)
-            result = {
+            result = _with_limit_notice({
                 "ok": True,
                 "created": created,
                 "existing": max(0, len(selected) - created),
@@ -842,7 +863,7 @@ def create_cards_from_studio(
                     "format_retry_count": 0,
                     "db_write_seconds": db_write_seconds,
                 },
-            }
+            })
             ai_mod.mark_card_generation_done(
                 user.id,
                 {
@@ -850,6 +871,7 @@ def create_cards_from_studio(
                     "existing": result["existing"],
                     "failed": result["failed"],
                     "error": "",
+                    "limit_notice": result.get("limit_notice", ""),
                     "total": result["created"] + result["existing"] + len(result["failed"]),
                 },
             )
@@ -1046,7 +1068,7 @@ def create_cards_from_studio(
         ai_error_summary = next(
             (str(message) for message in ai_errors.values() if str(message).strip()), ""
         )
-        result = {
+        result = _with_limit_notice({
             "ok": True,
             "created": created_now,
             "created_words": created_word_list,
@@ -1061,7 +1083,7 @@ def create_cards_from_studio(
                 "format_retry_count": int(ai_timings.get("format_retry_count", 0)),
                 "db_write_seconds": db_write_seconds,
             },
-        }
+        })
         # 进度条目写最终结果：请求被代理/隧道切断时前端靠轮询拿到它。
         ai_mod.mark_card_generation_done(
             user.id,
@@ -1070,6 +1092,7 @@ def create_cards_from_studio(
                 "existing": result["existing"],
                 "failed": result["failed"],
                 "error": result["error"],
+                "limit_notice": result.get("limit_notice", ""),
                 "total": result["created"] + result["existing"] + len(result["failed"]),
             },
         )
@@ -2330,6 +2353,7 @@ def _generate_study_articles_in_background(
         user = db.get(User, user_id)
         if user is None:
             raise RuntimeError("登录已失效，请刷新后重试")
+        user_credential = _user_ai_credential(db, user)
         generated: list[dict] = []
         total = len(word_groups)
         for index, words in enumerate(word_groups, start=1):
@@ -2338,8 +2362,17 @@ def _generate_study_articles_in_background(
                 completed=index - 1,
                 detail=f"AI 正在生成第 {index}/{total} 篇…",
             )
+            article_kwargs = (
+                {"user_api_key": user_credential} if user_credential else {}
+            )
             result, error = ai_mod.generate_article(
-                db, user_id, words, [], thinking=True, effort="max"
+                db,
+                user_id,
+                words,
+                [],
+                thinking=True,
+                effort="max",
+                **article_kwargs,
             )
             if error:
                 raise RuntimeError(f"第 {index} 篇生成失败：{error}")
@@ -2383,6 +2416,7 @@ def generate_study_article(
     最多 12 个，使用 DeepSeek 思考模式 `max`。同一卡片自动去重。
     """
     user = _require_user(db, request)
+    user_credential = _user_ai_credential(db, user)
     now = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
     _day, start_of_day, end_of_day = _learning_day(now)
 
@@ -2431,6 +2465,13 @@ def generate_study_article(
     )
     if not _start_article_generation(user.id, len(word_groups)):
         raise HTTPException(status_code=409, detail="今日短文正在生成，请稍候")
+    if not user_credential:
+        quota_error = ai_mod.free_ai_quota_reserve(
+            db, user.id, "article", need=1
+        )
+        if quota_error:
+            _finish_article_generation(user.id, error=quota_error)
+            raise HTTPException(status_code=429, detail=quota_error)
     background_tasks.add_task(
         _generate_study_articles_in_background,
         user.id,

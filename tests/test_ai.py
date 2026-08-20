@@ -468,12 +468,13 @@ def test_ai_quota_reserve_is_atomic_across_calls(monkeypatch):
         db.close()
 
 
-def test_free_ai_query_and_card_quotas_are_separate_and_atomic(monkeypatch):
+def test_free_ai_quotas_are_separate_and_atomic(monkeypatch):
     from app.db import SessionLocal
     from app.models import AiFreeDailyQuota, User
 
     monkeypatch.setattr(config, "AI_FREE_DAILY_QUERY_LIMIT", 2)
     monkeypatch.setattr(config, "AI_FREE_DAILY_CARD_LIMIT", 3)
+    monkeypatch.setattr(config, "AI_FREE_DAILY_ARTICLE_LIMIT", 1)
     db = SessionLocal()
     try:
         user = User(email="free-quota@example.com", password_hash="x", salt="y")
@@ -490,10 +491,15 @@ def test_free_ai_query_and_card_quotas_are_separate_and_atomic(monkeypatch):
         assert "免费制卡额度" in ai.free_ai_quota_reserve(
             db, user.id, "card"
         )
+        assert ai.free_ai_quota_reserve(db, user.id, "article") is None
+        assert "免费短文额度" in ai.free_ai_quota_reserve(
+            db, user.id, "article"
+        )
 
         row = db.query(AiFreeDailyQuota).filter_by(user_id=user.id).one()
         assert row.query_count == 2
         assert row.card_count == 3
+        assert row.article_count == 1
 
         monkeypatch.setattr(ai, "_quota_day", lambda: "2099-01-02")
         assert ai.free_ai_quota_reserve(db, user.id, "query") is None
