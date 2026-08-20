@@ -203,6 +203,25 @@
       </div>
     </section>
 
+    <section class="landing-section study-heatmap" id="study-heatmap"{% if not logged_in %} hidden{% endif %}>
+      <div class="study-heatmap-card">
+        <div class="study-heatmap-head">
+          <h2>学习热力图</h2>
+          <p class="study-heatmap-summary" id="study-heatmap-summary">–</p>
+        </div>
+        <div class="study-heatmap-scroll">
+          <div class="study-heatmap-wrap">
+            <div class="study-heatmap-months" id="study-heatmap-months"></div>
+            <div class="study-heatmap-grid" id="study-heatmap-grid"></div>
+          </div>
+        </div>
+        <div class="study-heatmap-foot">
+          <span class="study-heatmap-legend" aria-hidden="true"><span>少</span><i class="hm-swatch"></i><i class="hm-swatch lv-1"></i><i class="hm-swatch lv-2"></i><i class="hm-swatch lv-3"></i><i class="hm-swatch lv-4"></i><span>多</span></span>
+          <span class="study-heatmap-hint">点按格子查看当天明细</span>
+        </div>
+      </div>
+    </section>
+
     <section class="landing-section" id="guest-demo-article"{% if logged_in %} hidden{% endif %}>
       <div class="landing-section-head">
         <h2>体验 AI 短文</h2>
