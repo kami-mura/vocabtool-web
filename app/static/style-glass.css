@@ -145,45 +145,6 @@
   font-size: 28px;
   font-weight: 750;
 }
-#real-review .home-review-cards .reading-sentence-wrap .demo-front-text,
-#real-review .home-review-cards .reading-sentence-text,
-#real-review .home-review-cards .reading-front-wrap .reading-sentence-text,
-#guest-demo-cards .reading-sentence-wrap .demo-front-text {
-  font-size: 22px;
-  line-height: 1.6;
-  font-weight: 600;
-  color: var(--text);
-}
-#real-review .home-review-cards .reading-answer .reading-back-word,
-#real-review .home-review-cards .reading-answer .reading-word-row mark {
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--text);
-  background: transparent;
-}
-#real-review .home-review-cards .reading-answer .reading-meaning-text,
-#real-review .home-review-cards .reading-answer .reading-meaning-text * {
-  font-size: 22px;
-  line-height: 1.6;
-  font-weight: 500;
-  color: var(--muted);
-  background: transparent;
-}
-#real-review .home-review-cards .reading-sentence-audio,
-#real-review .home-review-cards .reading-word-row .demo-audio {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  vertical-align: middle;
-  margin: 0 0 0 8px;
-  padding: 3px 12px;
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 1;
-  min-height: 28px;
-  height: 28px;
-  border-radius: 999px;
-}
 #real-review .home-review-cards .card-answer,
 #real-review .home-review-cards .card-answer p,
 #real-review .home-review-cards .card-answer li,

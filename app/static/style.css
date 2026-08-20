@@ -737,74 +737,9 @@ button.landing-login-btn { border: none; cursor: pointer; }
   gap: 8px;
   justify-content: center;
 }
-.reading-front-wrap {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-}
 .reading-sentence-wrap {
   margin-top: 12px;
   text-align: center;
-}
-.reading-sentence-wrap .demo-front-text,
-.reading-sentence-text {
-  font-size: 22px;
-  line-height: 1.6;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-}
-.reading-sentence-audio,
-.reading-word-row .demo-audio {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  vertical-align: middle;
-  margin: 0 0 0 8px;
-  padding: 3px 12px;
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 1;
-  min-height: 28px;
-  height: 28px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: var(--panel-2);
-  color: var(--accent);
-  cursor: pointer;
-}
-.reading-answer {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  gap: 8px;
-  width: 100%;
-}
-.reading-answer .reading-word-row {
-  margin-bottom: 6px;
-}
-.reading-answer .reading-back-word,
-.reading-answer .reading-word-row mark {
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--text);
-  background: transparent;
-}
-.reading-answer .reading-meaning-text,
-.reading-answer .reading-meaning-text * {
-  font-family: var(--font-sans);
-  font-size: 22px;
-  line-height: 1.6;
-  font-weight: 500;
-  color: var(--muted);
-  letter-spacing: normal;
-  text-align: center;
-  margin: 0;
-  background: transparent;
 }
 .sentence-refresh-panel {
   align-items: center;

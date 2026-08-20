@@ -210,11 +210,6 @@ assert.match(
   /\.general-card \.demo-front-text\s*\{[^}]*font-size\s*:\s*28px/,
   "通用卡正面单词使用适中的 28px 字号"
 );
-assert.match(
-  glassStyleSource,
-  /\.reading-sentence-wrap \.demo-front-text[^}]*font-size\s*:\s*22px/,
-  "阅读卡正面例句使用清晰舒适的 22px 字号"
-);
 assert.ok(landingSource.includes("exclude_easy: options.excludeEasy"), "提取请求携带 Easy 过滤选项");
 assert.ok(landingSource.includes("result.limit_notice"), "制卡截断提示会显示给用户");
 assert.ok(
