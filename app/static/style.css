@@ -741,6 +741,13 @@ button.landing-login-btn { border: none; cursor: pointer; }
   margin-top: 12px;
   text-align: center;
 }
+.reading-sentence-wrap .demo-front-text,
+.reading-sentence-text {
+  font-size: 26px;
+  line-height: 1.6;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
 .sentence-refresh-panel {
   align-items: center;
   gap: 8px;

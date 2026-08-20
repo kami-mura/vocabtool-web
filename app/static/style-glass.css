@@ -145,6 +145,13 @@
   font-size: 28px;
   font-weight: 750;
 }
+#real-review .home-review-cards .reading-sentence-wrap .demo-front-text,
+#real-review .home-review-cards .reading-sentence-text,
+#guest-demo-cards .reading-sentence-wrap .demo-front-text {
+  font-size: 26px;
+  line-height: 1.6;
+  font-weight: 600;
+}
 #real-review .home-review-cards .card-answer,
 #real-review .home-review-cards .card-answer p,
 #real-review .home-review-cards .card-answer li,
