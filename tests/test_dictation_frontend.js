@@ -48,6 +48,7 @@ assert.ok(source.includes("温故而知新，可以为师矣。"), "包含温故
 assert.ok(source.includes("splitEnglishIntoLines"), "包含英文自适应折行防溢出引擎");
 assert.ok(source.includes("splitCjkIntoLines"), "包含中文自适应折行防溢出引擎");
 assert.ok(source.includes("vocabtool.com"), "包含底部网站 vocabtool.com");
+assert.ok(source.includes("AI + 间隔重复"), "包含底部宗旨 AI + 间隔重复");
 assert.ok(!source.includes("recent112"), "海报不再绘制热力图");
 
 console.log("dictation frontend checks passed");
