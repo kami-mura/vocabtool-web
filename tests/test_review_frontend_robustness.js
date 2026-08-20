@@ -109,8 +109,13 @@ assert.ok(
 );
 assert.match(
   source,
-  /card\.card_type === "reading"[\s\S]*?reading-word-row[\s\S]*?reading-sentence-wrap[\s\S]*?demo-front-text[\s\S]*?frontInner/,
-  "阅读卡正面直接渲染例句内容（目标词行 + 例句 + 发音按钮）"
+  /card\.card_type === "reading"[\s\S]*?reading-front-wrap[\s\S]*?demo-front-text reading-sentence-text[\s\S]*?frontInner/,
+  "阅读卡正面直接渲染例句内容与上方发音按钮"
+);
+assert.match(
+  source,
+  /card\.card_type === "reading"[\s\S]*?reading-answer[\s\S]*?reading-word-row/,
+  "阅读卡反面展示目标词行与发音按钮"
 );
 // 阅读卡反面不显示例句：反面只保留释义（card.back），不得再有例句区块。
 assert.ok(

@@ -737,6 +737,17 @@ button.landing-login-btn { border: none; cursor: pointer; }
   gap: 8px;
   justify-content: center;
 }
+.reading-front-wrap {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.reading-front-wrap .reading-audio-top {
+  margin-bottom: 12px;
+}
 .reading-sentence-wrap {
   margin-top: 12px;
   text-align: center;
@@ -747,6 +758,25 @@ button.landing-login-btn { border: none; cursor: pointer; }
   line-height: 1.6;
   font-weight: 600;
   letter-spacing: -0.01em;
+}
+.reading-answer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 8px;
+}
+.reading-answer .reading-word-row {
+  margin-bottom: 6px;
+}
+.reading-answer .reading-word-row mark {
+  font-size: 22px;
+  font-weight: 750;
+}
+.reading-answer .reading-meaning-text {
+  font-size: 22px;
+  line-height: 1.6;
 }
 .sentence-refresh-panel {
   align-items: center;

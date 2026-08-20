@@ -1194,21 +1194,16 @@
         "</div>" +
         "</div>";
     } else if (card.card_type === "reading") {
-      // 阅读卡正面：目标词一行（带播放按钮），下方直接显示完整例句，
-      // 不再需要点击“例句”按钮展开（例句就是学习内容，直接可见）。
+      // 阅读卡正面：不放单独目标词，例句播放按钮放在上方，正文为完整例句（22px）
+      const audioText = sentence || target;
       frontHtml =
-        '<div class="reading-word-row">' +
-        '<mark class="word-highlight">' + escapeHtml(target) + "</mark>" +
-        ' <button class="demo-audio" data-real-audio="' + escapeHtml(target) +
-        '" type="button">▶</button></div>' +
-        (sentence && sentence !== target
-          ? '<div class="reading-sentence-wrap">' +
-            '<div class="reading-sentence-content">' +
-            '<p class="demo-front-text reading-sentence-text">' + frontInner + "</p>" +
-            '<div class="demo-audio-row"><button class="demo-audio" data-real-audio="' +
-            escapeHtml(sentence) + '" type="button">▶</button></div>' +
-            "</div></div>"
-          : "");
+        '<div class="reading-front-wrap">' +
+        (audioText
+          ? '<div class="demo-audio-row reading-audio-top"><button class="demo-audio" data-real-audio="' +
+            escapeHtml(audioText) + '" type="button">▶</button></div>'
+          : "") +
+        '<p class="demo-front-text reading-sentence-text">' + frontInner + "</p>" +
+        "</div>";
     } else {
       frontHtml =
         '<p class="demo-front-text">' + frontInner + "</p>" +
@@ -1256,6 +1251,16 @@
         "</div>" +
         (cleanMeaning ? '<p class="demo-front-text dictation-meaning-text">' + renderMarkdown(cleanMeaning, target) + "</p>" : "") +
         sentenceHtml +
+        "</div>";
+    } else if (card.card_type === "reading") {
+      // 阅读卡反面：增加目标词汇行以及语音播放（22px），下方为释义（22px）
+      backInner =
+        '<div class="card-answer reading-answer">' +
+        '<div class="reading-word-row">' +
+        '<mark class="word-highlight">' + escapeHtml(target) + "</mark>" +
+        ' <button class="demo-audio" data-real-audio="' + escapeHtml(target) + '" type="button">▶</button>' +
+        "</div>" +
+        '<div class="reading-meaning-text">' + renderMarkdown(card.back, target) + "</div>" +
         "</div>";
     } else {
       backInner = '<div class="card-answer">' + renderMarkdown(card.back, target) + "</div>";
