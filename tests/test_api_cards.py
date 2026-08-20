@@ -57,7 +57,7 @@ def test_full_learning_flow(client):
 
 def test_generated_card_types_keep_their_front_formats(client):
     register(client, "sentence-cards@example.com")
-    for card_type in ("general", "reading", "cloze"):
+    for card_type in ("general", "reading", "cloze", "dictation"):
         generated = client.post(
             "/api/card-studio/cards",
             json={
@@ -69,11 +69,14 @@ def test_generated_card_types_keep_their_front_formats(client):
         assert generated.json()["created"] == 1
         queue = client.get("/api/cards", params={"card_type": card_type}).json()
         card = queue["new"][0]
-        assert not card["back"].lower().startswith("quasar\n")
-        if card_type == "general":
-            # 通用卡固定为 正面单词 / 反面含义，正面不出现阅读材料的句子。
+        if card_type == "dictation":
+            assert card["front"] == "n. | a test meaning | 测试释义"
+            assert "quasar" in card["back"]
+        elif card_type == "general":
+            assert not card["back"].lower().startswith("quasar\n")
             assert card["front"] == "quasar"
         else:
+            assert not card["back"].lower().startswith("quasar\n")
             assert len(card["front"].split()) >= 6
             assert card["front"].rstrip().endswith(".")
             if card_type == "cloze":
@@ -96,6 +99,18 @@ def test_studio_ai_cards_follow_old_streamlit_formats(client):
     ).json()["new"][0]
     assert general_card["front"] == "taxi"
     assert general_card["back"] == "测试释义"
+
+    dictation = client.post(
+        "/api/card-studio/cards",
+        json={"words": ["opportunity"], "card_type": "dictation"},
+    )
+    assert dictation.status_code == 200
+    assert dictation.json()["created"] == 1
+    dictation_card = client.get(
+        "/api/cards", params={"card_type": "dictation"}
+    ).json()["new"][0]
+    assert dictation_card["front"] == "n. | a test meaning | 测试释义"
+    assert "opportunity" in dictation_card["back"]
 
     reading = client.post(
         "/api/card-studio/cards",

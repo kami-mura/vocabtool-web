@@ -65,8 +65,8 @@ from .models import (
     WordEntry,
 )
 
-ALLOWED_CARD_TYPES = {"general", "reading", "cloze", "anki", "speaking"}
-GENERATABLE_CARD_TYPES = {"general", "reading", "cloze", "speaking"}
+ALLOWED_CARD_TYPES = {"general", "reading", "cloze", "anki", "speaking", "dictation"}
+GENERATABLE_CARD_TYPES = {"general", "reading", "cloze", "speaking", "dictation"}
 ALLOWED_READING_FONTS = {"book", "classic", "sans", "palatino"}
 _LOOKUP_CACHE_VERSION = "streamlit-simple-v8-multisense"
 

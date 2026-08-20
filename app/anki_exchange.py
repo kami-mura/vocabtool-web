@@ -317,7 +317,7 @@ def parse_apkg(data: bytes, max_cards: int) -> dict[str, object]:
         back = fields.get("back") or (values[1] if len(values) > 1 else "")
         word = fields.get("word") or front
         card_type = (fields.get("vocabflowtype") or "").strip().lower()
-        if card_type not in {"general", "reading", "cloze", "speaking"}:
+        if card_type not in {"general", "reading", "cloze", "speaking", "dictation"}:
             card_type = "anki"
         context = fields.get("context") or ""
         if card_type == "anki":

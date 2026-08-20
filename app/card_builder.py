@@ -275,8 +275,8 @@ def build_cards(
 ) -> tuple[int, int, list[str]]:
     """为语料库中指定词创建卡片；已存在的 (user, word, type) 自动跳过。
     返回 (本次新建数, 该类型卡片总数, 本次新建词)。"""
-    if card_type not in ("general", "reading", "cloze"):
-        raise ValueError("card_type 必须是 general / reading / cloze")
+    if card_type not in ("general", "reading", "cloze", "dictation"):
+        raise ValueError("card_type 必须是 general / reading / cloze / dictation")
     limit = min(max(1, limit), config.MAX_CARDS_PER_RUN)
     existing = {
         (row.word, row.card_type)
@@ -308,8 +308,8 @@ def build_cards(
         rank = vocab.rank_of(word)
         rank_line = f"NGSL 排名：{rank}" if rank else "NGSL 排名：—"
         sentence = _complete_sentence(vocab.sentence_for_word(corpus.raw_text, word))
-        # 通用卡正面固定为单词、不依赖语料句子；阅读卡/Cloze 卡才要求完整例句。
-        if card_type != "general" and not sentence:
+        # 通用卡与听写卡正面不强制依赖语料句子；阅读卡/Cloze 卡才要求完整例句。
+        if card_type not in ("general", "dictation") and not sentence:
             continue
         definition = definition_text(entry)
 
@@ -319,6 +319,9 @@ def build_cards(
         elif card_type == "general":
             front = word
             back = f"{definition}\n\n{rank_line}"
+        elif card_type == "dictation":
+            front = definition
+            back = f"{word}\n\n{definition}\n\n{rank_line}" + (f"\n\n{sentence}" if sentence else "")
         else:  # cloze
             front = sentence_front(sentence, word, cloze=True)
             back = "\n\n".join(

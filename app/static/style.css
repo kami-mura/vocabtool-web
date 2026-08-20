@@ -4402,3 +4402,313 @@ svg {
   display: inline-flex;
   align-items: center;
 }
+
+/* ---------- 听写卡 (Dictation Card) ---------- */
+.dictation-front-wrap,
+.dictation-back-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  text-align: center;
+  gap: 10px;
+}
+.dictation-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 12px;
+  border-radius: 999px;
+  background: var(--accent-soft, rgba(16, 185, 129, 0.12));
+  color: var(--accent, #10b981);
+  font-size: 12px;
+  font-weight: 600;
+}
+.dictation-audio-wrap {
+  margin: 4px 0;
+}
+.dictation-audio-btn {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 20px !important;
+  border-radius: 999px !important;
+  background: var(--accent) !important;
+  color: #fff !important;
+  font-size: 14px !important;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s, opacity 0.15s;
+}
+.dictation-audio-btn:hover {
+  opacity: 0.92;
+  transform: scale(1.03);
+}
+.dictation-meaning-box {
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.5;
+  max-width: 90%;
+  margin: 2px 0 6px;
+}
+.dictation-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: min(340px, 92%);
+  margin: 0 auto;
+}
+.dictation-input {
+  flex: 1;
+  min-height: 42px;
+  padding: 8px 14px;
+  border: 1.5px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 16px;
+  font-family: inherit;
+  outline: none;
+  text-align: center;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.dictation-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft, rgba(16, 185, 129, 0.2));
+}
+.dictation-hint-btn {
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+.dictation-hint-btn:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.dictation-word-header {
+  font-size: 26px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+.dictation-diff-box {
+  width: 100%;
+  margin: 4px 0 6px;
+}
+.dictation-diff-status {
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.dictation-diff-status.is-correct {
+  background: rgba(16, 185, 129, 0.12);
+  color: var(--accent, #10b981);
+  font-weight: 600;
+}
+.dictation-diff-status.is-empty {
+  background: rgba(156, 163, 175, 0.12);
+  color: var(--muted);
+}
+.dictation-diff-status.is-wrong {
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  text-align: left;
+}
+.dictation-diff-line {
+  margin: 3px 0;
+}
+.diff-label {
+  color: var(--muted);
+  font-size: 12px;
+}
+.diff-char {
+  display: inline-block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 15px;
+  font-weight: 700;
+  padding: 0 1px;
+}
+.diff-char.is-match {
+  color: #10b981;
+}
+.diff-char.is-wrong {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.15);
+  border-radius: 3px;
+}
+.diff-char.is-missing {
+  color: #f59e0b;
+  text-decoration: underline;
+}
+.diff-char.is-extra {
+  color: #ef4444;
+  text-decoration: line-through;
+}
+.diff-correct-text {
+  color: #10b981;
+  font-size: 14px;
+}
+
+/* ---------- 学习打卡海报 (Study Share Poster Modal) ---------- */
+.study-poster-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(15, 23, 42, 0.72);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  overflow-y: auto;
+}
+.study-poster-modal[hidden] {
+  display: none !important;
+}
+.study-poster-dialog {
+  position: relative;
+  width: min(840px, 100%);
+  max-height: 92vh;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: var(--panel);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+}
+.study-poster-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 12px;
+}
+.study-poster-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+.study-poster-close {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.study-poster-close:hover {
+  background: var(--line);
+  color: var(--text);
+}
+.study-poster-body {
+  display: grid;
+  grid-template-columns: minmax(0, 340px) 1fr;
+  gap: 28px;
+  align-items: center;
+}
+.study-poster-preview-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: 20px;
+  padding: 12px;
+}
+[data-theme="dark"] .study-poster-preview-wrap {
+  background: rgba(255, 255, 255, 0.03);
+}
+.study-poster-img {
+  width: 100%;
+  max-width: 300px;
+  height: auto;
+  aspect-ratio: 9 / 16;
+  border-radius: 16px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.18);
+  display: block;
+}
+.study-poster-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.study-poster-theme-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.study-poster-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.study-poster-themes {
+  display: flex;
+  gap: 10px;
+}
+.poster-theme-btn {
+  flex: 1;
+  padding: 10px 14px;
+  border: 1.5px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+.poster-theme-btn.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.study-poster-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.study-poster-actions button {
+  width: 100%;
+  padding: 12px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.study-poster-mobile-hint {
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+  margin: 0;
+}
+
+@media (max-width: 640px) {
+  .study-poster-body {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .study-poster-img {
+    max-width: 220px;
+  }
+  .study-poster-actions {
+    flex-direction: row;
+  }
+}

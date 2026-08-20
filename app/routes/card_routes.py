@@ -990,6 +990,13 @@ def create_cards_from_studio(
                 front = display_word
                 back = meaning
                 context = ""
+            elif body.card_type == "dictation":
+                sentence = card_builder.complete_sentence(
+                    str(content.get("e") or "").strip()
+                )
+                front = meaning
+                back = f"{display_word}\n\n{meaning}" + (f"\n\n{sentence}" if sentence else "")
+                context = sentence if sentence else ""
             else:
                 sentence = card_builder.complete_sentence(
                     str(content.get("e") or "").strip()

@@ -101,6 +101,7 @@
           <select id="real-extra-type">
             <option value="all" selected>全部类型</option>
             <option value="general">通用卡</option>
+            <option value="dictation">听写卡</option>
             <option value="reading">阅读卡</option>
             <option value="cloze">Cloze 卡</option>
             <option value="speaking">口语卡</option>
@@ -198,6 +199,7 @@
           <button id="today-overview-start" class="primary" type="button">开始今日学习</button>
           <button id="today-overview-add" type="button">制作新卡</button>
           <button id="today-overview-article" type="button">读今日短文</button>
+          <button id="today-overview-poster" type="button">生成打卡海报</button>
           <button id="today-overview-extra" type="button" hidden>继续学习</button>
         </div>
       </div>
@@ -366,6 +368,7 @@
               <select id="real-browser-type">
                 <option value="all">全部类型</option>
                 <option value="general">通用卡</option>
+                <option value="dictation">听写卡</option>
                 <option value="reading">阅读卡</option>
                 <option value="cloze">Cloze 卡</option>
                 <option value="speaking">口语卡</option>
@@ -421,8 +424,9 @@
             </div>
 
             <div class="card-step" id="card-step-1">
-              <div class="card-type-boxes four" id="real-card-types">
+              <div class="card-type-boxes" id="real-card-types">
                 <button type="button" class="card-type-option" data-card-type="general"><strong>通用卡</strong><span>单词 → 核心释义</span></button>
+                <button type="button" class="card-type-option" data-card-type="dictation"><strong>听写卡</strong><span>发音/释义 → 拼写检验</span></button>
                 <button type="button" class="card-type-option" data-card-type="reading"><strong>阅读卡</strong><span>在语境中识别</span></button>
                 <button type="button" class="card-type-option" data-card-type="cloze"><strong>Cloze 卡</strong><span>从语境主动提取</span></button>
                 <button type="button" class="card-type-option" data-card-type="speaking"><strong>口语卡</strong><span>交际意图 → 英文表达</span></button>
@@ -556,6 +560,35 @@
       </div>
       <p id="vocabulary-test-status" class="hint" role="status" aria-live="polite"></p>
     </section>
+  </div>
+  <div id="study-poster-modal" class="study-poster-modal" role="dialog" aria-modal="true" aria-labelledby="study-poster-title" hidden>
+    <div class="study-poster-dialog">
+      <div class="study-poster-header">
+        <h3 id="study-poster-title">学习打卡海报</h3>
+        <button id="study-poster-close" class="study-poster-close" type="button" aria-label="关闭">×</button>
+      </div>
+      <div class="study-poster-body">
+        <div class="study-poster-preview-wrap">
+          <canvas id="study-poster-canvas" width="1080" height="1920" hidden></canvas>
+          <img id="study-poster-img" class="study-poster-img" alt="学习打卡海报">
+        </div>
+        <div class="study-poster-sidebar">
+          <div class="study-poster-theme-group">
+            <span class="study-poster-label">海报主题</span>
+            <div class="study-poster-themes">
+              <button type="button" class="poster-theme-btn active" data-poster-theme="light">🌞 简约浅色</button>
+              <button type="button" class="poster-theme-btn" data-poster-theme="dark">🌙 极光黑金</button>
+            </div>
+          </div>
+          <div class="study-poster-actions">
+            <button id="study-poster-download" class="primary" type="button">📥 保存高清海报</button>
+            <button id="study-poster-copy" class="ghost" type="button">📋 复制图片</button>
+          </div>
+          <p id="study-poster-status" class="hint" role="status" aria-live="polite"></p>
+          <p class="hint study-poster-mobile-hint">📱 手机端可长按海报图片直接保存或发送给好友</p>
+        </div>
+      </div>
+    </div>
   </div>
   {% endif %}
   <script src="{{ static_url('theme-sync.js') }}"></script>
