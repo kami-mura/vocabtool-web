@@ -218,7 +218,7 @@ assert.ok(
 );
 assert.ok(landingSource.includes("今天还可免费制作"), "制卡前显示今日还能制作多少张");
 assert.ok(landingSource.includes("<b>Again</b><small>1m</small>"), "Again 下方显示 1m");
-assert.ok(landingSource.includes("<b>Hard</b><small>1m</small>"), "Hard 下方显示 1m");
+assert.ok(landingSource.includes('previewLabel("hard", "1d")'), "Hard 使用 FSRS 实际计算间隔");
 assert.ok(landingSource.includes('previewLabel("good", "2d")'), "Good 使用 2d 格式的间隔");
 assert.ok(landingSource.includes("拼写更正："), "词源结果显示拼写更正说明");
 assert.ok(

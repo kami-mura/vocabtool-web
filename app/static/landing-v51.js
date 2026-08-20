@@ -1280,7 +1280,7 @@
         : "") +
       '<div class="demo-rating">' +
       '<button class="rating again" data-real-rating="again" data-real-card="' + card.id + '" type="button"><b>Again</b><small>1m</small></button>' +
-      '<button class="rating hard" data-real-rating="hard" data-real-card="' + card.id + '" type="button"><b>Hard</b><small>1m</small></button>' +
+      '<button class="rating hard" data-real-rating="hard" data-real-card="' + card.id + '" type="button"><b>Hard</b><small>' + escapeHtml(previewLabel("hard", "1d")) + "</small></button>" +
       '<button class="rating good" data-real-rating="good" data-real-card="' + card.id + '" type="button"><b>Good</b><small>' + escapeHtml(previewLabel("good", "2d")) + "</small></button>" +
       '<button class="rating easy" data-real-rating="easy" data-real-card="' + card.id + '" type="button"><b>Easy</b><small>' + escapeHtml(previewLabel("easy", "3d")) + "</small></button>" +
       "</div>";
