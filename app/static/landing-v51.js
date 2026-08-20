@@ -2100,6 +2100,78 @@
     return lines;
   }
 
+  function drawWhaleLogo(ctx, x, y, size) {
+    ctx.save();
+    roundRect(ctx, x, y, size, size, size * 0.26);
+    const logoGrad = ctx.createLinearGradient(x, y, x + size, y + size);
+    logoGrad.addColorStop(0, "#007AFF");
+    logoGrad.addColorStop(1, "#0052b3");
+    ctx.fillStyle = logoGrad;
+    ctx.fill();
+
+    // 绘制白色灵动小鲸鱼 (类似 DeepSeek 跃水鲸鱼矢量)
+    const s = size / 64;
+    const ox = x + 10 * s;
+    const oy = y + 15 * s;
+
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    // 头部圆润起点
+    ctx.moveTo(ox + 4 * s, oy + 18 * s);
+    // 向上跃起的光滑背部弧线
+    ctx.bezierCurveTo(ox + 8 * s, oy + 4 * s, ox + 24 * s, oy + 3 * s, ox + 34 * s, oy + 9 * s);
+    // 翘起的尾部
+    ctx.bezierCurveTo(ox + 40 * s, oy + 12 * s, ox + 43 * s, oy + 6 * s, ox + 46 * s, oy + 2 * s);
+    // 上尾鳍
+    ctx.bezierCurveTo(ox + 48 * s, oy + 0 * s, ox + 49 * s, oy + 4 * s, ox + 47 * s, oy + 8 * s);
+    // 尾中凹点
+    ctx.lineTo(ox + 44 * s, oy + 11 * s);
+    // 下尾鳍
+    ctx.bezierCurveTo(ox + 47 * s, oy + 16 * s, ox + 49 * s, oy + 19 * s, ox + 48 * s, oy + 21 * s);
+    ctx.bezierCurveTo(ox + 45 * s, oy + 20 * s, ox + 42 * s, oy + 16 * s, ox + 38 * s, oy + 15 * s);
+    // 饱满腹部曲线
+    ctx.bezierCurveTo(ox + 28 * s, oy + 23 * s, ox + 14 * s, oy + 28 * s, ox + 4 * s, oy + 18 * s);
+    ctx.closePath();
+    ctx.fill();
+
+    // 萌动小胸鳍
+    ctx.beginPath();
+    ctx.moveTo(ox + 16 * s, oy + 18 * s);
+    ctx.quadraticCurveTo(ox + 22 * s, oy + 24 * s, ox + 19 * s, oy + 27 * s);
+    ctx.quadraticCurveTo(ox + 15 * s, oy + 25 * s, ox + 15 * s, oy + 19 * s);
+    ctx.closePath();
+    ctx.fill();
+
+    // 鲸鱼眼睛 (深蓝小圆点)
+    ctx.fillStyle = "#0052b3";
+    ctx.beginPath();
+    ctx.arc(ox + 11 * s, oy + 14 * s, 1.8 * s, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 头顶晶莹喷水水珠
+    ctx.fillStyle = "rgba(255, 255, 255, 0.95)";
+    ctx.beginPath();
+    ctx.arc(ox + 20 * s, oy + 1 * s, 2 * s, 0, Math.PI * 2);
+    ctx.arc(ox + 25 * s, oy - 1 * s, 2.4 * s, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.arcTo(x + w, y, x + w, y + r, r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+    ctx.lineTo(x + r, y + h);
+    ctx.arcTo(x, y + h, x, y + h - r, r);
+    ctx.lineTo(x, y + r);
+    ctx.arcTo(x, y, x + r, y, r);
+    ctx.closePath();
+  }
+
   function renderStudyPoster() {
     const canvas = document.getElementById("study-poster-canvas");
     const img = document.getElementById("study-poster-img");
@@ -2115,20 +2187,6 @@
       currentPosterQuote = getRandomPosterQuote();
     }
     const quote = currentPosterQuote;
-
-    function roundRect(x, y, w, h, r) {
-      ctx.beginPath();
-      ctx.moveTo(x + r, y);
-      ctx.lineTo(x + w - r, y);
-      ctx.arcTo(x + w, y, x + w, y + r, r);
-      ctx.lineTo(x + w, y + h - r);
-      ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
-      ctx.lineTo(x + r, y + h);
-      ctx.arcTo(x, y + h, x, y + h - r, r);
-      ctx.lineTo(x, y + r);
-      ctx.arcTo(x, y, x + r, y, r);
-      ctx.closePath();
-    }
 
     // 1. 全画幅日间艺术风景大背景 (贯穿全画布 1080 × 1920，无边框、充分利用全画幅空间)
     const bgGrad = ctx.createLinearGradient(0, 0, 0, H);
@@ -2186,7 +2244,7 @@
       ctx.stroke();
     });
 
-    // 2. 顶部 Header (y: 65 ~ 140) - 只要 Logo 和 VocabTool，右边日期含英文星期，无多余小字
+    // 2. 顶部 Header (y: 65 ~ 140) - 灵动小鲸鱼 Logo + VocabTool，右边日期含英文星期
     const now = new Date();
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, "0");
@@ -2194,20 +2252,8 @@
     const weekdaysEn = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
     const dateStr = year + "." + month + "." + day + " · " + weekdaysEn[now.getDay()];
 
-    // Logo (Logo 蓝)
-    ctx.save();
-    roundRect(65, 65, 66, 66, 18);
-    const logoGrad = ctx.createLinearGradient(65, 65, 131, 131);
-    logoGrad.addColorStop(0, "#007AFF");
-    logoGrad.addColorStop(1, "#0056b3");
-    ctx.fillStyle = logoGrad;
-    ctx.fill();
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 40px -apple-system, BlinkMacSystemFont, sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText("V", 98, 98);
-    ctx.restore();
+    // 动物 Logo (跃水小蓝鲸)
+    drawWhaleLogo(ctx, 65, 65, 66);
 
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
@@ -2224,63 +2270,52 @@
 
     // 3. 数据提取 (4 项数据)
     const stats = realTodayStats || {};
-    const studiedFromStats = Number(stats.unique_cards) || 0;
-    const studiedFromDash = (todayDashboardData && Number(todayDashboardData.today_studied)) || 0;
-    const todayStudied = studiedFromStats || studiedFromDash || 0;
-
-    // 记忆次数：今天的记忆次数 (今日点击评分/复习次数)
-    const todayNew = Number(stats.new_learned) || (todayDashboardData && Number(todayDashboardData.today_new)) || 0;
-    const todayReviews = Number(stats.reviews) || (todayDashboardData && Number(todayDashboardData.today_reviews)) || Math.max(0, todayStudied - todayNew);
+    // 今日学习卡片数 (去重)
+    const todayCards = Number(stats.unique_cards) || (todayDashboardData && Number(todayDashboardData.today_unique_cards)) || 0;
+    // 记忆次数 (今日点击评分/刷卡总次数，必定 >= 今日学习卡片数)
+    let todayReps = Number(stats.studied) || (todayDashboardData && Number(todayDashboardData.today_studied)) || todayCards;
+    if (todayReps < todayCards) {
+      todayReps = todayCards;
+    }
 
     const totalLearned = (todayDashboardData && (Number(todayDashboardData.attempted_cards) || Number(todayDashboardData.card_count) || Number(todayDashboardData.total_cards))) || (realReviewTotalCards || 0);
     const streak = (todayDashboardData && Number(todayDashboardData.consecutive_study_days)) || 0;
 
     // 4. 上半部分：4 项核心打卡数据通栏区 (y: 170 ~ 720, 全版面无框开放设计)
-    // 连续天数 Hero
+    // 连续天数超大字 (170px)
     ctx.save();
-    roundRect(W / 2 - 120, 175, 240, 42, 21);
-    ctx.fillStyle = "rgba(0, 122, 255, 0.12)";
-    ctx.fill();
-    ctx.fillStyle = "#007AFF";
-    ctx.font = "bold 22px -apple-system, BlinkMacSystemFont, sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText("🔥 连续高效打卡", W / 2, 203);
-    ctx.restore();
-
-    // 连续天数超大字 (160px)
-    ctx.save();
-    const streakGrad = ctx.createLinearGradient(W / 2 - 90, 240, W / 2 + 90, 400);
+    const streakGrad = ctx.createLinearGradient(W / 2 - 90, 200, W / 2 + 90, 360);
     streakGrad.addColorStop(0, "#007AFF");
     streakGrad.addColorStop(1, "#0052b3");
     ctx.fillStyle = streakGrad;
-    ctx.font = "bold 160px -apple-system, BlinkMacSystemFont, sans-serif";
+    ctx.font = "bold 170px -apple-system, BlinkMacSystemFont, sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText(String(streak), W / 2, 375);
+    ctx.fillText(String(streak), W / 2, 335);
     ctx.restore();
 
     ctx.fillStyle = "#475569";
-    ctx.font = "bold 30px -apple-system, BlinkMacSystemFont, sans-serif";
+    ctx.font = "bold 32px -apple-system, BlinkMacSystemFont, sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("连续学习天数", W / 2, 435);
+    ctx.fillText("连续打卡天数", W / 2, 395);
 
     // 通栏分割线
     ctx.save();
-    const divGrad = ctx.createLinearGradient(65, 475, W - 65, 475);
+    const divGrad = ctx.createLinearGradient(65, 445, W - 65, 445);
     divGrad.addColorStop(0, "rgba(0, 122, 255, 0)");
     divGrad.addColorStop(0.5, "rgba(0, 122, 255, 0.2)");
     divGrad.addColorStop(1, "rgba(0, 122, 255, 0)");
     ctx.strokeStyle = divGrad;
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(65, 475);
-    ctx.lineTo(W - 65, 475);
+    ctx.moveTo(65, 445);
+    ctx.lineTo(W - 65, 445);
     ctx.stroke();
     ctx.restore();
 
     // 3 项并排超大字数据 (今日学习、记忆次数、累计学习) - 无框开放横排
     const stats3 = [
-      { label: "今日学习", val: String(todayStudied), unit: "张", color: "#007AFF", cx: W * 0.2 },
-      { label: "记忆次数", val: String(todayReviews), unit: "次", color: "#2563eb", cx: W * 0.5 },
+      { label: "今日学习", val: String(todayCards), unit: "张", color: "#007AFF", cx: W * 0.2 },
+      { label: "记忆次数", val: String(todayReps), unit: "次", color: "#2563eb", cx: W * 0.5 },
       { label: "累计学习", val: String(totalLearned), unit: "张", color: "#0284c7", cx: W * 0.8 }
     ];
 
@@ -2288,38 +2323,39 @@
       ctx.textAlign = "center";
       ctx.fillStyle = item.color;
       ctx.font = "bold 84px -apple-system, BlinkMacSystemFont, sans-serif";
-      ctx.fillText(item.val, item.cx - 14, 590);
+      ctx.fillText(item.val, item.cx - 14, 560);
       const valW = ctx.measureText(item.val).width;
 
       // 单位 (28px)
       ctx.fillStyle = "#475569";
       ctx.font = "bold 28px -apple-system, BlinkMacSystemFont, sans-serif";
-      ctx.fillText(item.unit, item.cx + valW / 2 + 8, 586);
+      ctx.fillText(item.unit, item.cx + valW / 2 + 8, 556);
 
       // 大标签 (30px 加粗)
       ctx.fillStyle = "#0f172a";
       ctx.font = "bold 30px -apple-system, BlinkMacSystemFont, sans-serif";
-      ctx.fillText(item.label, item.cx, 665);
+      ctx.fillText(item.label, item.cx, 635);
     });
 
-    // 5. 中下部分：双语名言通栏大字区 (y: 750 ~ 1770, 全幅无框)
-    // 6. 格言排版（现代直体大气无衬线，不花哨，全幅居中）
+    // 5. 中下部分：双语名言通栏大字区 (y: 720 ~ 1770, 全幅无框)
+    // 6. 格言排版（经典直体人文衬线/刊物大字，既有质感又典雅沉稳，绝不花哨）
     const maxTextW = 940; // 940px 宽幅利用
+    const enFontFamily = '"Charter", "Merriweather", "Palatino Linotype", "Playfair Display", "Baskerville", "Times New Roman", serif';
     let enFontSize = 54;
     let enLineHeight = 76;
-    ctx.font = "bold " + enFontSize + "px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+    ctx.font = "bold " + enFontSize + "px " + enFontFamily;
     let enLines = splitEnglishIntoLines(ctx, quote.en, maxTextW);
 
     if (enLines.length > 3) {
       enFontSize = 46;
       enLineHeight = 64;
-      ctx.font = "bold " + enFontSize + "px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+      ctx.font = "bold " + enFontSize + "px " + enFontFamily;
       enLines = splitEnglishIntoLines(ctx, quote.en, maxTextW);
     }
     if (enLines.length > 4) {
       enFontSize = 38;
       enLineHeight = 54;
-      ctx.font = "bold " + enFontSize + "px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+      ctx.font = "bold " + enFontSize + "px " + enFontFamily;
       enLines = splitEnglishIntoLines(ctx, quote.en, maxTextW);
     }
 
@@ -2342,8 +2378,8 @@
 
     const totalTextBlockH = quoteMarkH + (enLines.length * enLineHeight) + gapEnZh + (zhLines.length * zhLineHeight) + gapZhAuthor + authorFontSize;
 
-    // 在 y: 760 ~ 1770 区域内垂直居中
-    const readingCenterY = 760 + (1770 - 760) / 2;
+    // 在 y: 730 ~ 1770 区域内垂直居中
+    const readingCenterY = 730 + (1770 - 730) / 2;
     let cursorY = readingCenterY - totalTextBlockH / 2;
 
     // 大引号 (Logo 蓝)
@@ -2353,9 +2389,9 @@
     ctx.fillText("“", W / 2, cursorY + 40);
     cursorY += quoteMarkH + 20;
 
-    // 英文名言 (现代大气直体无衬线)
+    // 英文名言 (经典直体人文衬线/刊物大字，典雅厚重)
     ctx.fillStyle = "#0f172a";
-    ctx.font = "bold " + enFontSize + "px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+    ctx.font = "bold " + enFontSize + "px " + enFontFamily;
     enLines.forEach((l) => {
       ctx.fillText(l, W / 2, cursorY + enFontSize * 0.82);
       cursorY += enLineHeight;
@@ -2378,17 +2414,23 @@
     ctx.font = "600 " + authorFontSize + "px -apple-system, BlinkMacSystemFont, sans-serif";
     ctx.fillText("—— " + quote.author, W / 2, cursorY + authorFontSize * 0.85);
 
-    // 7. 最下面一行：左边网址，右边宗旨 (y: 1845)
+    // 7. 最下面一行：居中展示网址与宗旨 (y: 1845)
+    ctx.font = "bold 32px ui-monospace, SFMono-Regular, Menlo, monospace";
+    const domainW = ctx.measureText("vocabtool.com").width;
+    ctx.font = "bold 28px -apple-system, BlinkMacSystemFont, sans-serif";
+    const tagW = ctx.measureText("  ·  AI + 间隔重复").width;
+    const totalBottomW = domainW + tagW;
+    const startBottomX = (W - totalBottomW) / 2;
+
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
     ctx.fillStyle = "#007AFF";
-    ctx.font = "bold 34px ui-monospace, SFMono-Regular, Menlo, monospace";
-    ctx.fillText("vocabtool.com", 65, 1850);
+    ctx.font = "bold 32px ui-monospace, SFMono-Regular, Menlo, monospace";
+    ctx.fillText("vocabtool.com", startBottomX, 1850);
 
-    ctx.textAlign = "right";
     ctx.fillStyle = "#475569";
     ctx.font = "bold 28px -apple-system, BlinkMacSystemFont, sans-serif";
-    ctx.fillText("AI + 间隔重复 · 终身不忘", W - 65, 1850);
+    ctx.fillText("  ·  AI + 间隔重复", startBottomX + domainW, 1850);
     ctx.textBaseline = "alphabetic";
 
     const dataUrl = canvas.toDataURL("image/png");
