@@ -1531,16 +1531,52 @@
     return html;
   }
 
+  function buildYearHeatmapDays(days) {
+    if (!Array.isArray(days) || !days.length) return [];
+    const dayMap = new Map();
+    days.forEach((d) => dayMap.set(d.date, d));
+
+    const lastDayStr = days[days.length - 1].date;
+    const parts = lastDayStr.split("-").map(Number);
+    const endDate = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
+
+    const fullDays = [];
+    for (let i = 364; i >= 0; i -= 1) {
+      const d = new Date(endDate.getTime() - i * 86400000);
+      const y = d.getUTCFullYear();
+      const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+      const day = String(d.getUTCDate()).padStart(2, "0");
+      const dateStr = y + "-" + m + "-" + day;
+      const existing = dayMap.get(dateStr);
+      if (existing) {
+        fullDays.push(existing);
+      } else {
+        fullDays.push({
+          date: dateStr,
+          total: 0,
+          new_count: 0,
+          review_count: 0,
+        });
+      }
+    }
+    return fullDays;
+  }
+
   function heatMonthLabels(days) {
     if (!days || !days.length) return [];
     const labels = [];
     let lastMonth = -1;
+    const first = new Date(days[0].date + "T00:00:00");
+    const leading = (first.getDay() + 6) % 7;
     days.forEach((day, index) => {
       const parts = day.date.split("-").map(Number);
       const month = parts[1];
       if (month !== lastMonth) {
-        labels.push({ month: month, col: Math.floor(index / 7) });
-        lastMonth = month;
+        const col = Math.floor((index + leading) / 7);
+        if (labels.length === 0 || col - labels[labels.length - 1].col >= 2) {
+          labels.push({ month: month, col: col });
+          lastMonth = month;
+        }
       }
     });
     return labels;
@@ -1557,11 +1593,13 @@
       document.body.appendChild(heatTooltipEl);
     }
     const show = (cell) => {
-      const day = cell.dataset.heatDate;
-      const entry = todayDashboardData &&
+      const dayStr = cell.dataset.heatDate;
+      let entry = todayDashboardData &&
         todayDashboardData.heatmap_days &&
-        todayDashboardData.heatmap_days.find((d) => d.date === day);
-      if (!entry) return;
+        todayDashboardData.heatmap_days.find((d) => d.date === dayStr);
+      if (!entry) {
+        entry = { date: dayStr, total: 0, new_count: 0, review_count: 0 };
+      }
       const isToday = cell.classList.contains("is-today");
       heatTooltipEl.innerHTML = heatTooltipHtml(entry, isToday);
       heatTooltipEl.hidden = false;
@@ -1641,10 +1679,11 @@
     });
 
     const consecutiveDays = (todayDashboardData && todayDashboardData.consecutive_study_days) || 0;
+    const joinedDays = days.length;
 
     if (summary) {
-      summary.textContent = days.length < 365
-        ? "注册以来共学 " + totalCards + " 张卡 · " + activeDays + " 天有学习"
+      summary.textContent = joinedDays < 365
+        ? "已加入 " + joinedDays + " 天 · 共学 " + totalCards + " 张卡 · " + activeDays + " 天有学习"
         : "近一年共学 " + totalCards + " 张卡 · " + activeDays + " 天有学习";
     }
 
@@ -1660,16 +1699,18 @@
         maxStreak + '</b> 天</span></div>';
     }
 
+    // 填充为完整的一年（365天 / 52周）网格，保持视图饱满美观且比例一致
+    const fullDays = buildYearHeatmapDays(days);
     const todayStr = days[days.length - 1].date;
 
     // 网格从周一列开始：起始日前用不可见占位格补齐。
-    const first = new Date(days[0].date + "T00:00:00");
+    const first = new Date(fullDays[0].date + "T00:00:00");
     const leading = (first.getDay() + 6) % 7;
     const html = [];
     for (let i = 0; i < leading; i += 1) {
       html.push('<i class="hm-cell hm-empty" aria-hidden="true"></i>');
     }
-    days.forEach((day) => {
+    fullDays.forEach((day) => {
       const level = heatLevelForDay(day.total);
       const isToday = day.date === todayStr;
       let cls = "hm-cell";
@@ -1681,12 +1722,12 @@
         '" title="' + heatTooltipText(day).replace(/"/g, "&quot;") + '"></i>'
       );
     });
-    const trailing = (7 - ((leading + days.length) % 7)) % 7;
+    const trailing = (7 - ((leading + fullDays.length) % 7)) % 7;
     for (let i = 0; i < trailing; i += 1) {
       html.push('<i class="hm-cell hm-empty" aria-hidden="true"></i>');
     }
     grid.innerHTML = html.join("");
-    months.innerHTML = heatMonthLabels(days)
+    months.innerHTML = heatMonthLabels(fullDays)
       .map((label) => '<span style="left:' + (label.col * 16) + 'px">' + label.month + "月</span>")
       .join("");
     wireHeatmapCells();
