@@ -47,7 +47,7 @@ assert.ok(source.includes("学而时习之，不亦说乎？"), "包含孔子论
 assert.ok(source.includes("温故而知新，可以为师矣。"), "包含温故而知新原文");
 assert.ok(source.includes("splitEnglishIntoLines"), "包含英文自适应折行防溢出引擎");
 assert.ok(source.includes("splitCjkIntoLines"), "包含中文自适应折行防溢出引擎");
-assert.ok(source.includes("drawFishLogo"), "包含平游可爱小鱼动物Logo");
+assert.ok(source.includes("drawLogoV"), "包含经典V字品牌Logo");
 assert.ok(source.includes("vocabtool.com"), "包含底部网站 vocabtool.com");
 assert.ok(source.includes("AI + 间隔重复"), "包含底部宗旨 AI + 间隔重复");
 assert.ok(!source.includes("recent112"), "海报不再绘制热力图");

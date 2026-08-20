@@ -1886,130 +1886,11 @@
 
   /* ---------- 9:16 竖屏学习打卡海报生成引擎 ---------- */
   const REAL_FAMOUS_QUOTES = [
-    // 1. 孔子《论语》文言文名篇
-    {
-      en: "Is it not pleasant to learn with a constant perseverance and practice?",
-      zh: "学而时习之，不亦说乎？",
-      author: "《论语·学而》· 孔子"
-    },
-    {
-      en: "He who by reviewing the old can acquire the new may be a teacher.",
-      zh: "温故而知新，可以为师矣。",
-      author: "《论语·为政》· 孔子"
-    },
-    {
-      en: "Learning without thought is labor lost; thought without learning is perilous.",
-      zh: "学而不思则罔，思而不学则殆。",
-      author: "《论语·为政》· 孔子"
-    },
-    {
-      en: "They who know the truth are not equal to those who love it, and they who love it are not equal to those who delight in it.",
-      zh: "知之者不如好之者，好之者不如乐之者。",
-      author: "《论语·雍也》· 孔子"
-    },
-    {
-      en: "It passes on like this, not ceasing day or night!",
-      zh: "逝者如斯夫，不舍昼夜。",
-      author: "《论语·子罕》· 孔子"
-    },
-    {
-      en: "In a party of three, there must be one who can be my teacher.",
-      zh: "三人行，必有我师焉。",
-      author: "《论语·述而》· 孔子"
-    },
-    {
-      en: "The progress of the superior man is upwards; the progress of the mean man is downwards.",
-      zh: "君子上达，小人下达。",
-      author: "《论语·宪问》· 孔子"
-    },
-    {
-      en: "Review what you have learned and gain new insights each day.",
-      zh: "日知其所亡，月无忘其所能，可谓好学也已矣。",
-      author: "《论语·子张》· 子夏"
-    },
-
-    // 2. 老子 / 荀子 / 庄子 / 古籍文言名篇
-    {
-      en: "A journey of a thousand miles begins with a single step.",
-      zh: "千里之行，始于足下。",
-      author: "《道德经》· 老子"
-    },
-    {
-      en: "A tree that fills the span of a man's arms grows from a tiny sprout.",
-      zh: "合抱之木，生于毫末；九层之台，起于累土。",
-      author: "《道德经》· 老子"
-    },
-    {
-      en: "No step is too small to make a journey of a thousand miles; no stream is too small to make an ocean.",
-      zh: "不积跬步，无以至千里；不积小流，无以成江海。",
-      author: "《荀子·劝学》· 荀子"
-    },
-    {
-      en: "Perseverance can carve through metal and stone.",
-      zh: "锲而舍之，朽木不折；锲而不舍，金石可镂。",
-      author: "《荀子·劝学》· 荀子"
-    },
-    {
-      en: "My life has a limit, but knowledge has none.",
-      zh: "吾生也有涯，而知也无涯。",
-      author: "《庄子·养生主》· 庄子"
-    },
-    {
-      en: "The drop of water hollows out the stone, not by force, but by its persistence.",
-      zh: "水滴石穿，绳锯木断。",
-      author: "《汉书·枚乘传》· 班固"
-    },
-    {
-      en: "Knowledge arrives through the investigation of things.",
-      zh: "致知在格物，物格而后知至。",
-      author: "《礼记·大学》"
-    },
-
-    // 3. 经典文哲与科学大师
-    {
-      en: "Stay hungry, stay foolish.",
-      zh: "求知若饥，虚心若愚。",
-      author: "Steve Jobs · 乔布斯"
-    },
-    {
-      en: "Live as if you were to die tomorrow. Learn as if you were to live forever.",
-      zh: "如行将就木般生活，如长生久视般求知。",
-      author: "Mahatma Gandhi · 甘地"
-    },
-    {
-      en: "The secret of getting ahead is getting started.",
-      zh: "取得领先的秘诀，就在于立刻付诸行动。",
-      author: "Mark Twain · 马克·吐温"
-    },
-    {
-      en: "Wisdom is not a product of schooling, but of the lifelong attempt to acquire it.",
-      zh: "真正的智慧，源于终身不懈的求索。",
-      author: "Albert Einstein · 爱因斯坦"
-    },
-    {
-      en: "We are what we repeatedly do. Excellence, then, is not an act, but a habit.",
-      zh: "日复一日的行为铸就了我们。卓越并非偶发的行为，而是一种习惯。",
-      author: "Aristotle · 亚里士多德"
-    },
-    {
-      en: "Knowledge is power.",
-      zh: "知识就是力量。",
-      author: "Francis Bacon · 培根"
-    },
+    // 1. 语言、词汇与多语言视角 (Language & Words)
     {
       en: "The limits of my language mean the limits of my world.",
       zh: "我语言的边界，就是我世界的边界。",
       author: "Ludwig Wittgenstein · 维特根斯坦"
-    },
-    {
-      en: "We are all in the gutter, but some of us are looking at the stars.",
-      zh: "我们都身处沟壑之中，但仍有人在仰望星空。",
-      author: "Oscar Wilde · 王尔德"
-    },
-    {
-      en: "There is nothing noble in being superior to your fellow man; true nobility is being superior to your former self.",
-      zh: "优于别人并不高贵，真正的高贵是优于过去的自己。",
-      author: "Ernest Hemingway · 海明威"
     },
     {
       en: "To have another language is to possess a second soul.",
@@ -2017,24 +1898,86 @@
       author: "Charlemagne · 查理曼大帝"
     },
     {
-      en: "Action is the foundational key to all success.",
-      zh: "行动是一切成功的基石。",
-      author: "Pablo Picasso · 毕加索"
+      en: "If you talk to a man in a language he understands, that goes to his head. If you talk to him in his language, that goes to his heart.",
+      zh: "用对方能听懂的语言交谈，打动的是头脑；用对方的母语交谈，触动的是心灵。",
+      author: "Nelson Mandela · 曼德拉"
     },
     {
-      en: "An investment in knowledge pays the best interest.",
-      zh: "对知识的投资，永远能带来最丰厚的回报。",
-      author: "Benjamin Franklin · 富兰克林"
+      en: "A different language is a different vision of life.",
+      zh: "另一种语言，是一种全新的生命视角。",
+      author: "Federico Fellini · 费里尼"
     },
+    {
+      en: "You can never understand one language until you understand at least two.",
+      zh: "除非你至少掌握两门语言，否则你无法真正读懂任何一种语言。",
+      author: "Geoffrey Willans · 威尔斯"
+    },
+    {
+      en: "One language sets you in a corridor for life. Two languages open every door along the way.",
+      zh: "一门语言为你铺就前行的走廊，而两门语言则为你打开沿途的所有大门。",
+      author: "Frank Smith · 弗兰克·史密斯"
+    },
+    {
+      en: "Language is the road map of a culture. It tells you where its people come from and where they are going.",
+      zh: "语言是文化的地图，它指明了人们从何而来，去往何方。",
+      author: "Rita Mae Brown · 丽塔·布朗"
+    },
+    {
+      en: "Learning another language is not only learning different words for the same things, but learning another way to think about things.",
+      zh: "学习另一种语言不仅是为事物换个词汇，更是获得另一种思考世界的方式。",
+      author: "Flora Lewis · 弗洛拉·刘易斯"
+    },
+    {
+      en: "A word is not a crystal, transparent and unchanged; it is the skin of a living thought.",
+      zh: "词汇并非晶莹剔透、一成不变的水晶，而是鲜活思想的肌肤。",
+      author: "Oliver Wendell Holmes · 霍姆斯"
+    },
+    {
+      en: "Words, English words, are full of echoes, of memories, of associations.",
+      zh: "词汇充满了历史的回响、深刻的记忆与无尽的联想。",
+      author: "Virginia Woolf · 弗吉尼亚·伍尔夫"
+    },
+    {
+      en: "The difference between the almost right word and the right word is the difference between the lightning bug and the lightning.",
+      zh: "恰如其分的词与几乎恰当的词之间的差别，宛如闪电与萤火虫的云泥之别。",
+      author: "Mark Twain · 马克·吐温"
+    },
+    {
+      en: "Language is the dress of thought.",
+      zh: "语言是思想的华服。",
+      author: "Samuel Johnson · 约翰逊"
+    },
+    {
+      en: "Those who know nothing of foreign languages know nothing of their own.",
+      zh: "不通晓外语的人，对自己的母语也一无所知。",
+      author: "Johann Wolfgang von Goethe · 歌德"
+    },
+    {
+      en: "Every language is a world. Without translation, we would inhabit provinces bordering on silence.",
+      zh: "每一种语言都是一个世界。若无翻译与求索，我们将困居于无声的荒原。",
+      author: "George Steiner · 斯坦纳"
+    },
+
+    // 2. 求知、阅读与终身学习 (Learning, Reading & Mind)
     {
       en: "Learning never exhausts the mind.",
-      zh: "学习是唯一一件永远不会让心灵感到疲倦的事。",
+      zh: "求知求学，是唯一一件永远不会让心灵感到疲倦的事。",
       author: "Leonardo da Vinci · 达·芬奇"
     },
     {
-      en: "What we know is a drop, what we don't know is an ocean.",
-      zh: "我们所知道的不过沧海一粟，未知的却如汪洋大海。",
-      author: "Isaac Newton · 牛顿"
+      en: "Reading maketh a full man; conference a ready man; and writing an exact man.",
+      zh: "读书使人充实，讨论使人机敏，写作使人严谨。",
+      author: "Francis Bacon · 培根"
+    },
+    {
+      en: "Wisdom is not a product of schooling, but of the lifelong attempt to acquire it.",
+      zh: "真正的智慧并非学校的产物，而是终身不断求索的结晶。",
+      author: "Albert Einstein · 爱因斯坦"
+    },
+    {
+      en: "Live as if you were to die tomorrow. Learn as if you were to live forever.",
+      zh: "如行将就木般生活，如长生久视般求知。",
+      author: "Mahatma Gandhi · 甘地"
     },
     {
       en: "The only true wisdom is in knowing you know nothing.",
@@ -2042,19 +1985,41 @@
       author: "Socrates · 苏格拉底"
     },
     {
-      en: "Pain is inevitable. Suffering is optional.",
-      zh: "痛苦无可避免，磨难却可以选择。",
-      author: "Haruki Murakami · 村上春树"
+      en: "The roots of education are bitter, but the fruit is sweet.",
+      zh: "求学之根是苦涩的，其结出的果实却无比甘甜。",
+      author: "Aristotle · 亚里士多德"
     },
     {
-      en: "What lies behind us and what lies before us are tiny matters compared to what lies within us.",
-      zh: "过往与未来，与我们内心蕴藏的力量相比，皆微不足道。",
-      author: "Ralph Waldo Emerson · 爱默生"
+      en: "An investment in knowledge pays the best interest.",
+      zh: "对知识的投资，永远能带来最丰厚的回报。",
+      author: "Benjamin Franklin · 富兰克林"
     },
     {
-      en: "The soul becomes dyed with the color of its thoughts.",
-      zh: "灵魂的色调，由思想的色彩所浸染。",
-      author: "Marcus Aurelius · 奥勒留"
+      en: "What we know is a drop, what we don't know is an ocean.",
+      zh: "我们所知道的不过沧海一粟，未知的却如汪洋大海。",
+      author: "Isaac Newton · 牛顿"
+    },
+    {
+      en: "The more that you read, the more things you will know. The more that you learn, the more places you'll go.",
+      zh: "读得越多，知晓越广；学得越深，行路越远。",
+      author: "Dr. Seuss · 苏斯博士"
+    },
+
+    // 3. 经典学习名篇 (Classic Learning Epigrams)
+    {
+      en: "He who by reviewing the old can acquire the new may be a teacher.",
+      zh: "温故而知新，可以为师矣。",
+      author: "《论语·为政》· 孔子"
+    },
+    {
+      en: "Is it not pleasant to learn with a constant perseverance and practice?",
+      zh: "学而时习之，不亦说乎？",
+      author: "《论语·学而》· 孔子"
+    },
+    {
+      en: "Learning without thought is labor lost; thought without learning is perilous.",
+      zh: "学而不思则罔，思而不学则殆。",
+      author: "《论语·为政》· 孔子"
     }
   ];
 
@@ -2100,59 +2065,20 @@
     return lines;
   }
 
-  function drawFishLogo(ctx, x, y, size) {
+  function drawLogoV(ctx, x, y, size) {
     ctx.save();
     roundRect(ctx, x, y, size, size, size * 0.28);
     const logoGrad = ctx.createLinearGradient(x, y, x + size, y + size);
     logoGrad.addColorStop(0, "#007AFF");
-    logoGrad.addColorStop(1, "#0056b3");
+    logoGrad.addColorStop(1, "#0052b3");
     ctx.fillStyle = logoGrad;
     ctx.fill();
 
-    // 绘制纯白平游可爱小鱼 (参考海报极简小鱼)
-    const s = size / 64;
-    const cx = x + size / 2;
-    const cy = y + size / 2;
-
     ctx.fillStyle = "#ffffff";
-    ctx.beginPath();
-    // 鱼身主体 (饱满流线型椭圆鱼身，面向左侧)
-    ctx.moveTo(cx - 18 * s, cy);
-    // 背部平滑圆弧
-    ctx.bezierCurveTo(cx - 14 * s, cy - 11 * s, cx + 4 * s, cy - 11 * s, cx + 13 * s, cy - 2 * s);
-    // 尾柄收窄
-    ctx.lineTo(cx + 17 * s, cy);
-    // 上尾鳍
-    ctx.lineTo(cx + 23 * s, cy - 8 * s);
-    // 尾鳍后缘凹弧
-    ctx.quadraticCurveTo(cx + 20 * s, cy, cx + 23 * s, cy + 8 * s);
-    // 下尾鳍
-    ctx.lineTo(cx + 17 * s, cy);
-    // 腹部饱满圆弧
-    ctx.bezierCurveTo(cx + 4 * s, cy + 11 * s, cx - 14 * s, cy + 11 * s, cx - 18 * s, cy);
-    ctx.closePath();
-    ctx.fill();
-
-    // 背鳍 (顶部小弧鳍)
-    ctx.beginPath();
-    ctx.moveTo(cx - 3 * s, cy - 9 * s);
-    ctx.quadraticCurveTo(cx + 2 * s, cy - 14 * s, cx + 7 * s, cy - 8 * s);
-    ctx.closePath();
-    ctx.fill();
-
-    // 腹鳍 (底部小弧鳍)
-    ctx.beginPath();
-    ctx.moveTo(cx - 2 * s, cy + 9 * s);
-    ctx.quadraticCurveTo(cx + 3 * s, cy + 14 * s, cx + 7 * s, cy + 8 * s);
-    ctx.closePath();
-    ctx.fill();
-
-    // 鱼眼 (深蓝小圆点)
-    ctx.fillStyle = "#0056b3";
-    ctx.beginPath();
-    ctx.arc(cx - 12 * s, cy - 2 * s, 1.8 * s, 0, Math.PI * 2);
-    ctx.fill();
-
+    ctx.font = "bold " + Math.round(size * 0.58) + "px -apple-system, BlinkMacSystemFont, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("V", x + size / 2, y + size / 2 + 1);
     ctx.restore();
   }
 
@@ -2250,8 +2176,8 @@
     const weekdaysEn = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
     const dateStr = year + "." + month + "." + day + " · " + weekdaysEn[now.getDay()];
 
-    // 动物 Logo (平游小蓝鱼)
-    drawFishLogo(ctx, 65, 65, 66);
+    // 经典 Logo (Logo 蓝 V)
+    drawLogoV(ctx, 65, 65, 66);
 
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
@@ -2380,11 +2306,11 @@
     const readingCenterY = 730 + (1770 - 730) / 2;
     let cursorY = readingCenterY - totalTextBlockH / 2;
 
-    // 大引号 (Logo 蓝)
+    // 居中成对双引号 (Logo 蓝)
     ctx.textAlign = "center";
     ctx.fillStyle = "#007AFF";
-    ctx.font = "bold 108px Georgia, serif";
-    ctx.fillText("“", W / 2, cursorY + 40);
+    ctx.font = "bold 96px Georgia, serif";
+    ctx.fillText("“  ”", W / 2, cursorY + 40);
     cursorY += quoteMarkH + 20;
 
     // 英文名言 (经典直体人文衬线/刊物大字，典雅厚重)
