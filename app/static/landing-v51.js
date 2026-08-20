@@ -2130,65 +2130,108 @@
       ctx.closePath();
     }
 
-    // 1. 全景日间艺术底色 (温暖明亮日间晨光)
+    // 1. 全画幅日间艺术风景大背景 (贯穿全画布 1080 × 1920)
     const bgGrad = ctx.createLinearGradient(0, 0, 0, H);
-    bgGrad.addColorStop(0, "#f8fbff");
-    bgGrad.addColorStop(0.35, "#f0f7ff");
-    bgGrad.addColorStop(0.75, "#e8f2fe");
-    bgGrad.addColorStop(1, "#dbeafe");
+    bgGrad.addColorStop(0, "#e8f4fc");
+    bgGrad.addColorStop(0.3, "#d9edfc");
+    bgGrad.addColorStop(0.6, "#fef3c7");
+    bgGrad.addColorStop(0.85, "#e0f2fe");
+    bgGrad.addColorStop(1, "#c7e3fc");
     ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, W, H);
 
-    // 顶部 Logo 蓝晨曦柔光
-    const topGlow = ctx.createRadialGradient(W * 0.85, 120, 40, W * 0.85, 120, 500);
-    topGlow.addColorStop(0, "rgba(0, 122, 255, 0.14)");
-    topGlow.addColorStop(1, "rgba(0, 122, 255, 0)");
-    ctx.fillStyle = topGlow;
+    // 晨曦金阳光晕
+    const sunGrad = ctx.createRadialGradient(W * 0.8, 260, 40, W * 0.8, 260, 650);
+    sunGrad.addColorStop(0, "rgba(251, 191, 36, 0.5)");
+    sunGrad.addColorStop(0.4, "rgba(245, 158, 11, 0.2)");
+    sunGrad.addColorStop(1, "rgba(254, 243, 199, 0)");
+    ctx.fillStyle = sunGrad;
     ctx.fillRect(0, 0, W, H);
 
-    // 2. 顶部 Header (y: 65 ~ 145)
+    // 远景水墨雪山群峰
+    ctx.fillStyle = "rgba(186, 215, 252, 0.6)";
+    ctx.beginPath();
+    ctx.moveTo(0, H);
+    ctx.lineTo(0, 1050);
+    ctx.lineTo(180, 880);
+    ctx.lineTo(380, 980);
+    ctx.lineTo(600, 820);
+    ctx.lineTo(840, 960);
+    ctx.lineTo(W, 850);
+    ctx.lineTo(W, H);
+    ctx.closePath();
+    ctx.fill();
+
+    // 中景俊秀山峦
+    ctx.fillStyle = "rgba(147, 197, 253, 0.45)";
+    ctx.beginPath();
+    ctx.moveTo(0, H);
+    ctx.lineTo(0, 1180);
+    ctx.lineTo(260, 1020);
+    ctx.lineTo(520, 1120);
+    ctx.lineTo(760, 990);
+    ctx.lineTo(W, 1080);
+    ctx.lineTo(W, H);
+    ctx.closePath();
+    ctx.fill();
+
+    // 近景苍翠/幽蓝山脊
+    ctx.fillStyle = "rgba(96, 165, 250, 0.3)";
+    ctx.beginPath();
+    ctx.moveTo(0, H);
+    ctx.lineTo(0, 1340);
+    ctx.lineTo(340, 1200);
+    ctx.lineTo(680, 1290);
+    ctx.lineTo(W, 1190);
+    ctx.lineTo(W, H);
+    ctx.closePath();
+    ctx.fill();
+
+    // 灵动飞鸟剪影
+    ctx.strokeStyle = "rgba(37, 99, 235, 0.65)";
+    ctx.lineWidth = 3;
+    const birds = [[200, 240], [250, 220], [300, 245], [780, 480], [830, 460]];
+    birds.forEach(([bx, by]) => {
+      ctx.beginPath();
+      ctx.arc(bx - 12, by, 12, Math.PI, 0, false);
+      ctx.arc(bx + 12, by, 12, Math.PI, 0, false);
+      ctx.stroke();
+    });
+
+    // 2. 顶部 Header (y: 65 ~ 135) - 只要 Logo 和 VocabTool，无小字
     const now = new Date();
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, "0");
     const day = String(now.getDate()).padStart(2, "0");
-    const weekdaysZh = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
-    const weekdaysEn = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
     const dateStr = year + "." + month + "." + day;
-    const weekdayStr = weekdaysZh[now.getDay()] + " · " + weekdaysEn[now.getDay()];
 
     // Logo (Logo 蓝)
     ctx.save();
-    roundRect(70, 75, 60, 60, 16);
-    const logoGrad = ctx.createLinearGradient(70, 75, 130, 135);
+    roundRect(70, 65, 64, 64, 18);
+    const logoGrad = ctx.createLinearGradient(70, 65, 134, 129);
     logoGrad.addColorStop(0, "#007AFF");
     logoGrad.addColorStop(1, "#0056b3");
     ctx.fillStyle = logoGrad;
     ctx.fill();
     ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 36px -apple-system, BlinkMacSystemFont, sans-serif";
+    ctx.font = "bold 38px -apple-system, BlinkMacSystemFont, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText("V", 100, 105);
+    ctx.fillText("V", 102, 97);
     ctx.restore();
 
     ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
     ctx.fillStyle = "#0f172a";
-    ctx.font = "bold 38px -apple-system, BlinkMacSystemFont, sans-serif";
-    ctx.fillText("VocabTool", 146, 100);
+    ctx.font = "bold 44px -apple-system, BlinkMacSystemFont, sans-serif";
+    ctx.fillText("VocabTool", 150, 97);
 
-    ctx.fillStyle = "#007AFF";
-    ctx.font = "600 20px -apple-system, BlinkMacSystemFont, sans-serif";
-    ctx.fillText("每日词汇复利 · 学习打卡", 146, 130);
-
-    // Date (Right-aligned)
+    // Date (Right-aligned, 纯粹日期，无小字)
     ctx.textAlign = "right";
     ctx.fillStyle = "#0f172a";
-    ctx.font = "bold 30px ui-monospace, SFMono-Regular, Menlo, monospace";
-    ctx.fillText(dateStr, W - 70, 100);
-
-    ctx.fillStyle = "#64748b";
-    ctx.font = "500 18px -apple-system, BlinkMacSystemFont, sans-serif";
-    ctx.fillText(weekdayStr, W - 70, 130);
+    ctx.font = "bold 32px ui-monospace, SFMono-Regular, Menlo, monospace";
+    ctx.fillText(dateStr, W - 70, 97);
+    ctx.textBaseline = "alphabetic";
 
     // 3. 数据提取 (4 项数据)
     const stats = realTodayStats || {};
@@ -2196,19 +2239,20 @@
     const studiedFromDash = (todayDashboardData && Number(todayDashboardData.today_studied)) || 0;
     const todayStudied = studiedFromStats || studiedFromDash || 0;
 
-    const todayMemoryReps = Number(stats.reviews) || (todayDashboardData && Number(todayDashboardData.today_reviews)) || todayStudied;
+    // 记忆次数：点击评分的总次数 (历史总点击复习数)
+    const totalReviews = (todayDashboardData && (Number(todayDashboardData.total_reviews) || Number(todayDashboardData.total_reps))) || Number(stats.reviews) || 0;
     const totalLearned = (todayDashboardData && (Number(todayDashboardData.attempted_cards) || Number(todayDashboardData.card_count) || Number(todayDashboardData.total_cards))) || (realReviewTotalCards || 0);
     const streak = (todayDashboardData && Number(todayDashboardData.consecutive_study_days)) || 0;
 
-    // 4. 上半部分：4 项核心打卡数据面板 (y: 165 ~ 765, h: 600)
+    // 4. 上半部分：4 项核心打卡数据面板 (y: 160 ~ 750, h: 590)
     const cardX = 70;
     const cardW = W - 140;
-    const dataCardY = 165;
-    const dataCardH = 600;
+    const dataCardY = 160;
+    const dataCardH = 590;
 
     ctx.save();
     roundRect(cardX, dataCardY, cardW, dataCardH, 32);
-    ctx.fillStyle = "rgba(255, 255, 255, 0.92)";
+    ctx.fillStyle = "rgba(255, 255, 255, 0.88)";
     ctx.shadowColor = "rgba(0, 122, 255, 0.08)";
     ctx.shadowBlur = 24;
     ctx.shadowOffsetY = 6;
@@ -2217,7 +2261,7 @@
 
     ctx.save();
     roundRect(cardX, dataCardY, cardW, dataCardH, 32);
-    ctx.strokeStyle = "rgba(0, 122, 255, 0.12)";
+    ctx.strokeStyle = "rgba(0, 122, 255, 0.14)";
     ctx.lineWidth = 1.5;
     ctx.stroke();
     ctx.restore();
@@ -2259,19 +2303,19 @@
     // 3 项并排大字数据 (今日学习、记忆次数、累计学习)
     const stats3 = [
       { label: "今日学习", val: String(todayStudied), unit: "张", color: "#007AFF" },
-      { label: "记忆次数", val: String(todayMemoryReps), unit: "次", color: "#2563eb" },
+      { label: "记忆次数", val: String(totalReviews), unit: "次", color: "#2563eb" },
       { label: "累计学习", val: String(totalLearned), unit: "张", color: "#0284c7" }
     ];
 
     const col3W = (cardW - 60 - 32) / 3;
-    const col3Y = dataCardY + 310;
-    const col3H = 250;
+    const col3Y = dataCardY + 305;
+    const col3H = 245;
 
     stats3.forEach((item, idx) => {
       const bx = cardX + 30 + idx * (col3W + 16);
       ctx.save();
       roundRect(bx, col3Y, col3W, col3H, 20);
-      ctx.fillStyle = "rgba(240, 247, 255, 0.85)";
+      ctx.fillStyle = "rgba(240, 247, 255, 0.88)";
       ctx.fill();
       ctx.strokeStyle = "rgba(0, 122, 255, 0.12)";
       ctx.lineWidth = 1.5;
@@ -2282,153 +2326,91 @@
       ctx.textAlign = "center";
       ctx.fillStyle = item.color;
       ctx.font = "bold 68px -apple-system, BlinkMacSystemFont, sans-serif";
-      ctx.fillText(item.val, bx + col3W / 2 - 12, col3Y + 120);
+      ctx.fillText(item.val, bx + col3W / 2 - 12, col3Y + 118);
       const valW = ctx.measureText(item.val).width;
 
       // 单位 (24px)
       ctx.fillStyle = "#475569";
       ctx.font = "bold 24px -apple-system, BlinkMacSystemFont, sans-serif";
-      ctx.fillText(item.unit, bx + col3W / 2 + valW / 2 + 6, col3Y + 118);
+      ctx.fillText(item.unit, bx + col3W / 2 + valW / 2 + 6, col3Y + 116);
 
       // 大标签 (24px 加粗)
       ctx.fillStyle = "#0f172a";
       ctx.font = "bold 24px -apple-system, BlinkMacSystemFont, sans-serif";
-      ctx.fillText(item.label, bx + col3W / 2, col3Y + 195);
+      ctx.fillText(item.label, bx + col3W / 2, col3Y + 192);
     });
 
-    // 5. 下半部分：精美日间艺术画境与双语名言 (y: 795 ~ 1820, h: 1025)
-    const quoteCardY = 795;
-    const quoteCardH = 1025;
+    // 5. 下半部分：双语格言面板 (y: 780 ~ 1770, h: 990)
+    const quoteCardY = 780;
+    const quoteCardH = 990;
 
     ctx.save();
     roundRect(cardX, quoteCardY, cardW, quoteCardH, 32);
+    ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
     ctx.shadowColor = "rgba(0, 122, 255, 0.08)";
     ctx.shadowBlur = 24;
     ctx.shadowOffsetY = 6;
-    ctx.fillStyle = "rgba(255, 255, 255, 0.95)";
     ctx.fill();
-    ctx.clip(); // 限制在圆角卡片内部
-
-    // 艺术画境顶部 (y: 795 ~ 1240)
-    const dawnGrad = ctx.createLinearGradient(cardX, quoteCardY, cardX, quoteCardY + 440);
-    dawnGrad.addColorStop(0, "#fefbf6");
-    dawnGrad.addColorStop(0.5, "#fef3c7");
-    dawnGrad.addColorStop(1, "#e0f2fe");
-    ctx.fillStyle = dawnGrad;
-    ctx.fillRect(cardX, quoteCardY, cardW, 440);
-
-    // 晨曦金阳光晕
-    const sun = ctx.createRadialGradient(cardX + cardW * 0.75, quoteCardY + 140, 30, cardX + cardW * 0.75, quoteCardY + 140, 360);
-    sun.addColorStop(0, "rgba(251, 191, 36, 0.45)");
-    sun.addColorStop(0.5, "rgba(245, 158, 11, 0.2)");
-    sun.addColorStop(1, "rgba(254, 243, 199, 0)");
-    ctx.fillStyle = sun;
-    ctx.fillRect(cardX, quoteCardY, cardW, 440);
-
-    // 远景水墨山峦
-    ctx.fillStyle = "rgba(191, 219, 254, 0.55)";
-    ctx.beginPath();
-    ctx.moveTo(cardX, quoteCardY + 440);
-    ctx.lineTo(cardX, quoteCardY + 300);
-    ctx.lineTo(cardX + 260, quoteCardY + 200);
-    ctx.lineTo(cardX + 520, quoteCardY + 280);
-    ctx.lineTo(cardX + 780, quoteCardY + 180);
-    ctx.lineTo(cardX + cardW, quoteCardY + 310);
-    ctx.lineTo(cardX + cardW, quoteCardY + 440);
-    ctx.closePath();
-    ctx.fill();
-
-    // 近景山峦
-    ctx.fillStyle = "rgba(147, 197, 253, 0.4)";
-    ctx.beginPath();
-    ctx.moveTo(cardX, quoteCardY + 440);
-    ctx.lineTo(cardX, quoteCardY + 350);
-    ctx.lineTo(cardX + 360, quoteCardY + 260);
-    ctx.lineTo(cardX + 660, quoteCardY + 330);
-    ctx.lineTo(cardX + cardW, quoteCardY + 290);
-    ctx.lineTo(cardX + cardW, quoteCardY + 440);
-    ctx.closePath();
-    ctx.fill();
-
-    // 飞鸟
-    ctx.strokeStyle = "rgba(37, 99, 235, 0.55)";
-    ctx.lineWidth = 2.5;
-    const birds = [[cardX + 180, quoteCardY + 130], [cardX + 220, quoteCardY + 115], [cardX + 260, quoteCardY + 135]];
-    birds.forEach(([bx, by]) => {
-      ctx.beginPath();
-      ctx.arc(bx - 10, by, 10, Math.PI, 0, false);
-      ctx.arc(bx + 10, by, 10, Math.PI, 0, false);
-      ctx.stroke();
-    });
-
-    // 磨砂过渡层 (自然过渡至下方阅读区)
-    const overlayGrad = ctx.createLinearGradient(cardX, quoteCardY + 260, cardX, quoteCardY + 440);
-    overlayGrad.addColorStop(0, "rgba(255, 255, 255, 0)");
-    overlayGrad.addColorStop(1, "rgba(255, 255, 255, 0.96)");
-    ctx.fillStyle = overlayGrad;
-    ctx.fillRect(cardX, quoteCardY + 260, cardW, 180);
-
     ctx.restore();
 
-    // 卡片外边框
     ctx.save();
     roundRect(cardX, quoteCardY, cardW, quoteCardH, 32);
-    ctx.strokeStyle = "rgba(0, 122, 255, 0.12)";
+    ctx.strokeStyle = "rgba(0, 122, 255, 0.14)";
     ctx.lineWidth = 1.5;
     ctx.stroke();
     ctx.restore();
 
-    // 6. 名言排版与自适应防超出框引擎
-    const maxTextW = cardW - 160; // 780px 严格安全行宽
-    let enFontSize = 42;
-    let enLineHeight = 58;
+    // 6. 格言排版（字体大幅放大，自适应防溢出）
+    const maxTextW = cardW - 140; // 800px 安全行宽
+    let enFontSize = 50;
+    let enLineHeight = 68;
     ctx.font = "italic 700 " + enFontSize + "px Georgia, serif";
     let enLines = splitEnglishIntoLines(ctx, quote.en, maxTextW);
 
     if (enLines.length > 3) {
+      enFontSize = 42;
+      enLineHeight = 58;
+      ctx.font = "italic 700 " + enFontSize + "px Georgia, serif";
+      enLines = splitEnglishIntoLines(ctx, quote.en, maxTextW);
+    }
+    if (enLines.length > 4) {
       enFontSize = 36;
       enLineHeight = 50;
       ctx.font = "italic 700 " + enFontSize + "px Georgia, serif";
       enLines = splitEnglishIntoLines(ctx, quote.en, maxTextW);
     }
-    if (enLines.length > 4) {
-      enFontSize = 30;
-      enLineHeight = 42;
-      ctx.font = "italic 700 " + enFontSize + "px Georgia, serif";
-      enLines = splitEnglishIntoLines(ctx, quote.en, maxTextW);
-    }
 
-    let zhFontSize = 32;
-    let zhLineHeight = 48;
+    let zhFontSize = 40;
+    let zhLineHeight = 56;
     ctx.font = "700 " + zhFontSize + "px -apple-system, BlinkMacSystemFont, sans-serif";
     let zhLines = splitCjkIntoLines(ctx, quote.zh, maxTextW);
 
     if (zhLines.length > 2) {
-      zhFontSize = 28;
-      zhLineHeight = 42;
+      zhFontSize = 34;
+      zhLineHeight = 48;
       ctx.font = "700 " + zhFontSize + "px -apple-system, BlinkMacSystemFont, sans-serif";
       zhLines = splitCjkIntoLines(ctx, quote.zh, maxTextW);
     }
 
-    const authorFontSize = 26;
-    const quoteMarkH = 50;
-    const gapEnZh = 32;
-    const gapZhAuthor = 30;
+    const authorFontSize = 28;
+    const quoteMarkH = 60;
+    const gapEnZh = 40;
+    const gapZhAuthor = 36;
 
     const totalTextBlockH = quoteMarkH + (enLines.length * enLineHeight) + gapEnZh + (zhLines.length * zhLineHeight) + gapZhAuthor + authorFontSize;
 
-    // 阅读区中心位于 y: 1220 ~ 1770 (高 550px)
-    const readingCenterY = quoteCardY + 440 + (quoteCardH - 440) / 2;
+    // 在 990px 卡片内绝对垂直居中
+    const readingCenterY = quoteCardY + quoteCardH / 2;
     let cursorY = readingCenterY - totalTextBlockH / 2;
 
     // 大引号 (Logo 蓝)
     ctx.textAlign = "center";
     ctx.fillStyle = "#007AFF";
-    ctx.font = "bold 84px Georgia, serif";
-    ctx.fillText("“", W / 2, cursorY + 30);
-    cursorY += quoteMarkH + 10;
+    ctx.font = "bold 96px Georgia, serif";
+    ctx.fillText("“", W / 2, cursorY + 36);
+    cursorY += quoteMarkH + 15;
 
-    // 英文名言
+    // 英文名言 (Georgia 经典大字)
     ctx.fillStyle = "#0f172a";
     ctx.font = "italic 700 " + enFontSize + "px Georgia, serif";
     enLines.forEach((l) => {
@@ -2438,7 +2420,7 @@
 
     cursorY += gapEnZh - 10;
 
-    // 中文翻译 (文言文原句/精译)
+    // 中文名句 (文言文原句大字)
     ctx.fillStyle = "#1e293b";
     ctx.font = "700 " + zhFontSize + "px -apple-system, BlinkMacSystemFont, sans-serif";
     zhLines.forEach((l) => {
@@ -2453,11 +2435,15 @@
     ctx.font = "italic 500 " + authorFontSize + "px Georgia, -apple-system, sans-serif";
     ctx.fillText("—— " + quote.author, W / 2, cursorY + authorFontSize * 0.8);
 
-    // 7. 底部 Footer (y: 1865)
+    // 7. 最下面给出网站和小字：vocabtool.com (y: 1810 ~ 1885)
     ctx.textAlign = "center";
-    ctx.fillStyle = "#94a3b8";
-    ctx.font = "500 20px -apple-system, BlinkMacSystemFont, sans-serif";
-    ctx.fillText("用间隔重复，让词汇真正留在脑海中 · VocabTool", W / 2, 1865);
+    ctx.fillStyle = "#007AFF";
+    ctx.font = "bold 28px ui-monospace, SFMono-Regular, Menlo, monospace";
+    ctx.fillText("vocabtool.com", W / 2, 1835);
+
+    ctx.fillStyle = "#64748b";
+    ctx.font = "500 19px -apple-system, BlinkMacSystemFont, sans-serif";
+    ctx.fillText("科学间隔重复 · 让词汇终身不忘", W / 2, 1870);
 
     const dataUrl = canvas.toDataURL("image/png");
     img.src = dataUrl;
