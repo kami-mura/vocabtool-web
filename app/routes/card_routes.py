@@ -758,6 +758,17 @@ def _create_speaking_cards(
     }
 
 
+@router.get("/card-studio/quota")
+def get_card_studio_quota(request: Request, db: Session = Depends(get_db)):
+    user = _require_user(db, request)
+    if _user_ai_credential(db, user):
+        return {"uses_own_key": True, "limit": None, "used": 0, "remaining": None}
+    return {
+        "uses_own_key": False,
+        **ai_mod.free_ai_quota_status(db, user.id, "card"),
+    }
+
+
 @router.post("/card-studio/cards")
 def create_cards_from_studio(
     body: CardStudioCreateIn, request: Request, db: Session = Depends(get_db)
@@ -767,14 +778,21 @@ def create_cards_from_studio(
     user_credential = _user_ai_credential(db, user)
     submitted_count = len(body.words)
     input_words = list(body.words)
-    free_card_limit = int(config.AI_FREE_DAILY_CARD_LIMIT)
     limit_notice = ""
-    if not user_credential and free_card_limit > 0 and len(input_words) > free_card_limit:
-        input_words = input_words[:free_card_limit]
-        limit_notice = (
-            f"免费用户每天最多制作 {free_card_limit} 张，"
-            f"本次只制作前 {free_card_limit} 张。"
-        )
+    if not user_credential:
+        quota = ai_mod.free_ai_quota_status(db, user.id, "card")
+        remaining = quota["remaining"]
+        if remaining is not None and len(input_words) > remaining:
+            if remaining <= 0:
+                raise HTTPException(
+                    status_code=429,
+                    detail="今日免费制卡额度已用完，请明天再试或配置自己的 API Key",
+                )
+            input_words = input_words[:remaining]
+            limit_notice = (
+                f"你今天还可免费制作 {remaining} 张，"
+                f"本次只制作前 {remaining} 张。"
+            )
 
     def _with_limit_notice(result: dict) -> dict:
         result["submitted"] = submitted_count

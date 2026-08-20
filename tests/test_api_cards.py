@@ -195,7 +195,7 @@ def test_free_card_generation_truncates_to_fifty_and_warns(
     assert data["created"] == 50
     assert data["submitted"] == 55
     assert data["processed"] == 50
-    assert "每天最多制作 50 张" in data["limit_notice"]
+    assert "还可免费制作 50 张" in data["limit_notice"]
     assert client.get(
         "/api/cards/browse", params={"card_type": "general"}
     ).json()["total"] == 50
@@ -221,6 +221,45 @@ def test_own_api_key_is_not_truncated_by_free_card_limit(client, monkeypatch):
     assert data["created"] == 55
     assert data["processed"] == 55
     assert "limit_notice" not in data
+
+
+def test_free_card_generation_uses_today_remaining_quota(client, monkeypatch):
+    from app import ai, config
+    from app.models import User
+
+    monkeypatch.setattr(config, "AI_FREE_DAILY_CARD_LIMIT", 50)
+    register(client, "remaining-free-card-cap@example.com")
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter_by(email="remaining-free-card-cap@example.com").one()
+        assert ai.free_ai_quota_reserve(db, user.id, "card", need=20) is None
+    finally:
+        db.close()
+
+    quota = client.get("/api/card-studio/quota")
+    assert quota.status_code == 200
+    assert quota.json() == {
+        "uses_own_key": False,
+        "limit": 50,
+        "used": 20,
+        "remaining": 30,
+    }
+
+    words = [f"remainingword{index}" for index in range(36)]
+    response = client.post(
+        "/api/card-studio/cards",
+        json={"card_type": "general", "words": words},
+    )
+
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert data["created"] == 30
+    assert data["failed"] == []
+    assert data["submitted"] == 36
+    assert data["processed"] == 30
+    assert "还可免费制作 30 张" in data["limit_notice"]
+    assert "只制作前 30 张" in data["limit_notice"]
+    assert "免费制卡额度已用完" not in data.get("error", "")
 
 
 def test_speaking_cards_generate_three_expressions_and_prefetch_audio(client):

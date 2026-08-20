@@ -1308,6 +1308,37 @@ def free_ai_quota_reserve(
         return f"{message}（已用 {used} / 每日 {limit}）"
 
 
+def free_ai_quota_status(
+    db: Session, user_id: int, quota_type: str
+) -> dict[str, int | None]:
+    """返回平台 Key 免费额度的今日使用量和剩余量。"""
+    if quota_type not in {"query", "card", "article"}:
+        raise ValueError("unsupported free AI quota type")
+    limits = {
+        "query": config.AI_FREE_DAILY_QUERY_LIMIT,
+        "card": config.AI_FREE_DAILY_CARD_LIMIT,
+        "article": config.AI_FREE_DAILY_ARTICLE_LIMIT,
+    }
+    columns = {
+        "query": AiFreeDailyQuota.query_count,
+        "card": AiFreeDailyQuota.card_count,
+        "article": AiFreeDailyQuota.article_count,
+    }
+    limit = int(limits[quota_type])
+    if limit <= 0:
+        return {"limit": None, "used": 0, "remaining": None}
+    row = (
+        db.query(columns[quota_type])
+        .filter(
+            AiFreeDailyQuota.user_id == user_id,
+            AiFreeDailyQuota.day == _quota_day(),
+        )
+        .first()
+    )
+    used = int(row[0]) if row else 0
+    return {"limit": limit, "used": used, "remaining": max(0, limit - used)}
+
+
 def guest_ai_quota_reserve(db: Session, need: int = 1) -> str | None:
     """全站游客每日 AI 查词总量原子预占（跨进程安全，按站点时区自然日）。"""
     limit = int(config.GUEST_AI_DAILY_LIMIT or 0)

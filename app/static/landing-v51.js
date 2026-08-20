@@ -3252,6 +3252,29 @@
   let realCardType = "";
   const realCardTypes = document.getElementById("real-card-types");
 
+  async function loadRealCardQuota() {
+    const note = document.getElementById("real-card-quota-note");
+    if (!note || !isLoggedIn) return;
+    try {
+      const res = await fetch("/api/card-studio/quota", {
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || "额度加载失败");
+      if (data.uses_own_key) {
+        note.textContent = "卡片正面与释义由 AI 生成。当前使用自己的 Key，不受网站免费额度限制。";
+      } else if (data.remaining == null) {
+        note.textContent = "卡片正面与释义由 AI 生成。当前网站免费制卡额度未设上限。";
+      } else {
+        note.textContent =
+          "卡片正面与释义由 AI 生成。今天还可免费制作 " + data.remaining +
+          " 张（每日 " + data.limit + " 张）；超过时只制作前 " + data.remaining + " 张。";
+      }
+    } catch (err) {
+      note.textContent = "卡片正面与释义由 AI 生成。暂时无法读取今日剩余额度。";
+    }
+  }
+
   function setWizardStep(step) {
     const indicators = {
       1: document.getElementById("card-wizard-step-2"),
@@ -3269,6 +3292,7 @@
     Object.entries(stepEls).forEach(([num, el]) => {
       if (el) el.hidden = Number(num) > step;
     });
+    if (step >= 3) loadRealCardQuota();
   }
 
   function setRealCardType(type) {
@@ -3863,6 +3887,7 @@
         status.textContent = result.limit_notice || (result.error ? "部分失败：" + result.error : "");
       }
       await loadRealWords();
+      loadRealCardQuota();
       requestReviewRefresh();
     }
 

@@ -488,6 +488,11 @@ def test_free_ai_quotas_are_separate_and_atomic(monkeypatch):
             db, user.id, "query"
         )
         assert ai.free_ai_quota_reserve(db, user.id, "card", need=3) is None
+        assert ai.free_ai_quota_status(db, user.id, "card") == {
+            "limit": 3,
+            "used": 3,
+            "remaining": 0,
+        }
         assert "免费制卡额度" in ai.free_ai_quota_reserve(
             db, user.id, "card"
         )

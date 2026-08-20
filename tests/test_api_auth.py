@@ -88,7 +88,8 @@ def test_ai_key_is_encrypted_never_returned_and_user_isolated(client, monkeypatc
     register(client, "key-owner@example.com")
     page = client.get("/")
     assert "查询 50 次、制卡 50 张、短文 1 次" in page.text
-    assert "超过时只制作前 50 张" in page.text
+    assert 'id="real-card-quota-note"' in page.text
+    assert "正在读取今天剩余的免费制卡额度" in page.text
 
     saved = client.put(
         "/api/ai-credentials",
