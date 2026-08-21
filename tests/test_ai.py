@@ -1,3 +1,4 @@
+import json
 from types import SimpleNamespace
 
 from app import ai, api_keys, config
@@ -140,8 +141,95 @@ healthy ||| ||| adj. | in good health | 健康的 ||| Daily walks help older adu
     assert parsed["healthy"]["e"].startswith("Daily walks")
 
 
+def test_structured_card_parser_maps_reordered_ids_and_discards_unknown_duplicates():
+    content = json.dumps(
+        {
+            "items": [
+                {"id": "I02", "meaning": "第二个释义"},
+                {"id": "I99", "meaning": "未知词不应入库"},
+                {"id": "I01", "meaning": "第一个释义"},
+                {"id": "I02", "meaning": "重复结果不应覆盖"},
+            ]
+        },
+        ensure_ascii=False,
+    )
+    parsed = _parse_ai_card_batch(content, ["alpha", "beta"], "general")
+    assert parsed["alpha"]["m"] == "第一个释义"
+    assert parsed["beta"]["m"] == "第二个释义"
+    assert set(parsed) == {"alpha", "beta"}
+
+
+def test_structured_reading_and_cloze_validation_requires_target_and_fields():
+    reading = {
+        "items": [
+            {
+                "id": "I01",
+                "pos": "v.",
+                "en_def": "move quickly",
+                "zh_def": "跑步",
+                "example": "She runs before work.",
+            },
+            {
+                "id": "I02",
+                "pos": "n.",
+                "en_def": "a thing",
+                "zh_def": "物品",
+                "example": "This sentence omits the target.",
+            },
+        ]
+    }
+    parsed = _parse_ai_card_batch(
+        json.dumps(reading, ensure_ascii=False), ["run", "item"], "reading"
+    )
+    assert set(parsed) == {"run"}
+
+    cloze = {
+        "items": [
+            {
+                "id": "I01",
+                "meaning": "跑步",
+                "example": "She runs and runs every morning.",
+            },
+            {
+                "id": "I02",
+                "meaning": "跑步",
+                "example": "She jogs every morning before work.",
+            },
+        ]
+    }
+    parsed = _parse_ai_card_batch(
+        json.dumps(cloze, ensure_ascii=False), ["run", "jog"], "cloze"
+    )
+    assert set(parsed) == {"jog"}
+
+
+def test_speaking_structured_parser_requires_exactly_three_unique_expressions():
+    def payload(expressions):
+        return json.dumps(
+            {"items": [{"id": "I01", "expressions": expressions}]},
+            ensure_ascii=False,
+        )
+
+    two = [
+        {"text": "I can help.", "note": "自然"},
+        {"text": "I would be happy to help.", "note": "正式"},
+    ]
+    four = two + [
+        {"text": "Sure, I can help out.", "note": "随意"},
+        {"text": "I can help you.", "note": "额外"},
+    ]
+    three = [
+        {"text": "I can help.", "note": "自然"},
+        {"text": "I would be happy to help.", "note": "正式礼貌"},
+        {"text": "Sure, I can help out.", "note": "随意"},
+    ]
+    assert _parse_ai_card_batch(payload(two), ["帮忙"], "speaking") == {}
+    assert _parse_ai_card_batch(payload(four), ["帮忙"], "speaking") == {}
+    assert set(_parse_ai_card_batch(payload(three), ["帮忙"], "speaking")) == {"帮忙"}
+
+
 def test_general_card_parser_accepts_every_matched_row():
-    """不做内容审核：AI 给出什么就收什么，只按词条身份匹配。"""
+    """通用卡保留旧文本解析，同时校验中文核心释义。"""
     parsed = _parse_ai_card_batch(
         """```text
 taxi (verb) ||| ||| （飞机）滑行 ||| ||| |||
@@ -171,9 +259,9 @@ def test_old_streamlit_prompt_builders_and_batch_sizes():
     _system_word, user_word = ai._build_word_front_prompts("taxi (verb)")
     _system_reading, user_reading = ai._build_reading_front_prompts("adamant")
     _system_cloze, user_cloze = ai._build_definition_front_prompts("taxi (verb)")
-    assert "1. 通用卡" in user_word and "Fields 2, 4, 5, and 6 are empty" in user_word
-    assert "SENSE DECISION" in user_reading and "FORMAT EXAMPLES" in user_reading
-    assert "ANSWERABILITY TEST" in user_cloze and "9–18 whitespace-delimited words" in user_cloze
+    assert '"items"' in user_word and '"meaning"' in user_word
+    assert '"pos"' in user_reading and '"en_def"' in user_reading
+    assert '"example"' in user_cloze and "clearly preferred answer" in user_cloze
     assert _card_generation_batch_size("cloze") == 5
     assert _card_generation_batch_size("reading") == 10
     assert _card_generation_batch_size("general") == 10
@@ -182,11 +270,9 @@ def test_old_streamlit_prompt_builders_and_batch_sizes():
 
 def test_speaking_prompt_and_parser():
     _system, user = _build_speaking_front_prompts("婉拒朋友的邀约（不想去，又不想扫兴）")
-    assert "口语卡" in user
-    assert "3 most common" in user
-    assert " || " in user
-    assert "对……说：" in user
-    assert "Field 1 exactly matches its input" in user
+    assert '"expressions"' in user
+    assert "exactly 3 complete expressions" in user
+    assert "formal" in user and "casual" in user
 
     parsed = _parse_ai_card_batch(
         """```text
@@ -231,7 +317,7 @@ def test_speaking_parser_accepts_multiline_expression_rows():
     assert len(_parse_speaking_expressions(parsed["总结讨论内容"]["m"])) == 3
 
 
-def test_speaking_parser_tolerates_trailing_punctuation_and_uses_order_fallback():
+def test_speaking_parser_does_not_use_order_fallback_for_unknown_need():
     content = """```text
 总结讨论内容。 ||| ||| 1. Let me wrap up what we discussed. —— 总结要点 || 2. To sum up, here are the main points. —— 常用开场 || 3. So in a nutshell, that is the plan. —— 口语 ||| ||| |||
 礼貌打断并补充一句（换个说法） ||| ||| 1. Sorry to jump in, but I have a point. —— 礼貌打断 || 2. Can I add something here? —— 更委婉 || 3. Just to add to that, I would wait. —— 轻松 ||| ||| |||
@@ -239,9 +325,8 @@ def test_speaking_parser_tolerates_trailing_punctuation_and_uses_order_fallback(
     parsed = _parse_ai_card_batch(
         content, ["总结讨论内容", "礼貌打断并补充一句"], "speaking"
     )
-    assert set(parsed) == {"总结讨论内容", "礼貌打断并补充一句"}
+    assert set(parsed) == {"总结讨论内容"}
     assert "Let me wrap up" in parsed["总结讨论内容"]["m"]
-    assert "Sorry to jump in" in parsed["礼貌打断并补充一句"]["m"]
 
 
 def test_speaking_parser_rejects_blank_slots():
@@ -890,7 +975,7 @@ def test_topic_word_list_parses_code_block(monkeypatch):
             "```text\nmarket\nsupply\ndemand\n```"
         ),
     )
-    words, error = ai.generate_topic_word_list(_FakeDb(), 1, "economy", 50)
+    words, error = ai.generate_topic_word_list(_FakeDb(), 1, "economy", 3)
     assert error is None
     assert words == ["market", "supply", "demand"]
 
@@ -903,7 +988,7 @@ def test_priority_select_maps_ai_output_back_to_input(monkeypatch):
         ai,
         "_chat_completion",
         lambda _client, **kwargs: _fake_chat_response(
-            "```text\napple\nbanana\n```\n```text\ncherry\n```"
+            "```text\nI0001\nI0003\n```"
         ),
     )
     result, error = ai.select_priority_words(

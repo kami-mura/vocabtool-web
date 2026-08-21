@@ -129,7 +129,7 @@ DEEPSEEK_MODEL = os.environ.get("DEEPSEEK_MODEL", "deepseek-v4-flash")
 DEEPSEEK_DISABLE_THINKING = os.environ.get("DEEPSEEK_DISABLE_THINKING", "true").strip().lower() in {
     "1", "true", "yes", "on"
 }
-# AI 文章固定使用思考模式 `max`；保留此配置仅供直接调用 generate_article 时使用。
+# AI 文章默认快速生成；显式 thinking=True 时才读取此思考强度配置。
 AI_ARTICLE_REASONING_EFFORT = os.environ.get(
-    "AI_ARTICLE_REASONING_EFFORT", "max"
+    "AI_ARTICLE_REASONING_EFFORT", "low"
 ).strip().lower()

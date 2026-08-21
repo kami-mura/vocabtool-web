@@ -200,6 +200,19 @@ def test_article_prompt_follows_user_template():
     assert "{" in prompt and "{{" not in prompt
 
 
+def test_article_prompt_includes_learned_sense_and_part_of_speech():
+    prompt = _build_article_prompt(
+        ["run"],
+        [],
+        3000,
+        target_details={"run": {"pos": "v.", "sense": "跑步"}},
+    )
+    assert "part of speech: v." in prompt
+    assert "learned sense: 跑步" in prompt
+    assert "允许自然的词形变化" in prompt
+    assert "多词短语" in prompt
+
+
 def test_article_length_scales_with_target_count():
     short = _build_article_prompt(["run"], ["develop", "point"], 3000)
     assert "about 18-36 words" in short
@@ -220,9 +233,10 @@ def test_article_word_groups_are_balanced_and_never_exceed_twelve():
 
 
 def test_article_output_token_limit_scales_with_article_length():
-    assert _article_max_tokens(1) == 65536
-    assert _article_max_tokens(100) == 65536
-    assert _article_max_tokens(1000) == 65536
+    assert _article_max_tokens(1) == 4096
+    assert _article_max_tokens(100) == 4096
+    assert _article_max_tokens(1000) == 4096
+    assert _article_max_tokens(1, thinking=True) == 8192
 
 
 def test_article_parse_accepts_plain_and_fenced_json():
@@ -236,6 +250,15 @@ def test_article_parse_accepts_plain_and_fenced_json():
     assert fenced == ("T", ["A"])
     assert _parse_article_json("not json at all") is None
     assert _parse_article_json('{"title": "T", "paragraphs": []}') is None
+
+
+def test_article_parse_rejects_non_english_html_and_more_than_two_paragraphs():
+    assert _parse_article_json('{"title": "中文", "paragraphs": ["A"]}') is None
+    assert _parse_article_json('{"title": "T", "paragraphs": ["English 中文"]}') is None
+    assert _parse_article_json('{"title": "T", "paragraphs": ["<b>A</b>"]}') is None
+    assert _parse_article_json(
+        '{"title": "T", "paragraphs": ["A", "B", "C"]}'
+    ) is None
 
 
 def test_article_highlight_marks_target_words_with_inflections():
@@ -890,8 +913,8 @@ def test_article_highlights_only_today_targets(client, monkeypatch):
     assert "bonus" not in latest["target_words"]
 
 
-def test_article_always_uses_thinking_max(client, monkeypatch):
-    """短文固定用思考模式 max，不提供降级参数。"""
+def test_article_defaults_to_fast_mode(client, monkeypatch):
+    """今日短文默认走快速模式，显式思考才提高质量。"""
     _prepare_article_user(client, "article-mode@example.com")
     calls = []
 
@@ -910,7 +933,7 @@ def test_article_always_uses_thinking_max(client, monkeypatch):
     assert first.status_code == 200
     second = client.post("/api/cards/article")
     assert second.status_code == 200
-    assert calls == [(True, "max"), (True, "max")]
+    assert calls == [(False, None), (False, None)]
 
 
 def test_article_uses_only_today_again_cards(client, monkeypatch):

@@ -68,7 +68,7 @@ from .models import (
 ALLOWED_CARD_TYPES = {"general", "reading", "cloze", "anki", "speaking", "dictation"}
 GENERATABLE_CARD_TYPES = {"general", "reading", "cloze", "speaking", "dictation"}
 ALLOWED_READING_FONTS = {"book", "classic", "sans", "palatino"}
-_LOOKUP_CACHE_VERSION = "streamlit-simple-v8-multisense"
+_LOOKUP_CACHE_VERSION = "streamlit-simple-v9-pos-format"
 
 
 # ---------- 工具函数 ----------

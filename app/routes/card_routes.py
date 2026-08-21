@@ -64,7 +64,7 @@ from ..api_support import (
     vocab,
 )
 from ..db import SessionLocal, is_sqlite_busy_error, reserve_sqlite_write
-from ..models import AnkiReviewLog
+from ..models import AnkiReviewLog, WordEntry
 from ..schemas import (
     CardsBatchDeleteIn,
     CardStudioCreateIn,
@@ -1009,6 +1009,9 @@ def create_cards_from_studio(
                 # 句中定位得到目标词才加粗/挖空，定位不到就保留原句。
                 if body.card_type == "cloze":
                     front = card_builder.sentence_front(sentence, base_word, cloze=True)
+                    if "______" not in front:
+                        failed.append(f"{raw_word}：例句未成功挖空目标词")
+                        continue
                     back = (
                         f"{card_builder.sentence_front(sentence, base_word, cloze=False)}\n\n"
                         f"{meaning}"
@@ -2391,6 +2394,7 @@ def _generate_study_articles_in_background(
     user_id: int,
     day: str,
     word_groups: list[list[str]],
+    target_details: dict[str, dict[str, str]] | None = None,
 ) -> None:
     """在后台逐篇生成今天点过「重来」的单词的今日短文；全部成功后再原子保存。"""
     db = SessionLocal()
@@ -2410,15 +2414,42 @@ def _generate_study_articles_in_background(
             article_kwargs = (
                 {"user_api_key": user_credential} if user_credential else {}
             )
-            result, error = ai_mod.generate_article(
-                db,
-                user_id,
-                words,
-                [],
-                thinking=True,
-                effort="max",
-                **article_kwargs,
-            )
+            if target_details:
+                details_for_words = {
+                    word: target_details[word]
+                    for word in words
+                    if word in target_details
+                }
+                if details_for_words:
+                    article_kwargs["target_details"] = details_for_words
+            try:
+                result, error = ai_mod.generate_article(
+                    db,
+                    user_id,
+                    words,
+                    [],
+                    thinking=False,
+                    effort=None,
+                    **article_kwargs,
+                )
+            except TypeError as exc:
+                # 保留旧 provider/测试替身的四参数调用兼容；真实 TypeError
+                # 不吞掉，避免把模型或业务错误误判为签名差异。
+                if (
+                    "target_details" not in str(exc)
+                    or "target_details" not in article_kwargs
+                ):
+                    raise
+                article_kwargs.pop("target_details", None)
+                result, error = ai_mod.generate_article(
+                    db,
+                    user_id,
+                    words,
+                    [],
+                    thinking=False,
+                    effort=None,
+                    **article_kwargs,
+                )
             if error:
                 raise RuntimeError(f"第 {index} 篇生成失败：{error}")
             generated.append(result)
@@ -2458,7 +2489,8 @@ def generate_study_article(
 
     单词来源 = 今天 ReviewLog 中至少有一条 rating=again 的卡片（今天点过
     「重来」的卡片），包含新卡和复习卡。目标词全部覆盖并均匀拆分为每篇
-    最多 12 个，使用 DeepSeek 思考模式 `max`。同一卡片自动去重。
+    最多 12 个，默认使用快速生成；需要更高质量时由显式思考参数控制。
+    同一卡片自动去重。
     """
     user = _require_user(db, request)
     user_credential = _user_ai_credential(db, user)
@@ -2505,6 +2537,42 @@ def generate_study_article(
             status_code=400,
             detail="今天还没有点过「重来」的单词，请先学习今天的卡片后再生成今日短文",
         )
+    learned_entries = (
+        db.query(WordEntry)
+        .filter(WordEntry.word.in_(selected_words))
+        .all()
+    )
+    target_details = {
+        entry.word: {
+            "pos": str(entry.pos or "").strip(),
+            "sense": str(entry.zh_def or entry.en_def or "").strip(),
+        }
+        for entry in learned_entries
+        if entry.word
+    }
+    card_details = (
+        db.query(Card.word, Card.back, Card.card_type)
+        .filter(Card.user_id == user.id, Card.word.in_(selected_words))
+        .all()
+    )
+    for word, back, card_type in card_details:
+        if word in target_details and target_details[word].get("sense"):
+            continue
+        back_text = str(back or "").strip()
+        if card_type == "reading":
+            parts = ai_mod._reading_meaning_parts(back_text)
+            detail = {
+                "pos": parts[0] if parts else "",
+                "sense": parts[2] if parts else back_text,
+            }
+        elif card_type == "cloze" and "\n\n" in back_text:
+            detail = {"pos": "", "sense": back_text.rsplit("\n\n", 1)[-1].strip()}
+        elif card_type == "speaking":
+            continue
+        else:
+            detail = {"pos": "", "sense": back_text}
+        if detail["sense"]:
+            target_details[word] = detail
     word_groups = _article_word_groups(
         selected_words, ai_mod.AI_ARTICLE_TARGET_LIMIT
     )
@@ -2522,6 +2590,7 @@ def generate_study_article(
         user.id,
         _day,
         word_groups,
+        target_details,
     )
     return {
         "ok": True,
