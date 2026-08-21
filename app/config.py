@@ -113,8 +113,14 @@ AI_FREE_DAILY_ARTICLE_LIMIT = max(0, _env_int("AI_FREE_DAILY_ARTICLE_LIMIT", 1))
 # 全站未登录用户每日 AI 查词总量上限；0 表示不限制。
 GUEST_AI_DAILY_LIMIT = max(0, _env_int("GUEST_AI_DAILY_LIMIT", 500))
 
-# TTS 音频缓存总容量上限（字节）；超出后按最旧优先清理。
+# TTS 音频缓存与引擎配置（mimo | edge）
 TTS_CACHE_MAX_BYTES = _env_int("TTS_CACHE_MAX_BYTES", 512 * 1024 * 1024)
+TTS_PROVIDER = os.environ.get("TTS_PROVIDER", "mimo").strip().lower()
+MIMO_API_KEY = os.environ.get("MIMO_API_KEY", "").strip()
+MIMO_API_BASE = os.environ.get("MIMO_API_BASE", "https://api.xiaomimimo.com/v1").strip().rstrip("/")
+MIMO_TTS_MODEL = os.environ.get("MIMO_TTS_MODEL", "mimo-v2.5-tts").strip()
+MIMO_TTS_VOICE_EN = os.environ.get("MIMO_TTS_VOICE_EN", "mimo_default").strip()
+MIMO_TTS_VOICE_ZH = os.environ.get("MIMO_TTS_VOICE_ZH", "mimo_default").strip()
 
 # 可选：deepseek-v4-flash 释义。Key 只从服务器环境变量读取，绝不下发到浏览器。
 AI_PROVIDER = os.environ.get("AI_PROVIDER", "").strip().lower()

@@ -51,13 +51,23 @@ def _normalize_tts_text(text: str) -> str:
     return cleaned
 
 
-def _pick_voice(text: str) -> str:
+def _pick_edge_voice(text: str) -> str:
     return _TTS_VOICE_ZH if re.search(r"[\u4e00-\u9fff]", text) else _TTS_VOICE_EN
+
+
+def _pick_voice(text: str) -> str:
+    is_zh = bool(re.search(r"[\u4e00-\u9fff]", text))
+    if config.TTS_PROVIDER == "mimo":
+        return config.MIMO_TTS_VOICE_ZH if is_zh else config.MIMO_TTS_VOICE_EN
+    return _TTS_VOICE_ZH if is_zh else _TTS_VOICE_EN
 
 
 def _audio_path(text: str) -> tuple[Path, str]:
     voice = _pick_voice(text)
-    digest = hashlib.sha1((text + "\x1f" + voice).encode("utf-8")).hexdigest()[:24]
+    provider = config.TTS_PROVIDER
+    digest = hashlib.sha1(
+        (text + "\x1f" + provider + "\x1f" + voice).encode("utf-8")
+    ).hexdigest()[:24]
     return TTS_DIR / f"{digest}.mp3", voice
 
 
@@ -74,30 +84,110 @@ def _generation_lock(text: str) -> asyncio.Lock:
         return lock
 
 
-def _generate_audio_blocking(text: str, voice: str, path: Path) -> bool:
-    """在工作线程里生成音频：edge-tts 的任何阻塞都不会冻结事件循环。"""
+def _generate_mimo_audio(text: str, voice: str, staging: Path) -> bool:
+    """调用小米 MiMo-V2.5-TTS 生成音频并写入 staging 文件。"""
+    import base64
+
+    import httpx
+
+    if not config.MIMO_API_KEY:
+        return False
+
+    api_base = config.MIMO_API_BASE.rstrip("/")
+    endpoint = f"{api_base}/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {config.MIMO_API_KEY}",
+        "api-key": config.MIMO_API_KEY,
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": config.MIMO_TTS_MODEL,
+        "messages": [
+            {"role": "user", "content": text}
+        ],
+        "audio": {
+            "voice": voice if voice and voice != "default" else "mimo_default",
+            "format": "mp3",
+        },
+    }
+    try:
+        with httpx.Client(timeout=_TTS_TIMEOUT_SECONDS) as client:
+            resp = client.post(endpoint, json=payload, headers=headers)
+            if resp.status_code != 200:
+                logger.warning(
+                    "mimo tts http error status=%s body=%s",
+                    resp.status_code,
+                    resp.text[:200],
+                )
+                return False
+            data = resp.json()
+            audio_obj = (
+                data.get("choices", [{}])[0]
+                .get("message", {})
+                .get("audio", {})
+            )
+            audio_b64 = audio_obj.get("data")
+            if not audio_b64:
+                logger.warning(
+                    "mimo tts response missing audio data: %s", str(data)[:200]
+                )
+                return False
+            audio_bytes = base64.b64decode(audio_b64)
+            if len(audio_bytes) < _TTS_MIN_AUDIO_SIZE:
+                return False
+            staging.write_bytes(audio_bytes)
+            return True
+    except Exception as exc:
+        logger.warning("mimo tts failed error=%s", type(exc).__name__)
+        return False
+
+
+def _generate_edge_audio(text: str, staging: Path) -> bool:
+    """调用 edge-tts 生成音频并写入 staging 文件。"""
     import asyncio
 
     import edge_tts
 
-    path.parent.mkdir(parents=True, exist_ok=True)
-    # 先写 .part 再原子替换，避免并发或中断留下半截文件。
-    # 文件名含 PID + 随机后缀：多进程部署时线程 ID 相同也不会互相覆盖。
-    staging = path.with_name(
-        f"{path.name}.{os.getpid()}.{uuid.uuid4().hex[:8]}.part"
-    )
+    edge_voice = _pick_edge_voice(text)
     try:
         async def _run() -> None:
-            communicate = edge_tts.Communicate(text, voice)
+            communicate = edge_tts.Communicate(text, edge_voice)
             await asyncio.wait_for(
                 communicate.save(str(staging)), timeout=_TTS_TIMEOUT_SECONDS
             )
 
         asyncio.run(_run())
-        if not staging.is_file() or staging.stat().st_size < _TTS_MIN_AUDIO_SIZE:
-            raise RuntimeError("generated audio file is missing or too small")
-        staging.replace(path)
-        return True
+        return staging.is_file() and staging.stat().st_size >= _TTS_MIN_AUDIO_SIZE
+    except Exception as exc:
+        text_digest = hashlib.sha256(text.encode("utf-8")).hexdigest()[:12]
+        logger.warning(
+            "edge tts generation failed text_sha256=%s length=%s error=%s",
+            text_digest,
+            len(text),
+            type(exc).__name__,
+        )
+        return False
+
+
+def _generate_audio_blocking(text: str, voice: str, path: Path) -> bool:
+    """在工作线程里生成音频：优先使用配置的 TTS 引擎（如 MiMo），失败自动 Fallback 到 Edge-TTS。"""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    staging = path.with_name(
+        f"{path.name}.{os.getpid()}.{uuid.uuid4().hex[:8]}.part"
+    )
+    success = False
+    try:
+        if config.TTS_PROVIDER == "mimo" and config.MIMO_API_KEY:
+            success = _generate_mimo_audio(text, voice, staging)
+
+        if not success:
+            success = _generate_edge_audio(text, staging)
+
+        if success and staging.is_file() and staging.stat().st_size >= _TTS_MIN_AUDIO_SIZE:
+            staging.replace(path)
+            return True
+        staging.unlink(missing_ok=True)
+        return False
     except Exception as exc:
         text_digest = hashlib.sha256(text.encode("utf-8")).hexdigest()[:12]
         logger.warning(

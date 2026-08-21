@@ -37,9 +37,14 @@ def test_long_texts_sharing_prefix_share_one_cache_file(monkeypatch, tmp_path):
     assert all(len(text) <= tts.TTS_TEXT_MAX_CHARS for text, _path in generated)
 
 
-def test_pick_voice():
+def test_pick_voice(monkeypatch):
+    monkeypatch.setattr(tts.config, "TTS_PROVIDER", "edge")
     assert tts._pick_voice("hello world") == tts._TTS_VOICE_EN
     assert tts._pick_voice("你好") == tts._TTS_VOICE_ZH
+
+    monkeypatch.setattr(tts.config, "TTS_PROVIDER", "mimo")
+    assert tts._pick_voice("hello world") == tts.config.MIMO_TTS_VOICE_EN
+    assert tts._pick_voice("你好") == tts.config.MIMO_TTS_VOICE_ZH
 
 
 def test_audio_path_stable():
@@ -198,3 +203,58 @@ def test_prune_removes_stale_part_files_and_keeps_fresh_ones(monkeypatch, tmp_pa
 def test_prefetch_dropped_when_max_tasks_active(monkeypatch):
     monkeypatch.setattr(tts, "_active_prefetch_tasks", tts._TTS_MAX_PREFETCH_TASKS)
     assert tts.schedule_prefetch(["apple"]) == 0
+
+
+def test_mimo_tts_generation_and_fallback(monkeypatch, tmp_path):
+    import base64
+
+    monkeypatch.setattr(tts, "TTS_DIR", tmp_path)
+    monkeypatch.setattr(tts.config, "TTS_PROVIDER", "mimo")
+    monkeypatch.setattr(tts.config, "MIMO_API_KEY", "sk-test-mimo-key")
+
+    dummy_audio = b"ID3" + b"\x00" * 200
+    dummy_b64 = base64.b64encode(dummy_audio).decode("utf-8")
+
+    class MockResp:
+        status_code = 200
+        def json(self):
+            return {
+                "choices": [{
+                    "message": {
+                        "audio": {"data": dummy_b64}
+                    }
+                }]
+            }
+
+    class MockClient:
+        def __init__(self, *args, **kwargs):
+            pass
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            pass
+        def post(self, url, json=None, headers=None):
+            return MockResp()
+
+    monkeypatch.setattr("httpx.Client", MockClient)
+
+    staging = tmp_path / "test_mimo.part"
+    ok = tts._generate_mimo_audio("Hello", "mimo_default", staging)
+    assert ok is True
+    assert staging.read_bytes() == dummy_audio
+
+    # 测试 MiMo 失败时自动 Fallback 到 Edge
+    edge_called = []
+    def fake_edge_generate(text, staging_path):
+        edge_called.append(text)
+        staging_path.write_bytes(b"edge-audio" * 20)
+        return True
+
+    monkeypatch.setattr(tts, "_generate_edge_audio", fake_edge_generate)
+    monkeypatch.setattr(tts, "_generate_mimo_audio", lambda *args: False)
+
+    target_path = tmp_path / "fallback.mp3"
+    result = tts._generate_audio_blocking("Hello World", "mimo_default", target_path)
+    assert result is True
+    assert target_path.is_file()
+    assert edge_called == ["Hello World"]
