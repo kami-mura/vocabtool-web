@@ -119,7 +119,7 @@
           <div id="real-review-manage-menu" class="review-manage-menu" role="menu" hidden>
             <button id="real-review-undo" type="button" role="menuitem" disabled>撤回</button>
             <button id="real-review-delete-first" type="button" role="menuitem">删除当前卡</button>
-            <button id="real-manage-library" type="button" role="menuitem">我的词库</button>
+            <button id="real-manage-library" type="button" role="menuitem">生词库</button>
             <button id="real-manage-add-card" type="button" role="menuitem">制作新卡</button>
             <button id="real-manage-browser" type="button" role="menuitem">我的卡片</button>
             <button id="real-review-refresh-sentences" type="button" role="menuitem">更新阅读卡例句</button>
@@ -297,60 +297,24 @@
 
     <section class="landing-section manage-area" id="manage-area"{% if not logged_in %} hidden{% endif %}>
       <div class="manage-tabs" role="tablist" aria-label="管理功能">
-        <button type="button" class="manage-button" data-manage-panel="real-library" role="tab" aria-selected="false">我的词库</button>
+        <button type="button" class="manage-button" data-manage-panel="real-library" role="tab" aria-selected="false">生词库</button>
         <button type="button" class="manage-button" data-manage-panel="real-card-browser" role="tab" aria-selected="false">我的卡片</button>
         <button type="button" class="manage-button" data-manage-panel="real-add-card" role="tab" aria-selected="false">制作新卡</button>
       </div>
       <div class="manage-panels">
         <div id="real-library" class="manage-panel" hidden>
           <div class="library-body">
-            <div class="word-status-filters" role="group" aria-label="词库状态筛选">
-              <button type="button" class="word-status-filter active" data-word-status-filter="all">全部</button>
-              <button type="button" class="word-status-filter" data-word-status-filter="easy">Easy</button>
-              <button type="button" class="word-status-filter" data-word-status-filter="mid">Mid（已制卡）</button>
-              <button type="button" class="word-status-filter" data-word-status-filter="hard">Hard（生词库）</button>
-            </div>
-            <div class="library-profile-row">
-              <label>阅读基础词范围：NGSL 前 <input id="real-profile-known-rank" type="number" min="0" max="31000" value="3000"> 词</label>
-              <button id="real-profile-save" class="small primary" type="button">保存</button>
-              <span id="real-profile-status" class="hint" role="status" aria-live="polite"></span>
-            </div>
-            <input id="real-library-search" class="landing-library-search" placeholder="搜索我的词库…">
-            <p id="real-word-total" class="hint card-browser-total">共 0 个词</p>
+            <input id="real-library-search" class="landing-library-search" placeholder="搜索生词库…">
+            <p id="real-word-total" class="hint card-browser-total">共 0 个生词</p>
             <div id="real-word-batch" class="library-batch" hidden>
               <div class="card-batch-left">
                 <label class="check-row"><input id="real-word-batch-all" type="checkbox"> 全选本页</label>
-                <button id="real-word-batch-easy" class="small" type="button">标记为 Easy</button>
-                <button id="real-word-batch-hard" class="small" type="button">标记为 Hard</button>
-                <button id="real-word-batch-delete" class="small danger" type="button">移出词库</button>
+                <button id="real-word-batch-create-cards" class="small primary" type="button">批量制卡</button>
+                <button id="real-word-batch-delete" class="small danger" type="button">移出生词库</button>
                 <button id="real-word-batch-clear" class="small" type="button">取消选择</button>
               </div>
               <span id="real-word-batch-count" class="hint">已选 0 个</span>
             </div>
-            <div id="real-word-mark-easy" class="word-mark-easy" hidden>
-              <div class="word-mark-easy-head">
-                <strong>批量标记 Easy</strong>
-                <button type="button" class="small" id="real-word-mark-easy-close">收起</button>
-              </div>
-              <p class="hint">把内置词表、NGSL 排名范围或粘贴的单词标记为 Easy（已掌握），标记后这些词从 Hard 中筛出。</p>
-              <div class="word-mark-easy-sources">
-                <label class="check-row"><input id="real-word-mark-easy-list-toggle" type="checkbox"> 用内置词表</label>
-                <div id="real-word-mark-easy-list-fields" class="ngsl-fields-row" hidden>
-                  <label>词表 <select id="real-word-mark-easy-list-id"></select></label>
-                </div>
-                <label class="check-row"><input id="real-word-mark-easy-ngsl-toggle" type="checkbox"> 用 NGSL 词库</label>
-                <div id="real-word-mark-easy-ngsl-fields" class="ngsl-fields-row" hidden>
-                  <label>范围 <input id="real-word-mark-easy-ngsl-from" type="number" min="1" max="31000" value="1"> - <input id="real-word-mark-easy-ngsl-to" type="number" min="1" max="31000" value="3000"></label>
-                </div>
-                <label class="check-row"><input id="real-word-mark-easy-paste-toggle" type="checkbox"> 粘贴单词</label>
-                <div id="real-word-mark-easy-paste-fields" class="ngsl-fields-row" hidden>
-                  <textarea id="real-word-mark-easy-paste" rows="3" placeholder="每行一个单词或短语"></textarea>
-                </div>
-              </div>
-              <button id="real-word-mark-easy-run" class="small primary" type="button">标记为 Easy</button>
-              <span id="real-word-mark-easy-status" class="hint" role="status" aria-live="polite"></span>
-            </div>
-            <button id="real-word-batch-easy-open" class="small" type="button">批量标记 Easy…</button>
             <p id="real-word-status" class="hint" role="status" aria-live="polite" hidden></p>
             <div id="real-word-results" class="word-results"></div>
           </div>

@@ -3685,9 +3685,10 @@
     };
   }
 
-  /* ---------- 登录后：我的词库（三态 easy/mid/hard） ---------- */
+  /* ---------- 登录后：生词库 ---------- */
   const realWordSelection = new Set();
-  let realWordFilter = "all";
+  let realWordsLoadVersion = 0;
+  let realWordStatusTimer = null;
 
   function setRealWordStatus(text) {
     const el = document.getElementById("real-word-status");
@@ -3699,61 +3700,33 @@
       el.hidden = true;
     }, 3000);
   }
-  let realWordStatusTimer = null;
 
-  async function loadRealProfile() {
-    const input = document.getElementById("real-profile-known-rank");
-    if (!input) return;
-    try {
-      const res = await fetch("/api/words/ngsl-profile", {
-        headers: { "Content-Type": "application/json" },
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.detail || "加载失败");
-      input.value = Number(data.known_rank) || 3000;
-    } catch (err) {
-      const status = document.getElementById("real-profile-status");
-      if (status) status.textContent = "词汇量加载失败：" + err.message;
+  function openCardStudioWithWords(wordsText) {
+    if (realShowManagePanel) realShowManagePanel("real-add-card");
+    const sourceSelect = document.getElementById("real-card-source");
+    if (sourceSelect) {
+      sourceSelect.value = "wordlist";
+      sourceSelect.dispatchEvent(new Event("change"));
+    }
+    const sourceText = document.getElementById("real-card-source-text");
+    if (sourceText) {
+      sourceText.value = wordsText;
+      sourceText.focus();
+    }
+    const step1 = document.getElementById("card-step-1");
+    const step2 = document.getElementById("card-step-2");
+    const step2Nav = document.getElementById("card-wizard-step-2");
+    if (step1 && step2) {
+      step1.hidden = true;
+      step2.hidden = false;
+      if (step2Nav) step2Nav.classList.add("active");
     }
   }
 
-  async function saveRealProfile() {
-    const input = document.getElementById("real-profile-known-rank");
-    const status = document.getElementById("real-profile-status");
-    if (!input || !status) return;
-    const rank = Number(input.value);
-    if (!Number.isInteger(rank) || rank < 0 || rank > 31000) {
-      status.textContent = "请输入 0 - 31000 之间的整数";
-      return;
-    }
-    const button = document.getElementById("real-profile-save");
-    if (button) button.disabled = true;
-    try {
-      const res = await fetch("/api/words/ngsl-profile", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ known_rank: rank }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.detail || "保存失败");
-      input.value = Number(data.known_rank) || rank;
-      status.textContent = "已保存";
-    } catch (err) {
-      status.textContent = "保存失败：" + err.message;
-    } finally {
-      if (button) button.disabled = false;
-    }
-  }
-  const realProfileSave = document.getElementById("real-profile-save");
-  if (realProfileSave) realProfileSave.onclick = saveRealProfile;
-
-  // 请求序号守卫 + 搜索防抖：输入快时慢响应不能覆盖新结果，
-  // 也不能每个按键都发一次请求（照抄复习队列 realReviewQueueVersion 的模式）。
-  let realWordsLoadVersion = 0;
   async function loadRealWords() {
     const search = document.getElementById("real-library-search");
     const query = search ? search.value.trim() : "";
-    const params = new URLSearchParams({ limit: "120", status: realWordFilter });
+    const params = new URLSearchParams({ limit: "120" });
     if (query) params.set("q", query);
     const loadVersion = ++realWordsLoadVersion;
     try {
@@ -3764,7 +3737,7 @@
       if (!res.ok) throw new Error(data.detail || "加载失败");
       if (loadVersion !== realWordsLoadVersion) return;
       const total = document.getElementById("real-word-total");
-      if (total) total.textContent = "共 " + (Number(data.count) || 0) + " 个词";
+      if (total) total.textContent = "共 " + (Number(data.count) || 0) + " 个生词";
       renderRealWords(data.words || []);
     } catch (err) {
       if (loadVersion !== realWordsLoadVersion) return;
@@ -3777,34 +3750,28 @@
     const box = document.getElementById("real-word-results");
     if (!box) return;
     if (!words.length) {
-      box.innerHTML = '<div class="empty-state">词库里还没有单词。查词后可以把想学的词加入这里。</div>';
+      box.innerHTML = '<div class="empty-state">生词库里还没有单词。查词或阅读时可以把生词加入这里。</div>';
       return;
     }
     box.innerHTML = words.map((item) => {
       const meta = [
         item.rank ? "NGSL #" + item.rank : "不在 NGSL 词表",
-        item.occurrences ? "出现 " + item.occurrences + " 次" : "尚未出现在文章中",
-        item.corpus_count ? item.corpus_count + " 篇文章" : "",
-        item.mid ? "已制卡" : "",
+        item.zh_def || item.en_def || "",
       ].filter(Boolean).join(" · ");
-      const statusButtons = item.mid
-        ? '<span class="word-status-badge word-status-mid">Mid（已制卡）</span>'
-        : '<button type="button" class="word-status-btn' + (item.status === "easy" ? " active" : "") +
-          '" data-word-status="easy" data-status-word="' + escapeHtml(item.word) + '">Easy</button>' +
-          '<button type="button" class="word-status-btn' + (item.status === "hard" ? " active" : "") +
-          '" data-word-status="hard" data-status-word="' + escapeHtml(item.word) + '">Hard（生词库）</button>';
       return (
-        '<article class="word-result status-' + item.status + '">' +
+        '<article class="word-result">' +
         '<label class="check-row word-batch-check" title="选择用于批量操作">' +
         '<input type="checkbox" data-select-word="' + escapeHtml(item.word) + '">' +
         "</label>" +
         '<div class="word-result-main"><div class="word-title-row"><h3>' +
         '<button class="word-link" data-real-lookup="' + escapeHtml(item.word) + '" type="button">' +
-        escapeHtml(item.word) + "</button></h3></div>" +
+        escapeHtml(item.word) + "</button></h3>" +
+        (item.pos ? '<span class="word-pos">' + escapeHtml(item.pos) + "</span>" : "") +
+        "</div>" +
         '<div class="meta">' + escapeHtml(meta) + "</div></div>" +
-        '<div class="word-result-actions">' + statusButtons +
-        '<button class="small danger" data-delete-word="' +
-        escapeHtml(item.word) + '" type="button">移出</button>' +
+        '<div class="word-result-actions">' +
+        '<button class="small primary" data-create-card-word="' + escapeHtml(item.word) + '" type="button">制卡</button>' +
+        '<button class="small danger" data-delete-word="' + escapeHtml(item.word) + '" type="button">移出</button>' +
         "</div></article>"
       );
     }).join("");
@@ -3814,15 +3781,6 @@
     updateRealWordBatch();
   }
 
-  const realWordFilters = document.querySelectorAll("[data-word-status-filter]");
-  realWordFilters.forEach((button) => {
-    button.addEventListener("click", () => {
-      realWordFilter = button.dataset.wordStatusFilter;
-      realWordFilters.forEach((b) => b.classList.toggle("active", b === button));
-      loadRealWords();
-    });
-  });
-
   const realLibrarySearch = document.getElementById("real-library-search");
   if (realLibrarySearch) {
     let searchDebounceTimer = 0;
@@ -3831,6 +3789,7 @@
       searchDebounceTimer = setTimeout(() => loadRealWords(), 250);
     });
   }
+
   const realWordResults = document.getElementById("real-word-results");
   if (realWordResults) {
     realWordResults.addEventListener("click", async (e) => {
@@ -3839,27 +3798,16 @@
         lookupFloating(lookupBtn.dataset.realLookup, e.clientX, e.clientY);
         return;
       }
+      const createBtn = e.target.closest("[data-create-card-word]");
+      if (createBtn) {
+        const word = createBtn.dataset.createCardWord;
+        if (word) openCardStudioWithWords(word);
+        return;
+      }
       const deleteBtn = e.target.closest("[data-delete-word]");
       if (deleteBtn) {
         await deleteRealWord(deleteBtn);
         return;
-      }
-      const statusBtn = e.target.closest("[data-word-status]");
-      if (statusBtn) {
-        const word = statusBtn.dataset.statusWord;
-        const status = statusBtn.dataset.wordStatus;
-        try {
-          const res = await fetch("/api/words/batch-status", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ words: [word], status }),
-          });
-          const data = await res.json().catch(() => ({}));
-          if (!res.ok) throw new Error(data.detail || "标记失败");
-          await loadRealWords();
-        } catch (err) {
-          setRealWordStatus(err.message);
-        }
       }
     });
     realWordResults.addEventListener("change", (e) => {
@@ -3890,7 +3838,7 @@
 
   async function deleteRealWord(button) {
     const word = button.dataset.deleteWord;
-    if (!confirm("将「" + word + "」移出词库？")) {
+    if (!confirm("将「" + word + "」移出生词库？")) {
       return;
     }
     try {
@@ -3901,7 +3849,7 @@
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.detail || "删除失败");
       realWordSelection.delete(word);
-      setRealWordStatus("已将「" + word + "」移出词库");
+      setRealWordStatus("已将「" + word + "」移出生词库");
       await loadRealWords();
     } catch (err) {
       const box = document.getElementById("real-word-results");
@@ -3925,11 +3873,21 @@
       updateRealWordBatch();
     };
   }
+
+  const realWordBatchCreateCards = document.getElementById("real-word-batch-create-cards");
+  if (realWordBatchCreateCards) {
+    realWordBatchCreateCards.onclick = () => {
+      if (!realWordSelection.size) return;
+      const words = [...realWordSelection].join("\n");
+      openCardStudioWithWords(words);
+    };
+  }
+
   const realWordBatchDelete = document.getElementById("real-word-batch-delete");
   if (realWordBatchDelete) {
     realWordBatchDelete.onclick = async () => {
       if (!realWordSelection.size) return;
-      if (!confirm("确定将选中的 " + realWordSelection.size + " 个词移出词库？")) return;
+      if (!confirm("确定将选中的 " + realWordSelection.size + " 个词移出生词库？")) return;
       realWordBatchDelete.disabled = true;
       try {
         const res = await fetch("/api/words/delete-batch", {
@@ -3943,7 +3901,7 @@
         updateRealWordBatch();
         await Promise.all([loadRealWords(), loadRealBrowser()]);
         requestReviewRefresh();
-        setRealWordStatus("已将 " + data.deleted + " 个词移出词库");
+        setRealWordStatus("已将 " + data.deleted + " 个词移出生词库");
       } catch (err) {
         setRealWordStatus(err.message);
       } finally {
@@ -3952,32 +3910,6 @@
     };
   }
 
-  async function markSelectedWords(status) {
-    if (!realWordSelection.size) return;
-    try {
-      const res = await fetch("/api/words/batch-status", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ words: [...realWordSelection], status }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.detail || "批量标记失败");
-      setRealWordStatus("已将 " + data.updated + " 个词标记为 " + status);
-      realWordSelection.clear();
-      updateRealWordBatch();
-      await loadRealWords();
-    } catch (err) {
-      setRealWordStatus(err.message);
-    }
-  }
-  const realWordBatchEasy = document.getElementById("real-word-batch-easy");
-  if (realWordBatchEasy) {
-    realWordBatchEasy.onclick = () => markSelectedWords("easy");
-  }
-  const realWordBatchHard = document.getElementById("real-word-batch-hard");
-  if (realWordBatchHard) {
-    realWordBatchHard.onclick = () => markSelectedWords("hard");
-  }
   const realWordBatchClear = document.getElementById("real-word-batch-clear");
   if (realWordBatchClear) {
     realWordBatchClear.onclick = () => {
@@ -3986,163 +3918,6 @@
         input.checked = false;
       });
       updateRealWordBatch();
-    };
-  }
-
-  /* ---------- 批量标记 Easy（内置词表 / 粘贴） ---------- */
-  const realWordMarkEasyPanel = document.getElementById("real-word-mark-easy");
-  const realWordMarkEasyOpen = document.getElementById("real-word-batch-easy-open");
-  const realWordMarkEasyClose = document.getElementById("real-word-mark-easy-close");
-  if (realWordMarkEasyOpen && realWordMarkEasyPanel) {
-    realWordMarkEasyOpen.onclick = () => {
-      realWordMarkEasyPanel.hidden = false;
-      loadRealWordMarkEasyLists();
-    };
-  }
-  if (realWordMarkEasyClose && realWordMarkEasyPanel) {
-    realWordMarkEasyClose.onclick = () => {
-      realWordMarkEasyPanel.hidden = true;
-    };
-  }
-  const realWordMarkEasyListToggle = document.getElementById("real-word-mark-easy-list-toggle");
-  const realWordMarkEasyListFields = document.getElementById("real-word-mark-easy-list-fields");
-  const realWordMarkEasyNgslToggle = document.getElementById("real-word-mark-easy-ngsl-toggle");
-  const realWordMarkEasyNgslFields = document.getElementById("real-word-mark-easy-ngsl-fields");
-  const realWordMarkEasyPasteToggle = document.getElementById("real-word-mark-easy-paste-toggle");
-  const realWordMarkEasyPasteFields = document.getElementById("real-word-mark-easy-paste-fields");
-  if (realWordMarkEasyListToggle && realWordMarkEasyListFields) {
-    realWordMarkEasyListToggle.onchange = () => {
-      realWordMarkEasyListFields.hidden = !realWordMarkEasyListToggle.checked;
-    };
-  }
-  if (realWordMarkEasyNgslToggle && realWordMarkEasyNgslFields) {
-    realWordMarkEasyNgslToggle.onchange = () => {
-      realWordMarkEasyNgslFields.hidden = !realWordMarkEasyNgslToggle.checked;
-    };
-  }
-  if (realWordMarkEasyPasteToggle && realWordMarkEasyPasteFields) {
-    realWordMarkEasyPasteToggle.onchange = () => {
-      realWordMarkEasyPasteFields.hidden = !realWordMarkEasyPasteToggle.checked;
-    };
-  }
-
-  let realWordMarkEasyListsLoaded = false;
-  async function loadRealWordMarkEasyLists() {
-    const select = document.getElementById("real-word-mark-easy-list-id");
-    if (!select || realWordMarkEasyListsLoaded) return;
-    try {
-      const res = await fetch("/api/wordlists", {
-        headers: { "Content-Type": "application/json" },
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.detail || "加载失败");
-      realWordMarkEasyListsLoaded = true;
-      select.innerHTML = (data.lists || [])
-        .map((l) => `<option value="${l.id}">${l.name}（${l.count}）</option>`)
-        .join("");
-    } catch (err) {
-      select.innerHTML = '<option value="">词表加载失败</option>';
-    }
-  }
-
-  const realWordMarkEasyRun = document.getElementById("real-word-mark-easy-run");
-  if (realWordMarkEasyRun) {
-    realWordMarkEasyRun.onclick = async () => {
-      const statusEl = document.getElementById("real-word-mark-easy-status");
-      const words = new Set();
-      if (realWordMarkEasyListToggle && realWordMarkEasyListToggle.checked) {
-        const listId = document.getElementById("real-word-mark-easy-list-id");
-        if (!listId || !listId.value) {
-          if (statusEl) statusEl.textContent = "请选择词表";
-          return;
-        }
-        try {
-          const res = await fetch("/api/card-studio/targets", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              source: "builtin",
-              list_id: listId.value,
-              from_rank: 1,
-              to_rank: 31000,
-              count: 5000,
-              randomize: false,
-              include_unknown: true,
-              card_type: "general",
-            }),
-          });
-          const data = await res.json().catch(() => ({}));
-          if (!res.ok) throw new Error(data.detail || "提取词表失败");
-          (data.words || []).forEach((item) => words.add(item.word));
-        } catch (err) {
-          if (statusEl) statusEl.textContent = err.message;
-          return;
-        }
-      }
-      if (realWordMarkEasyNgslToggle && realWordMarkEasyNgslToggle.checked) {
-        const fromInput = document.getElementById("real-word-mark-easy-ngsl-from");
-        const toInput = document.getElementById("real-word-mark-easy-ngsl-to");
-        const fromRank = Number(fromInput && fromInput.value) || 1;
-        const toRank = Number(toInput && toInput.value) || 3000;
-        try {
-          const res = await fetch("/api/card-studio/targets", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              source: "ngsl",
-              from_rank: fromRank,
-              to_rank: toRank,
-              count: 5000,
-              randomize: false,
-              include_unknown: true,
-              card_type: "general",
-            }),
-          });
-          const data = await res.json().catch(() => ({}));
-          if (!res.ok) throw new Error(data.detail || "提取 NGSL 失败");
-          (data.words || []).forEach((item) => words.add(item.word));
-        } catch (err) {
-          if (statusEl) statusEl.textContent = err.message;
-          return;
-        }
-      }
-      if (realWordMarkEasyPasteToggle && realWordMarkEasyPasteToggle.checked) {
-        const paste = document.getElementById("real-word-mark-easy-paste");
-        (paste.value || "")
-          .split(/\n|,|，/)
-          .map((s) => s.trim().toLowerCase())
-          .filter(Boolean)
-          .forEach((w) => words.add(w));
-      }
-      if (!words.size) {
-        if (statusEl) statusEl.textContent = "请勾选词表或粘贴单词";
-        return;
-      }
-      realWordMarkEasyRun.disabled = true;
-      const chunk = [...words];
-      const countText = (data, prefix) =>
-        prefix + data.updated + " 个词" +
-        (data.skipped_existing
-          ? "（已 Easy 的 " + data.skipped_existing + " 个跳过）"
-          : "");
-      try {
-        if (statusEl) statusEl.textContent = "正在标记 " + chunk.length + " 个词…";
-        const res = await fetch("/api/words/batch-status", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ words: chunk, status: "easy" }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.detail || "批量标记失败");
-        if (statusEl) {
-          statusEl.textContent = "已将 " + countText(data, "");
-        }
-        await loadRealWords();
-      } catch (err) {
-        if (statusEl) statusEl.textContent = err.message;
-      } finally {
-        realWordMarkEasyRun.disabled = false;
-      }
     };
   }
 

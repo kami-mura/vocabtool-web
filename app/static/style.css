@@ -2461,6 +2461,7 @@ mark.article-word,
 .word-result-main { min-width: 0; }
 .word-title-row { display: flex; align-items: center; gap: 8px; }
 .word-title-row h3 { font-size: 21px; margin: 0; color: #26324a; }
+.word-pos { font-size: 13px; color: var(--accent); font-style: italic; font-weight: 500; }
 .word-definition { margin: 5px 0 4px; }
 .word-definition b { color: var(--accent); margin-right: 4px; }
 .word-definition span { display: block; color: #536176; font-size: 13px; }

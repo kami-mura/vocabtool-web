@@ -47,7 +47,7 @@ class _VocabularyTestSubmitIn(VocabularyTestSubmitIn):
     level: int | None = None
 
 
-# ---------- 我的词库 ----------
+# ---------- 生词库 ----------
 
 
 @router.get("/words")
@@ -56,7 +56,7 @@ def list_words(
     db: Session = Depends(get_db),
     q: str = "",
     status: str = "all",
-    limit: int = 100,
+    limit: int = 120,
 ):
     user = _require_user(db, request)
     query = q.strip()
@@ -65,20 +65,8 @@ def list_words(
     if status != "all" and status not in ALLOWED_WORD_STATUSES:
         raise HTTPException(status_code=400, detail="无效状态")
 
-    corpora = db.query(Corpus.id).filter(Corpus.user_id == user.id).all()
-    corpus_ids = [row[0] for row in corpora]
-    occurrences: Counter = Counter()
-    corpus_presence: Counter = Counter()
-    if corpus_ids:
-        rows = db.query(CorpusWord).filter(CorpusWord.corpus_id.in_(corpus_ids)).all()
-        for row in rows:
-            occurrences[row.word] += row.count
-            corpus_presence[row.word] += 1
-
-    rows = db.query(SavedWord).filter(SavedWord.user_id == user.id).all()
-    saved = {row.word: row for row in rows}
-    # mid 是派生状态：同步所有单词卡（general/reading/cloze/anki）。
-    # 口语卡 word 是内部需求 ID 而非单词，不参与词库 mid。
+    saved_rows = db.query(SavedWord).filter(SavedWord.user_id == user.id).all()
+    saved_dict = {row.word: row for row in saved_rows}
     all_card_words = {
         str(row[0] or "").split(" [", 1)[0]
         for row in db.query(Card.word)
@@ -86,24 +74,24 @@ def list_words(
         .distinct()
         .all()
     }
-    all_words = set(saved) | all_card_words
+    all_words = set(saved_dict) | all_card_words
     if query_lower:
         all_words = {word for word in all_words if query_lower in word.lower()}
+
+    # 兼容 status 筛选
     if status == "mid":
         all_words = all_words & all_card_words
     elif status == "easy":
-        # mid 优先：已制卡（mid）的词不算 easy，即使 saved_words 曾标过 easy
         all_words = {
-            word for word in all_words
-            if word not in all_card_words
-            and word in saved and saved[word].status == "easy"
+            w for w in all_words
+            if w not in all_card_words and saved_dict.get(w) and saved_dict[w].status == "easy"
         }
     elif status == "hard":
         all_words = {
-            word for word in all_words
-            if word not in all_card_words
-            and (word not in saved or saved[word].status != "easy")
+            w for w in all_words
+            if w not in all_card_words and (not saved_dict.get(w) or saved_dict[w].status != "easy")
         }
+
     count = len(all_words)
     ordered = sorted(
         all_words,
@@ -121,7 +109,7 @@ def list_words(
     for word in ordered:
         entry = entries.get(word)
         is_mid = word in all_card_words
-        explicit = saved.get(word)
+        explicit = saved_dict.get(word)
         effective = (
             "mid" if is_mid else (explicit.status if explicit else "hard")
         )
@@ -131,8 +119,6 @@ def list_words(
                 "status": effective,
                 "mid": is_mid,
                 "rank": vocab.rank_of(word),
-                "occurrences": occurrences.get(word, 0),
-                "corpus_count": corpus_presence.get(word, 0),
                 "pos": entry.pos if entry else "",
                 "en_def": entry.en_def if entry else "",
                 "zh_def": entry.zh_def if entry else "",
