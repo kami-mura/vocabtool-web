@@ -707,9 +707,12 @@ button.landing-login-btn { border: none; cursor: pointer; }
   margin-bottom: 4px;
 }
 .reading-word-row mark { font-size: 28px; line-height: 1.2; }
+.demo-audio,
 .reading-word-row .demo-audio,
 .reading-word-audio,
-.reading-sentence-audio {
+.reading-sentence-audio,
+.dictation-word-row .demo-audio,
+.speaking-expression .demo-audio {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -726,6 +729,13 @@ button.landing-login-btn { border: none; cursor: pointer; }
   background: var(--panel-2);
   color: var(--text);
   cursor: pointer;
+  box-sizing: border-box;
+}
+.demo-audio:hover,
+.reading-word-audio:hover,
+.reading-sentence-audio:hover {
+  border-color: var(--text);
+  filter: brightness(1.05);
 }
 .demo-back-word { margin: 0; font-size: 18px; font-weight: 800; color: var(--accent); }
 .demo-card-face.back p:not(.demo-front-text) { margin: 4px 0 0; color: var(--muted); font-size: 15px; line-height: 1.5; }
@@ -734,18 +744,6 @@ button.landing-login-btn { border: none; cursor: pointer; }
   color: var(--accent);
   font-weight: 700;
 }
-.demo-audio {
-  margin-top: 6px;
-  padding: 4px 12px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: var(--panel-2);
-  color: var(--accent);
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-}
-.demo-audio:hover { filter: brightness(1.05); }
 .lookup-audio {
   margin: 0 0 0 8px;
   padding: 2px 10px;

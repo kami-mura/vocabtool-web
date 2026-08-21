@@ -175,9 +175,12 @@
 #real-review .home-review-cards .demo-card-face.front {
   padding: 16px 16px 84px;
 }
+#real-review .home-review-cards .demo-audio,
 #real-review .home-review-cards .reading-word-row .demo-audio,
 #real-review .home-review-cards .reading-word-audio,
-#real-review .home-review-cards .reading-sentence-audio {
+#real-review .home-review-cards .reading-sentence-audio,
+#real-review .home-review-cards .speaking-expression .demo-audio,
+#guest-demo-cards .demo-audio {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -192,7 +195,6 @@
   border-radius: 999px;
   color: var(--text);
 }
-#real-review .home-review-cards .demo-audio-row .demo-audio,
 #real-review .home-review-cards .demo-flip {
   font-size: 16px;
   min-height: 48px;

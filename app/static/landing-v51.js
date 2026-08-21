@@ -1210,14 +1210,15 @@
           : "");
     } else {
       frontHtml =
-        '<p class="demo-front-text">' + frontInner + "</p>" +
-        (!isSpeaking && frontButtons ? '<div class="demo-audio-row">' + frontButtons + "</div>" : "");
+        '<p class="demo-front-text">' + frontInner +
+        (hasFrontAudio ? ' <button class="demo-audio reading-word-audio" data-real-audio="' + escapeHtml(target) + '" type="button">▶</button>' : "") +
+        "</p>";
     }
     let backInner;
     if (isSpeaking) {
       backInner = '<div class="card-answer">' + speakingRows(card.back).map((row) =>
         '<div class="speaking-expression">' +
-        '<button class="small" data-real-audio="' + escapeHtml(row.en) + '" type="button">▶</button>' +
+        '<button class="demo-audio reading-word-audio" data-real-audio="' + escapeHtml(row.en) + '" type="button">▶</button>' +
         '<div class="speaking-expression-text"><span class="speaking-en">' + escapeHtml(row.en) + "</span>" +
         (row.note ? '<span class="speaking-note">' + escapeHtml(row.note) + "</span>" : "") +
         "</div></div>"
@@ -1241,34 +1242,24 @@
         sentence && sentence !== target
           ? '<div class="reading-sentence-wrap dictation-sentence-wrap">' +
             '<div class="reading-sentence-content">' +
-            '<p class="demo-front-text dictation-sentence-text">' + renderMarkdown(sentence, target) + "</p>" +
-            '<div class="demo-audio-row"><button class="demo-audio" data-real-audio="' +
-            escapeHtml(sentence) + '" type="button">▶</button></div>' +
+            '<p class="demo-front-text dictation-sentence-text">' + renderMarkdown(sentence, target) + ' <button class="demo-audio reading-sentence-audio" data-real-audio="' +
+            escapeHtml(sentence) + '" type="button">▶</button></p>' +
             "</div></div>"
           : "";
       backInner =
         '<div class="card-answer dictation-answer">' +
         '<div class="reading-word-row dictation-word-row">' +
         '<mark class="word-highlight">' + escapeHtml(target) + "</mark>" +
-        ' <button class="demo-audio" data-real-audio="' + escapeHtml(target) + '" type="button">▶</button>' +
+        ' <button class="demo-audio reading-word-audio" data-real-audio="' + escapeHtml(target) + '" type="button">▶</button>' +
         ' <span class="dictation-user-tag is-empty">（未输入）</span>' +
         "</div>" +
         (cleanMeaning ? '<p class="demo-front-text dictation-meaning-text">' + renderMarkdown(cleanMeaning, target) + "</p>" : "") +
         sentenceHtml +
         "</div>";
     } else {
-      backInner = '<div class="card-answer">' + renderMarkdown(card.back, target) + "</div>";
-      if (card.card_type === "cloze") {
-        // Cloze 卡音频放背面：翻面后答案已可见，听单词/例句不剧透。
-        backInner +=
-          '<div class="demo-audio-row">' +
-          '<button class="demo-audio" data-real-audio="' + escapeHtml(target) + '" type="button">▶</button>';
-        if (sentence && sentence !== target) {
-          backInner +=
-            '<button class="demo-audio" data-real-audio="' + escapeHtml(sentence) + '" type="button">▶</button>';
-        }
-        backInner += "</div>";
-      }
+      backInner = '<div class="card-answer">' + renderMarkdown(card.back, target) +
+        (card.card_type === "cloze" ? ' <button class="demo-audio reading-word-audio" data-real-audio="' + escapeHtml(target) + '" type="button">▶</button>' : "") +
+        "</div>";
     }
     const showBury = (realReviewAgainCounts.get(card.id) || 0) >= 3;
     const backHtml = backInner +
