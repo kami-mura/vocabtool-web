@@ -1743,7 +1743,10 @@
       section.hidden = true;
       return;
     }
-    const totalCards = days.reduce((sum, day) => sum + (Number(day.total) || 0), 0);
+    const totalCards =
+      (todayDashboardData && (Number(todayDashboardData.attempted_cards) || Number(todayDashboardData.card_count) || Number(todayDashboardData.total_cards))) ||
+      (realReviewTotalCards || 0) ||
+      days.reduce((sum, day) => sum + (Number(day.total) || 0), 0);
     const activeDays = days.filter((day) => (Number(day.total) || 0) > 0).length;
 
     let maxStreak = 0;
@@ -1762,13 +1765,13 @@
 
     if (summary) {
       summary.textContent = joinedDays < 365
-        ? "已加入 " + joinedDays + " 天 · 共学 " + totalCards + " 张卡 · " + activeDays + " 天有学习"
-        : "近一年共学 " + totalCards + " 张卡 · " + activeDays + " 天有学习";
+        ? "已加入 " + joinedDays + " 天 · 累计学习 " + totalCards + " 张卡 · " + activeDays + " 天有学习"
+        : "近一年累计学习 " + totalCards + " 张卡 · " + activeDays + " 天有学习";
     }
 
     if (statsEl) {
       statsEl.innerHTML =
-        '<div class="hm-stat-pill"><span class="hm-stat-icon">📚</span><span class="hm-stat-text">累计 <b>' +
+        '<div class="hm-stat-pill"><span class="hm-stat-icon">📚</span><span class="hm-stat-text">累计学习 <b>' +
         totalCards + '</b> 张</span></div>' +
         '<div class="hm-stat-pill"><span class="hm-stat-icon">📅</span><span class="hm-stat-text">打卡 <b>' +
         activeDays + '</b> 天</span></div>' +
