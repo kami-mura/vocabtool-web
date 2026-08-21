@@ -447,6 +447,23 @@
   });
 
   /* ---------- 登录后：个人菜单 / 每日新学习 / 退出 ---------- */
+  let toastTimer = null;
+  function showToast(msg, isError) {
+    let toast = document.getElementById("global-toast");
+    if (!toast) {
+      toast = document.createElement("div");
+      toast.id = "global-toast";
+      toast.className = "toast";
+      document.body.appendChild(toast);
+    }
+    toast.textContent = msg;
+    toast.className = "toast" + (isError ? " err" : "") + " show";
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => {
+      toast.classList.remove("show");
+    }, 2200);
+  }
+
   function applyLandingTheme(dark) {
     if (window.vocabTheme) window.vocabTheme.apply(dark);
     else document.documentElement.dataset.theme = dark ? "dark" : "light";
@@ -459,6 +476,28 @@
       else applyLandingTheme(dark);
     };
   }
+
+  const topbarSkinToggle = document.getElementById("topbar-skin-toggle");
+  if (topbarSkinToggle) {
+    topbarSkinToggle.onclick = () => {
+      if (window.vocabTheme) {
+        const next = window.vocabTheme.toggleSkin();
+        showToast(next === "studio" ? "已切换至「文墨工坊」皮肤" : "已切换至「经典模式」皮肤");
+      }
+    };
+  }
+
+  const accountSkinToggle = document.getElementById("account-skin-toggle");
+  if (accountSkinToggle) {
+    accountSkinToggle.onclick = () => {
+      if (window.vocabTheme) {
+        const next = window.vocabTheme.toggleSkin();
+        if (accountPanel) accountPanel.hidden = true;
+        showToast(next === "studio" ? "已切换至「文墨工坊」皮肤" : "已切换至「经典模式」皮肤");
+      }
+    };
+  }
+
   try {
     if (window.vocabTheme) window.vocabTheme.sync();
     else {
@@ -568,6 +607,21 @@
   }
   // 事件委托：无论按钮何时渲染都能响应，兼容缓存的新旧页面结构。
   document.addEventListener("click", (e) => {
+    if (e.target.closest("#topbar-skin-toggle")) {
+      if (window.vocabTheme) {
+        const next = window.vocabTheme.toggleSkin();
+        showToast(next === "studio" ? "已切换至「文墨工坊」皮肤" : "已切换至「经典模式」皮肤");
+      }
+      return;
+    }
+    if (e.target.closest("#account-skin-toggle")) {
+      if (window.vocabTheme) {
+        const next = window.vocabTheme.toggleSkin();
+        if (accountPanel) accountPanel.hidden = true;
+        showToast(next === "studio" ? "已切换至「文墨工坊」皮肤" : "已切换至「经典模式」皮肤");
+      }
+      return;
+    }
     if (e.target.closest("#account-api-key-open")) {
       openAccountApiModal();
       return;

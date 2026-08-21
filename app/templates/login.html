@@ -21,6 +21,7 @@
   <link rel="stylesheet" href="{{ static_url('style.css') }}">
   <link rel="stylesheet" href="{{ static_url('style-glass.css') }}" id="skin-glass">
   <link rel="stylesheet" href="{{ static_url('style-liquid.css') }}" id="skin-liquid">
+  <link rel="stylesheet" href="{{ static_url('style-studio.css') }}" id="skin-studio">
   <link rel="stylesheet" href="{{ static_url('style-motion.css') }}">
 </head>
 <body class="auth-body">
@@ -30,6 +31,7 @@
       <span class="auth-brand-name">vocabtool</span>
     </div>
     <div class="topbar-right">
+      <button id="topbar-skin-toggle" class="topbar-skin-btn" type="button" title="一键切换皮肤风格" aria-label="切换皮肤风格"><span class="skin-toggle-icon">🎨</span></button>
       <button id="auth-theme-toggle" class="auth-theme-toggle" type="button" aria-label="切换夜间模式">☾</button>
     </div>
   </header>
