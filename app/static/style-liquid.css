@@ -147,6 +147,7 @@ select:focus-visible {
 [data-theme="dark"] .card-browser,
 [data-theme="dark"] .manage-panel,
 [data-theme="dark"] .account-menu-panel,
+[data-theme="dark"] .account-api-modal-card,
 [data-theme="dark"] .real-extra-panel,
 [data-theme="dark"] .review-manage-menu,
 [data-theme="dark"] .home-review-empty,

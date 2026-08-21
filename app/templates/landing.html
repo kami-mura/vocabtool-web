@@ -35,27 +35,7 @@
         <button id="account-menu-toggle" class="account-menu-summary" data-ico="account" type="button"><span class="ic nav-emoji" aria-hidden="true">👤</span>个人</button>
         <div id="account-menu-panel" class="account-menu-panel" hidden>
           <p class="account-email">邮箱：<strong id="home-email">…</strong></p>
-          <div class="account-api-key">
-            <label for="account-api-provider">自己的 AI API Key</label>
-            <select id="account-api-provider" aria-label="AI 服务商">
-              <option value="mimo">小米 MiMo</option>
-              <option value="deepseek">DeepSeek</option>
-              <option value="openai">OpenAI</option>
-              <option value="gemini">Google Gemini</option>
-              <option value="anthropic">Anthropic Claude</option>
-              <option value="qwen">通义千问</option>
-              <option value="kimi">Kimi</option>
-              <option value="glm">智谱 GLM</option>
-              <option value="xai">xAI Grok</option>
-            </select>
-            <input id="account-api-key-input" type="password" placeholder="输入所选服务商的 API Key" autocomplete="new-password" spellcheck="false" data-1p-ignore>
-            <div class="account-api-key-actions">
-              <button id="account-api-key-save" class="small" type="button">保存 Key</button>
-              <button id="account-api-key-delete" class="small danger" type="button" hidden>删除 Key</button>
-            </div>
-            <p id="account-api-key-status" class="account-api-key-status">加载中…</p>
-            <p class="account-api-key-note">加密保存在服务器，保存后不再显示明文。网站免费 API 每日额度：查询 50 次、制卡 50 张、短文 1 次；使用自己的 Key 不占免费额度。</p>
-          </div>
+          <button id="account-api-key-open" class="small" type="button">AI API 设置</button>
           <button id="account-vocabulary-test" class="small" type="button">词汇量测试</button>
           <button id="account-theme-toggle" class="small" type="button"><span id="account-theme-toggle-label">☾ 夜间模式</span></button>
           <button id="home-logout" class="danger" type="button">退出登录</button>
@@ -504,6 +484,35 @@
     <div id="floating-lookup-body"></div>
   </div>
   {% if logged_in %}
+  <div id="account-api-modal" class="account-api-modal" role="dialog" aria-modal="true" aria-labelledby="account-api-modal-title" hidden>
+    <div class="account-api-modal-card">
+      <div class="account-api-modal-header">
+        <h3 id="account-api-modal-title">AI API 设置</h3>
+        <button id="account-api-modal-close" class="account-api-modal-close" type="button" aria-label="关闭">×</button>
+      </div>
+      <div class="account-api-key">
+        <label for="account-api-provider">选择 AI 服务商</label>
+        <select id="account-api-provider" aria-label="AI 服务商">
+          <option value="mimo">小米 MiMo</option>
+          <option value="deepseek">DeepSeek</option>
+          <option value="openai">OpenAI</option>
+          <option value="gemini">Google Gemini</option>
+          <option value="anthropic">Anthropic Claude</option>
+          <option value="qwen">通义千问</option>
+          <option value="kimi">Kimi</option>
+          <option value="glm">智谱 GLM</option>
+          <option value="xai">xAI Grok</option>
+        </select>
+        <input id="account-api-key-input" type="password" placeholder="输入所选服务商的 API Key" autocomplete="new-password" spellcheck="false" data-1p-ignore>
+        <div class="account-api-key-actions">
+          <button id="account-api-key-save" class="small primary" type="button">保存 Key</button>
+          <button id="account-api-key-delete" class="small danger" type="button" hidden>删除 Key</button>
+        </div>
+        <p id="account-api-key-status" class="account-api-key-status">加载中…</p>
+        <p class="account-api-key-note">加密保存在服务器，保存后不再显示明文。网站免费 API 每日额度：查询 50 次、制卡 50 张、短文 1 次；使用自己的 Key 不占免费额度。</p>
+      </div>
+    </div>
+  </div>
   <div id="vocabulary-test-modal" class="vocabulary-test-modal" role="dialog" aria-modal="true" aria-labelledby="vocabulary-test-title" hidden>
     <section class="vocabulary-test-card">
       <button id="vocabulary-test-close" class="vocabulary-test-close" type="button" aria-label="关闭">×</button>

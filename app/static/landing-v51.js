@@ -470,6 +470,9 @@
   } catch (_) { /* 隐私模式等场景忽略 */ }
 
   const accountPanel = document.getElementById("account-menu-panel");
+  const accountApiModal = document.getElementById("account-api-modal");
+  const accountApiKeyOpen = document.getElementById("account-api-key-open");
+  const accountApiModalClose = document.getElementById("account-api-modal-close");
   const accountApiProvider = document.getElementById("account-api-provider");
   const accountApiKeyInput = document.getElementById("account-api-key-input");
   const accountApiKeySave = document.getElementById("account-api-key-save");
@@ -477,6 +480,26 @@
   const accountApiKeyStatus = document.getElementById("account-api-key-status");
   let accountApiKeyLoaded = false;
   let configuredApiProviderLabel = "";
+
+  function openAccountApiModal() {
+    if (accountApiModal) {
+      accountApiModal.hidden = false;
+      if (accountPanel) accountPanel.hidden = true;
+      loadAccountApiKeyStatus(true);
+    }
+  }
+
+  function closeAccountApiModal() {
+    if (accountApiModal) accountApiModal.hidden = true;
+  }
+
+  if (accountApiKeyOpen) accountApiKeyOpen.onclick = openAccountApiModal;
+  if (accountApiModalClose) accountApiModalClose.onclick = closeAccountApiModal;
+  if (accountApiModal) {
+    accountApiModal.addEventListener("click", (e) => {
+      if (e.target === accountApiModal) closeAccountApiModal();
+    });
+  }
 
   async function loadAccountApiKeyStatus(force) {
     if (!isLoggedIn || !accountApiKeyStatus || (accountApiKeyLoaded && !force)) return;
@@ -545,6 +568,14 @@
   }
   // 事件委托：无论按钮何时渲染都能响应，兼容缓存的新旧页面结构。
   document.addEventListener("click", (e) => {
+    if (e.target.closest("#account-api-key-open")) {
+      openAccountApiModal();
+      return;
+    }
+    if (e.target.closest("#account-api-modal-close")) {
+      closeAccountApiModal();
+      return;
+    }
     if (e.target.closest("#account-menu-toggle")) {
       if (!isLoggedIn) {
         location.href = "/login";
@@ -552,7 +583,6 @@
       }
       if (accountPanel) {
         accountPanel.hidden = !accountPanel.hidden;
-        if (!accountPanel.hidden) loadAccountApiKeyStatus();
       }
       return;
     }
