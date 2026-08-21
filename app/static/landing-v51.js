@@ -5062,14 +5062,7 @@
     if (lookup.has_card || lookup.card_id) {
       return '<div class="lookup-actions"><span class="lookup-state">已制成学习卡片</span></div>';
     }
-    if (lookup.saved) {
-      // easy/mid/hard 三态互斥；Easy 词可再次加入生词库（升级为 hard）
-      if (lookup.easy) {
-        const saveButton = '<button class="small" type="button" data-save-lookup-word="' +
-          Number(lookup.id) + '">加入生词库</button>';
-        return '<div class="lookup-actions"><span class="lookup-state easy">已标记 Easy</span>' +
-          saveButton + "</div>";
-      }
+    if (lookup.saved && !lookup.easy) {
       return '<div class="lookup-actions"><span class="lookup-state">已在生词库</span></div>';
     }
     const saveButton = '<button class="small" type="button" data-save-lookup-word="' +
