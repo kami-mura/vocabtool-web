@@ -540,8 +540,8 @@ OUTPUT CONTRACT
 - Output exactly one ```text code block and nothing else.
 - Output one line per input item, in the same order. Never omit, merge, add, or number items.
 - Every line has exactly 6 fields and exactly 5 separators:
-  Word/Phrase ||| Pronunciation ||| Chinese Meaning ||| English Example ||| Example Translation ||| Mnemonic (助记)
-- Never write ||| inside a field. Fields 2, 4, and 5 are empty. Field 6 contains the mnemonic.
+  Word/Phrase ||| Pronunciation ||| Chinese Meaning ||| English Example ||| Example Translation ||| Etymology
+- Never write ||| inside a field. Fields 2, 4, 5, and 6 are empty.
 
 SENSE RULES
 
@@ -558,12 +558,12 @@ FIELD RULES
 3. Give one short Simplified Chinese core meaning. No part of speech, English definition, second sense, slash list, or explanation.
 4. Leave empty.
 5. Leave empty.
-6. Mnemonic (助记): Write a vivid cognitive mnemonic (3-4 Emojis + a short vivid scene or clever memory hook, e.g. `✈️ 飞机降落 ➔ 🛞 轮子触地 ➔ 🛣️ 跑道缓缓滑行。飞机像出租车(taxi)一样在地面慢慢开。`).
+6. Leave empty.
 
 FORMAT EXAMPLE — do not include it unless it is an input item:
 
 ```text
-taxi (verb) ||| ||| （飞机）滑行 ||| ||| ||| ✈️ 飞机降落 ➔ 🛞 轮子触地 ➔ 🛣️ 跑道缓缓滑行。飞机像出租车(taxi)一样在地面慢慢开。
+taxi (verb) ||| ||| （飞机）滑行 ||| ||| |||
 ```
 
 FINAL CHECK
@@ -571,7 +571,6 @@ FINAL CHECK
 - Output line count equals input line count.
 - Field 1 exactly matches its input item.
 - Each Field 3 contains one Chinese meaning only.
-- Field 6 contains a vivid mnemonic.
 - Every line contains exactly 5 occurrences of |||.
 - Nothing appears outside the single text code block."""
     return system_prompt, user_prompt
@@ -595,8 +594,8 @@ OUTPUT CONTRACT
 - Output exactly one ```text code block and nothing else.
 - Output one line per input item, in the same order. Never omit, merge, add, or number items.
 - Every line has exactly 6 fields and exactly 5 separators:
-  Word/Phrase ||| Pronunciation ||| Structured Meaning ||| English Example ||| Example Translation ||| Mnemonic (助记)
-- Never write ||| inside a field. Fields 2 and 5 are empty. Field 6 contains the mnemonic.
+  Word/Phrase ||| Pronunciation ||| Structured Meaning ||| English Example ||| Example Translation ||| Etymology
+- Never write ||| inside a field. Fields 2, 5, and 6 are empty.
 
 SENSE DECISION — apply in this order
 
@@ -627,13 +626,13 @@ FIELD RULES
      never a different meaning of the word.
    - Do not bold the target. Do not use HTML, a blank, a quotation, a second sentence, or a definition disguised as a sentence.
 5. Example Translation: leave empty.
-6. Mnemonic (助记): Write a concise, vivid cognitive mnemonic (3-4 Emojis + a high-contrast mental imagery scene or clever decomposition, e.g. `💎 钻石坚硬 ➔ 🔨 铁锤猛砸 ➔ 🛡️ 纹丝不动 ➔ 😤 态度坚决。像金刚石(adamant)一样坚不可摧。`).
+6. Etymology: leave empty.
 
 FORMAT EXAMPLES — do not include them unless they are input items:
 
 ```text
-adamant ||| ||| adj. | refusing to change an opinion or decision | 坚定不改的 ||| She remained adamant despite pressure from the entire board. ||| ||| 💎 钻石坚硬 ➔ 🔨 铁锤猛砸 ➔ 🛡️ 纹丝不动 ➔ 😤 态度坚决。像金刚石(adamant)一样坚不可摧。
-at ten o'clock sharp ||| ||| phrase | exactly at ten o'clock | 十点整 ||| The interview will begin at ten o'clock sharp, so please arrive early. ||| ||| ⏰ 钟表指向十点 ➔ 🔪 刀尖一样精准 ➔ ⏱️ 分秒不差。sharp 像刀刃一样精准切在十点。
+adamant ||| ||| adj. | refusing to change an opinion or decision | 坚定不改的 ||| She remained adamant despite pressure from the entire board. ||| |||
+at ten o'clock sharp ||| ||| phrase | exactly at ten o'clock | 十点整 ||| The interview will begin at ten o'clock sharp, so please arrive early. ||| |||
 ```
 
 FINAL CHECK — silently repair any failed line before answering
@@ -642,7 +641,6 @@ FINAL CHECK — silently repair any failed line before answering
 - Field 3 has exactly three nonempty parts: part of speech, English definition, Chinese gloss.
 - Field 4 has 7–18 words, one sentence, terminal punctuation, and the complete visible target or a natural inflected form at least once.
 - Meaning and example use the same single most central sense.
-- Field 6 contains a vivid mnemonic.
 - Every line contains exactly 5 occurrences of |||.
 - Nothing appears outside the single text code block."""
     return system_prompt, user_prompt
@@ -666,8 +664,8 @@ OUTPUT CONTRACT
 - Output exactly one ```text code block and nothing else.
 - Output one line per input item, in the same order. Never omit, merge, add, or number items.
 - Every line has exactly 6 fields and exactly 5 separators:
-  Word/Phrase ||| Pronunciation ||| Chinese Meaning ||| English Example ||| Example Translation ||| Mnemonic (助记)
-- Never write ||| inside a field. Fields 2 and 5 are empty. Field 6 contains the mnemonic.
+  Word/Phrase ||| Pronunciation ||| Chinese Meaning ||| English Example ||| Example Translation ||| Etymology
+- Never write ||| inside a field. Fields 2, 5, and 6 are empty.
 
 SENSE RULES
 
@@ -692,12 +690,12 @@ FIELD RULES
      never a different meaning of the word.
    - Do not use HTML, a blank, a quotation, a second sentence, stereotypes, or awkward dictionary prose.
 5. Leave empty.
-6. Mnemonic (助记): Write a concise, vivid cognitive mnemonic (3-4 Emojis + a short vivid scene or clever memory hook).
+6. Leave empty.
 
 FORMAT EXAMPLE — do not include it unless it is an input item:
 
 ```text
-taxi (verb) ||| ||| （飞机）滑行 ||| After landing, pilots taxi the aircraft slowly toward the assigned gate. ||| ||| ✈️ 飞机降落 ➔ 🛞 轮子触地 ➔ 🛣️ 跑道缓缓滑行。飞机像出租车(taxi)一样在地面慢慢开。
+taxi (verb) ||| ||| （飞机）滑行 ||| After landing, pilots taxi the aircraft slowly toward the assigned gate. ||| |||
 ```
 
 ANSWERABILITY TEST — perform silently for every line
@@ -710,7 +708,6 @@ FINAL CHECK
 - Field 3 has one Chinese meaning only.
 - Field 4 has 9–18 words, one sentence, terminal punctuation, and the complete visible target or a natural inflected form at least once.
 - Meaning and example use the same single most central sense, and the target is the best cloze answer.
-- Field 6 contains a vivid mnemonic.
 - Every line contains exactly 5 occurrences of |||.
 - Nothing appears outside the single text code block."""
     return system_prompt, user_prompt
@@ -2449,43 +2446,3 @@ def generate_article(
     except Exception as exc:
         db.rollback()
         return None, _safe_api_error(exc, "article generation", user_api_key)
-
-
-def generate_word_mnemonic(
-    word: str,
-    meaning: str = "",
-    context: str = "",
-    user_api_key: api_keys.UserAiCredential | str | None = None,
-) -> str:
-    """为指定单词生成生动的认知助记（Emoji 视觉链 + 画面感联想/拆词技巧）。"""
-    client = _new_ai_client(user_api_key) if user_api_key else _new_ai_client()
-    system_prompt = (
-        "You are an expert cognitive memory coach and linguist. "
-        "You create vivid, unforgettable visual mnemonics for English vocabulary."
-    )
-    user_prompt = f"""为以下英语单词生成一个极具画面感、幽默生动的中文助记（Mnemonic）：
-
-目标单词：{word}
-核心释义：{meaning or '结合该词常用核心含义'}
-参考语境：{context or '无'}
-
-要求：
-1. 采用“Emoji 视觉微场景 + 一句夸张/高对比度的画面描摹或巧妙拆词谐音联想”；
-2. 简明精炼（60字以内），不要废话，直接输出助记内容（不要带有“助记：”等前缀，不要加 markdown 代码块）。
-
-示例格式：
-⏰ 闹钟大响 ➔ 🛌 翻身继续睡 ➔ 🎮 通宵打游戏 ➔ 😱 截止前半小时抱头痛哭。书桌上倒计时剩1小时，却在专心给香蕉画五官。
-"""
-    response = _chat_completion(
-        client,
-        provider=_active_provider(user_api_key),
-        model=_active_model(user_api_key),
-        temperature=0.7,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-    )
-    content = str(response.choices[0].message.content or "").strip()
-    return re.sub(r"^(?:💡\s*)?(?:助记|记忆法|Mnemonic)[：:\s]*", "", content).strip()
-
