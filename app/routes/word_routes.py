@@ -6,9 +6,6 @@ from fastapi import APIRouter
 
 from ..api_support import (
     Card,
-    Corpus,
-    CorpusWord,
-    Counter,
     Depends,
     HTTPException,
     Request,
