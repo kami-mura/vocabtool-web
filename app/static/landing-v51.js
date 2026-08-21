@@ -1143,6 +1143,36 @@
     cardEl.classList.toggle("flipped");
   }
 
+  function extractCardMnemonic(backText) {
+    const raw = String(backText || "");
+    const match = raw.match(/\n\n(?:💡\s*)?助记[：:]\s*([\s\S]+)$/) || raw.match(/💡\s*助记[：:]\s*([\s\S]+)$/);
+    if (match) {
+      const main = raw.slice(0, match.index).trim();
+      const mnemonic = match[1].trim();
+      return { main, mnemonic };
+    }
+    return { main: raw.trim(), mnemonic: "" };
+  }
+
+  function renderMnemonicBox(mnemonic, cardId) {
+    if (mnemonic) {
+      return (
+        '<div class="card-mnemonic-box">' +
+        '<div class="card-mnemonic-header"><span class="card-mnemonic-tag">💡 助记</span></div>' +
+        '<div class="card-mnemonic-text">' + escapeHtml(mnemonic) + "</div>" +
+        "</div>"
+      );
+    }
+    if (cardId) {
+      return (
+        '<div class="card-mnemonic-box is-empty">' +
+        '<button type="button" class="card-mnemonic-fetch-btn" data-mnemonic-card="' + cardId + '">💡 展开助记</button>' +
+        "</div>"
+      );
+    }
+    return "";
+  }
+
   function realReviewCardHtml(card) {
     const isSpeaking = card.card_type === "speaking";
     const isDictation = card.card_type === "dictation";
@@ -1224,7 +1254,9 @@
         "</div></div>"
       ).join("") + "</div>";
     } else if (isDictation) {
-      const rawBack = (card.back || "").trim();
+      const extracted = extractCardMnemonic(card.back || "");
+      const rawBack = extracted.main;
+      const mnemonic = extracted.mnemonic;
       const lines = rawBack.split("\n").map((l) => l.trim()).filter(Boolean);
       const filteredLines = lines.filter((line) => {
         const lower = line.toLowerCase();
@@ -1246,6 +1278,7 @@
             escapeHtml(sentence) + '" type="button">▶</button></p>' +
             "</div></div>"
           : "";
+      const mnemonicHtml = renderMnemonicBox(mnemonic, card.id);
       backInner =
         '<div class="card-answer dictation-answer">' +
         '<div class="reading-word-row dictation-word-row">' +
@@ -1255,10 +1288,14 @@
         "</div>" +
         (cleanMeaning ? '<p class="demo-front-text dictation-meaning-text">' + renderMarkdown(cleanMeaning, target) + "</p>" : "") +
         sentenceHtml +
+        mnemonicHtml +
         "</div>";
     } else {
-      backInner = '<div class="card-answer">' + renderMarkdown(card.back, target) +
+      const extracted = extractCardMnemonic(card.back || "");
+      const mnemonicHtml = renderMnemonicBox(extracted.mnemonic, card.id);
+      backInner = '<div class="card-answer">' + renderMarkdown(extracted.main, target) +
         (card.card_type === "cloze" ? ' <button class="demo-audio reading-word-audio" data-real-audio="' + escapeHtml(target) + '" type="button">▶</button>' : "") +
+        mnemonicHtml +
         "</div>";
     }
     const showBury = (realReviewAgainCounts.get(card.id) || 0) >= 3;
@@ -3351,9 +3388,47 @@
     }
   });
 
+  async function fetchAndRenderMnemonic(btn, cardId) {
+    if (!btn || btn.disabled) return;
+    btn.disabled = true;
+    btn.textContent = "💡 正在生成助记…";
+    const box = btn.closest(".card-mnemonic-box");
+    try {
+      const res = await fetch("/api/cards/" + cardId + "/mnemonic", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.mnemonic) {
+        if (box) {
+          box.classList.remove("is-empty");
+          box.innerHTML =
+            '<div class="card-mnemonic-header"><span class="card-mnemonic-tag">💡 助记</span></div>' +
+            '<div class="card-mnemonic-text">' + escapeHtml(data.mnemonic) + "</div>";
+        }
+        const localCard = realReviewQueue.find((c) => c.id === cardId);
+        if (localCard) {
+          localCard.back = data.back || (localCard.back + "\n\n💡 助记：" + data.mnemonic);
+        }
+        return;
+      }
+      btn.textContent = "生成失败，点击重试";
+      btn.disabled = false;
+    } catch (_) {
+      btn.textContent = "网络错误，点击重试";
+      btn.disabled = false;
+    }
+  }
+
   const realReviewCards = document.getElementById("real-review-cards");
   if (realReviewCards) {
     realReviewCards.addEventListener("click", (e) => {
+      const mnemonicBtn = e.target.closest("[data-mnemonic-card]");
+      if (mnemonicBtn) {
+        const cardId = Number(mnemonicBtn.dataset.mnemonicCard);
+        if (cardId) fetchAndRenderMnemonic(mnemonicBtn, cardId);
+        return;
+      }
       const hintBtn = e.target.closest("[data-real-dictation-hint]");
       if (hintBtn) {
         const target = hintBtn.dataset.realDictationHint || "";

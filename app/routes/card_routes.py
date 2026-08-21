@@ -985,17 +985,24 @@ def create_cards_from_studio(
                 failed.append(f"{raw_word}：{ai_errors.get(ai_word) or '没有可用释义'}")
                 continue
             meaning = str(content.get("m") or "").strip()
+            mnemonic = str(content.get("r") or "").strip()
+            if mnemonic and not mnemonic.startswith("💡 助记"):
+                mnemonic_block = f"\n\n💡 助记：{mnemonic}"
+            elif mnemonic:
+                mnemonic_block = f"\n\n{mnemonic}"
+            else:
+                mnemonic_block = ""
             display_word, _ = ai_mod._split_card_entry(raw_word)
             if body.card_type == "general":
                 front = display_word
-                back = meaning
+                back = f"{meaning}{mnemonic_block}"
                 context = ""
             elif body.card_type == "dictation":
                 sentence = card_builder.complete_sentence(
                     str(content.get("e") or "").strip()
                 )
                 front = meaning
-                back = meaning
+                back = f"{meaning}{mnemonic_block}"
                 context = sentence if sentence else ""
             else:
                 sentence = card_builder.complete_sentence(
@@ -1011,12 +1018,13 @@ def create_cards_from_studio(
                     front = card_builder.sentence_front(sentence, base_word, cloze=True)
                     back = (
                         f"{card_builder.sentence_front(sentence, base_word, cloze=False)}\n\n"
-                        f"{meaning}"
+                        f"{meaning}{mnemonic_block}"
                     )
                     context = sentence
                 else:
                     meaning_parts = ai_mod._reading_meaning_parts(meaning)
-                    back = " | ".join(meaning_parts) if meaning_parts else meaning
+                    base_back = " | ".join(meaning_parts) if meaning_parts else meaning
+                    back = f"{base_back}{mnemonic_block}"
                     front = card_builder.sentence_front(sentence, base_word, cloze=False)
                     context = sentence
             prepared_cards.append(
@@ -1318,6 +1326,52 @@ def refresh_single_card_sentence(
         return {"ok": True, "updated": 1, "errors": []}
     message = errors[0] if errors else "换句失败"
     return JSONResponse(status_code=400, content={"ok": False, "detail": message})
+
+
+@router.post("/cards/{card_id}/mnemonic")
+def get_or_generate_card_mnemonic(
+    card_id: int, request: Request, db: Session = Depends(get_db)
+):
+    """获取或动态为单张卡片生成 💡 助记；若已有则直接返回，若无则生成并写入数据库。"""
+    user = _require_user(db, request)
+    card = (
+        db.query(Card)
+        .filter(Card.id == card_id, Card.user_id == user.id)
+        .first()
+    )
+    if not card:
+        raise HTTPException(status_code=404, detail="卡片不存在")
+
+    back_text = card.back or ""
+    # 检查是否已包含助记
+    if "💡 助记" in back_text or "💡助记" in back_text:
+        match = re.search(r"💡\s*助记[：:]\s*(.+)", back_text, re.DOTALL)
+        if match:
+            return {"ok": True, "mnemonic": match.group(1).strip(), "back": card.back}
+
+    # 提取释义与语境
+    meaning = card.back or ""
+    context = card.context or card.front or ""
+    user_credential = _user_ai_credential(db, user)
+    try:
+        mnemonic = ai_mod.generate_word_mnemonic(
+            word=card.word,
+            meaning=meaning,
+            context=context,
+            user_api_key=user_credential,
+        )
+        if mnemonic:
+            mnemonic_clean = mnemonic.strip()
+            if not mnemonic_clean.startswith("💡 助记"):
+                card.back = f"{back_text.rstrip()}\n\n💡 助记：{mnemonic_clean}".strip()
+            else:
+                card.back = f"{back_text.rstrip()}\n\n{mnemonic_clean}".strip()
+            db.commit()
+            return {"ok": True, "mnemonic": mnemonic_clean, "back": card.back}
+        return JSONResponse(status_code=500, content={"ok": False, "detail": "助记生成失败"})
+    except Exception as exc:
+        db.rollback()
+        return JSONResponse(status_code=500, content={"ok": False, "detail": str(exc)})
 
 
 @router.get("/cards/browse")

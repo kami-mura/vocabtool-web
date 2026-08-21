@@ -171,9 +171,9 @@ def test_old_streamlit_prompt_builders_and_batch_sizes():
     _system_word, user_word = ai._build_word_front_prompts("taxi (verb)")
     _system_reading, user_reading = ai._build_reading_front_prompts("adamant")
     _system_cloze, user_cloze = ai._build_definition_front_prompts("taxi (verb)")
-    assert "1. 通用卡" in user_word and "Fields 2, 4, 5, and 6 are empty" in user_word
-    assert "SENSE DECISION" in user_reading and "FORMAT EXAMPLES" in user_reading
-    assert "ANSWERABILITY TEST" in user_cloze and "9–18 whitespace-delimited words" in user_cloze
+    assert "1. 通用卡" in user_word and "Field 6 contains the mnemonic" in user_word
+    assert "SENSE DECISION" in user_reading and "FORMAT EXAMPLES" in user_reading and "Mnemonic (助记)" in user_reading
+    assert "ANSWERABILITY TEST" in user_cloze and "9–18 whitespace-delimited words" in user_cloze and "Field 6 contains the mnemonic" in user_cloze
     assert _card_generation_batch_size("cloze") == 5
     assert _card_generation_batch_size("reading") == 10
     assert _card_generation_batch_size("general") == 10

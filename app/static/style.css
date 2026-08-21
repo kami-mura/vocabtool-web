@@ -766,6 +766,58 @@ button.landing-login-btn { border: none; cursor: pointer; }
   margin-top: 2px;
   text-align: center;
 }
+.card-mnemonic-box {
+  margin: 10px 0 4px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--panel-2);
+  border: 1px dashed var(--line);
+  text-align: left;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 480px;
+}
+.card-mnemonic-box.is-empty {
+  border: none;
+  background: transparent;
+  padding: 4px 0;
+  text-align: center;
+}
+.card-mnemonic-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 2px;
+}
+.card-mnemonic-tag {
+  font-weight: 700;
+  font-size: 11px;
+  color: var(--accent);
+  letter-spacing: 0.5px;
+}
+.card-mnemonic-text {
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.5;
+  word-break: break-word;
+}
+.card-mnemonic-fetch-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px dashed var(--line);
+  background: var(--panel-2);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.card-mnemonic-fetch-btn:hover {
+  border-color: var(--text);
+  color: var(--text);
+}
 .sentence-refresh-panel {
   align-items: center;
   gap: 8px;
