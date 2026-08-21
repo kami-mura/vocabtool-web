@@ -373,9 +373,16 @@ def _new_ai_client(user_api_key=None):
     credential = _user_credential(user_api_key)
     if credential:
         provider = api_keys.AI_PROVIDERS[credential.provider]
+        base_url = provider.base_url
+        if (
+            credential.provider == "mimo"
+            and credential.api_key.startswith("tp-")
+            and "api.xiaomimimo.com" in base_url
+        ):
+            base_url = "https://token-plan-cn.xiaomimimo.com/v1"
         return OpenAI(
             api_key=credential.api_key,
-            base_url=provider.base_url,
+            base_url=base_url,
             timeout=AI_REQUEST_TIMEOUT_SECONDS,
             max_retries=0,
         )
@@ -390,9 +397,12 @@ def _new_ai_client(user_api_key=None):
             kwargs["base_url"] = config.OPENAI_BASE_URL
         return OpenAI(**kwargs)
     if prov == "mimo":
+        base_url = config.MIMO_API_BASE
+        if config.MIMO_API_KEY.startswith("tp-") and "api.xiaomimimo.com" in base_url:
+            base_url = "https://token-plan-cn.xiaomimimo.com/v1"
         return OpenAI(
             api_key=config.MIMO_API_KEY,
-            base_url=config.MIMO_API_BASE,
+            base_url=base_url,
             timeout=AI_REQUEST_TIMEOUT_SECONDS,
             max_retries=0,
         )

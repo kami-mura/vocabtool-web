@@ -30,7 +30,7 @@ class UserAiCredential:
 
 
 AI_PROVIDERS: dict[str, AiProvider] = {
-    "mimo": AiProvider("小米 MiMo", "https://api.xiaomimimo.com/v1", "mimo-v2-flash"),
+    "mimo": AiProvider("小米 MiMo", "https://api.xiaomimimo.com/v1", "mimo-v2.5"),
     "deepseek": AiProvider("DeepSeek", "https://api.deepseek.com", "deepseek-v4-flash"),
     "openai": AiProvider("OpenAI", "https://api.openai.com/v1", "gpt-4o-mini"),
     "gemini": AiProvider(
