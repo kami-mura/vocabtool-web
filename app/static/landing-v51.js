@@ -3725,7 +3725,7 @@
   async function loadRealWords() {
     const search = document.getElementById("real-library-search");
     const query = search ? search.value.trim() : "";
-    const params = new URLSearchParams({ limit: "120" });
+    const params = new URLSearchParams({ limit: "120", status: "hard" });
     if (query) params.set("q", query);
     const loadVersion = ++realWordsLoadVersion;
     try {
@@ -3769,7 +3769,6 @@
         "</div>" +
         '<div class="meta">' + escapeHtml(meta) + "</div></div>" +
         '<div class="word-result-actions">' +
-        '<button class="small primary" data-create-card-word="' + escapeHtml(item.word) + '" type="button">制卡</button>' +
         '<button class="small danger" data-delete-word="' + escapeHtml(item.word) + '" type="button">移出</button>' +
         "</div></article>"
       );
@@ -3795,12 +3794,6 @@
       const lookupBtn = e.target.closest("[data-real-lookup]");
       if (lookupBtn) {
         lookupFloating(lookupBtn.dataset.realLookup, e.clientX, e.clientY);
-        return;
-      }
-      const createBtn = e.target.closest("[data-create-card-word]");
-      if (createBtn) {
-        const word = createBtn.dataset.createCardWord;
-        if (word) openCardStudioWithWords(word);
         return;
       }
       const deleteBtn = e.target.closest("[data-delete-word]");
