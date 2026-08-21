@@ -277,10 +277,12 @@ def _active_provider(user_api_key=None) -> str:
     if credential:
         return credential.provider
     provider = config.AI_PROVIDER
-    if provider in {"openai", "deepseek"}:
+    if provider in {"openai", "deepseek", "mimo"}:
         return provider
     if config.OPENAI_API_KEY:
         return "openai"
+    if config.MIMO_API_KEY and not config.DEEPSEEK_API_KEY:
+        return "mimo"
     return "deepseek"
 
 
@@ -288,13 +290,21 @@ def _active_model(user_api_key=None) -> str:
     credential = _user_credential(user_api_key)
     if credential:
         return api_keys.AI_PROVIDERS[credential.provider].model
-    if _active_provider() == "openai":
+    prov = _active_provider()
+    if prov == "openai":
         return config.OPENAI_MODEL
+    if prov == "mimo":
+        return config.MIMO_LLM_MODEL
     return config.DEEPSEEK_MODEL
 
 
 def ai_enabled(user_api_key=None) -> bool:
-    return bool(user_api_key or config.OPENAI_API_KEY or config.DEEPSEEK_API_KEY)
+    return bool(
+        user_api_key
+        or config.OPENAI_API_KEY
+        or config.DEEPSEEK_API_KEY
+        or config.MIMO_API_KEY
+    )
 
 
 def _clean_card_entry(value: str) -> str:
@@ -369,7 +379,8 @@ def _new_ai_client(user_api_key=None):
             timeout=AI_REQUEST_TIMEOUT_SECONDS,
             max_retries=0,
         )
-    if _active_provider() == "openai":
+    prov = _active_provider()
+    if prov == "openai":
         kwargs = {
             "api_key": config.OPENAI_API_KEY,
             "timeout": AI_REQUEST_TIMEOUT_SECONDS,
@@ -378,6 +389,13 @@ def _new_ai_client(user_api_key=None):
         if config.OPENAI_BASE_URL:
             kwargs["base_url"] = config.OPENAI_BASE_URL
         return OpenAI(**kwargs)
+    if prov == "mimo":
+        return OpenAI(
+            api_key=config.MIMO_API_KEY,
+            base_url=config.MIMO_API_BASE,
+            timeout=AI_REQUEST_TIMEOUT_SECONDS,
+            max_retries=0,
+        )
     return OpenAI(
         api_key=config.DEEPSEEK_API_KEY,
         base_url=config.DEEPSEEK_BASE_URL,
