@@ -1883,136 +1883,136 @@
     {
       en: "The limits of my language mean the limits of my world.",
       zh: "我语言的边界，就是我世界的边界。",
-      author: "Ludwig Wittgenstein · 维特根斯坦"
+      author: "Ludwig Wittgenstein 维特根斯坦"
     },
     {
       en: "To have another language is to possess a second soul.",
       zh: "掌握另一门语言，如同拥有了第二个灵魂。",
-      author: "Charlemagne · 查理曼大帝"
+      author: "Charlemagne 查理曼大帝"
     },
     {
       en: "If you talk to a man in a language he understands, that goes to his head. If you talk to him in his language, that goes to his heart.",
       zh: "用对方能听懂的语言交谈，打动的是头脑；用对方的母语交谈，触动的是心灵。",
-      author: "Nelson Mandela · 曼德拉"
+      author: "Nelson Mandela 曼德拉"
     },
     {
       en: "A different language is a different vision of life.",
       zh: "另一种语言，是一种全新的生命视角。",
-      author: "Federico Fellini · 费里尼"
+      author: "Federico Fellini 费里尼"
     },
     {
       en: "You can never understand one language until you understand at least two.",
       zh: "除非你至少掌握两门语言，否则你无法真正读懂任何一种语言。",
-      author: "Geoffrey Willans · 威尔斯"
+      author: "Geoffrey Willans 威尔斯"
     },
     {
       en: "One language sets you in a corridor for life. Two languages open every door along the way.",
       zh: "一门语言为你铺就前行的走廊，而两门语言则为你打开沿途的所有大门。",
-      author: "Frank Smith · 弗兰克·史密斯"
+      author: "Frank Smith 弗兰克·史密斯"
     },
     {
       en: "Language is the road map of a culture. It tells you where its people come from and where they are going.",
       zh: "语言是文化的地图，它指明了人们从何而来，去往何方。",
-      author: "Rita Mae Brown · 丽塔·布朗"
+      author: "Rita Mae Brown 丽塔·布朗"
     },
     {
       en: "Learning another language is not only learning different words for the same things, but learning another way to think about things.",
       zh: "学习另一种语言不仅是为事物换个词汇，更是获得另一种思考世界的方式。",
-      author: "Flora Lewis · 弗洛拉·刘易斯"
+      author: "Flora Lewis 弗洛拉·刘易斯"
     },
     {
       en: "A word is not a crystal, transparent and unchanged; it is the skin of a living thought.",
       zh: "词汇并非晶莹剔透、一成不变的水晶，而是鲜活思想的肌肤。",
-      author: "Oliver Wendell Holmes · 霍姆斯"
+      author: "Oliver Wendell Holmes 霍姆斯"
     },
     {
       en: "Words, English words, are full of echoes, of memories, of associations.",
       zh: "词汇充满了历史的回响、深刻的记忆与无尽的联想。",
-      author: "Virginia Woolf · 弗吉尼亚·伍尔夫"
+      author: "Virginia Woolf 弗吉尼亚·伍尔夫"
     },
     {
       en: "The difference between the almost right word and the right word is the difference between the lightning bug and the lightning.",
       zh: "恰如其分的词与几乎恰当的词之间的差别，宛如闪电与萤火虫的云泥之别。",
-      author: "Mark Twain · 马克·吐温"
+      author: "Mark Twain 马克·吐温"
     },
     {
       en: "Language is the dress of thought.",
       zh: "语言是思想的华服。",
-      author: "Samuel Johnson · 约翰逊"
+      author: "Samuel Johnson 约翰逊"
     },
     {
       en: "Those who know nothing of foreign languages know nothing of their own.",
       zh: "不通晓外语的人，对自己的母语也一无所知。",
-      author: "Johann Wolfgang von Goethe · 歌德"
+      author: "Johann Wolfgang von Goethe 歌德"
     },
     {
       en: "Every language is a world. Without translation, we would inhabit provinces bordering on silence.",
       zh: "每一种语言都是一个世界。若无翻译与求索，我们将困居于无声的荒原。",
-      author: "George Steiner · 斯坦纳"
+      author: "George Steiner 斯坦纳"
     },
 
     // 2. 求知、阅读与终身学习 (Learning, Reading & Mind)
     {
       en: "Learning never exhausts the mind.",
       zh: "求知求学，是唯一一件永远不会让心灵感到疲倦的事。",
-      author: "Leonardo da Vinci · 达·芬奇"
+      author: "Leonardo da Vinci 达·芬奇"
     },
     {
       en: "Reading maketh a full man; conference a ready man; and writing an exact man.",
       zh: "读书使人充实，讨论使人机敏，写作使人严谨。",
-      author: "Francis Bacon · 培根"
+      author: "Francis Bacon 培根"
     },
     {
       en: "Wisdom is not a product of schooling, but of the lifelong attempt to acquire it.",
       zh: "真正的智慧并非学校的产物，而是终身不断求索的结晶。",
-      author: "Albert Einstein · 爱因斯坦"
+      author: "Albert Einstein 爱因斯坦"
     },
     {
       en: "Live as if you were to die tomorrow. Learn as if you were to live forever.",
       zh: "如行将就木般生活，如长生久视般求知。",
-      author: "Mahatma Gandhi · 甘地"
+      author: "Mahatma Gandhi 甘地"
     },
     {
       en: "The only true wisdom is in knowing you know nothing.",
       zh: "真正的智慧，在于认识到自己的无知。",
-      author: "Socrates · 苏格拉底"
+      author: "Socrates 苏格拉底"
     },
     {
       en: "The roots of education are bitter, but the fruit is sweet.",
       zh: "求学之根是苦涩的，其结出的果实却无比甘甜。",
-      author: "Aristotle · 亚里士多德"
+      author: "Aristotle 亚里士多德"
     },
     {
       en: "An investment in knowledge pays the best interest.",
       zh: "对知识的投资，永远能带来最丰厚的回报。",
-      author: "Benjamin Franklin · 富兰克林"
+      author: "Benjamin Franklin 富兰克林"
     },
     {
       en: "What we know is a drop, what we don't know is an ocean.",
       zh: "我们所知道的不过沧海一粟，未知的却如汪洋大海。",
-      author: "Isaac Newton · 牛顿"
+      author: "Isaac Newton 牛顿"
     },
     {
       en: "The more that you read, the more things you will know. The more that you learn, the more places you'll go.",
       zh: "读得越多，知晓越广；学得越深，行路越远。",
-      author: "Dr. Seuss · 苏斯博士"
+      author: "Dr. Seuss 苏斯博士"
     },
 
     // 3. 经典学习名篇 (Classic Learning Epigrams)
     {
       en: "He who by reviewing the old can acquire the new may be a teacher.",
       zh: "温故而知新，可以为师矣。",
-      author: "《论语·为政》· 孔子"
+      author: "《论语·为政》 孔子"
     },
     {
       en: "Is it not pleasant to learn with a constant perseverance and practice?",
       zh: "学而时习之，不亦说乎？",
-      author: "《论语·学而》· 孔子"
+      author: "《论语·学而》 孔子"
     },
     {
       en: "Learning without thought is labor lost; thought without learning is perilous.",
       zh: "学而不思则罔，思而不学则殆。",
-      author: "《论语·为政》· 孔子"
+      author: "《论语·为政》 孔子"
     }
   ];
 
