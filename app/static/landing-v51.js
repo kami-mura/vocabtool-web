@@ -3830,9 +3830,6 @@
 
   async function deleteRealWord(button) {
     const word = button.dataset.deleteWord;
-    if (!confirm("将「" + word + "」移出生词库？")) {
-      return;
-    }
     try {
       const res = await fetch("/api/words/" + encodeURIComponent(word), {
         method: "DELETE",
@@ -3879,7 +3876,6 @@
   if (realWordBatchDelete) {
     realWordBatchDelete.onclick = async () => {
       if (!realWordSelection.size) return;
-      if (!confirm("确定将选中的 " + realWordSelection.size + " 个词移出生词库？")) return;
       realWordBatchDelete.disabled = true;
       try {
         const res = await fetch("/api/words/delete-batch", {
