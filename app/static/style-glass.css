@@ -172,6 +172,21 @@
 #real-review .home-review-cards .demo-rating .rating small {
   font-size: 12px;
 }
+#real-review .home-review-cards .reading-word-row .demo-audio,
+#real-review .home-review-cards .reading-sentence-audio {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  margin: 0 0 0 8px;
+  padding: 3px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  min-height: 28px;
+  height: 28px;
+  border-radius: 999px;
+}
 #real-review .home-review-cards .demo-audio-row .demo-audio,
 #real-review .home-review-cards .demo-flip {
   font-size: 16px;

@@ -1204,9 +1204,8 @@
         (sentence && sentence !== target
           ? '<div class="reading-sentence-wrap">' +
             '<div class="reading-sentence-content">' +
-            '<p class="demo-front-text">' + frontInner + "</p>" +
-            '<div class="demo-audio-row"><button class="demo-audio" data-real-audio="' +
-            escapeHtml(sentence) + '" type="button">▶</button></div>' +
+            '<p class="demo-front-text">' + frontInner + ' <button class="demo-audio reading-sentence-audio" data-real-audio="' +
+            escapeHtml(sentence) + '" type="button">▶</button></p>' +
             "</div></div>"
           : "");
     } else {

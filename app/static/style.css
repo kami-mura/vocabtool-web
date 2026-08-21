@@ -706,7 +706,25 @@ button.landing-login-btn { border: none; cursor: pointer; }
   margin-bottom: 8px;
 }
 .reading-word-row mark { font-size: 28px; }
-.reading-word-row .demo-audio { margin-top: 0; padding: 3px 12px; }
+.reading-word-row .demo-audio,
+.reading-sentence-audio {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  margin: 0 0 0 8px;
+  padding: 3px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  min-height: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--accent);
+  cursor: pointer;
+}
 .demo-back-word { margin: 0; font-size: 18px; font-weight: 800; color: var(--accent); }
 .demo-card-face.back p:not(.demo-front-text) { margin: 4px 0 0; color: var(--muted); font-size: 15px; line-height: 1.5; }
 .demo-card-face mark {
