@@ -53,10 +53,8 @@
     apply(dark);
 
     const isStudio = skin === "studio";
-    const topbarLabel = document.getElementById("topbar-skin-label");
-    if (topbarLabel) topbarLabel.textContent = isStudio ? "文墨工坊" : "经典模式";
     const accountSkinLabel = document.getElementById("account-skin-toggle-label");
-    if (accountSkinLabel) accountSkinLabel.textContent = isStudio ? "切换为经典皮肤" : "切换为文墨工坊";
+    if (accountSkinLabel) accountSkinLabel.textContent = isStudio ? "🎨 切换为经典皮肤" : "🎨 切换为文墨工坊";
   }
 
   function getSkin() {

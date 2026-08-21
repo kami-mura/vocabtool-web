@@ -20,12 +20,6 @@
       else applyTheme(dark);
     };
   }
-  const topbarSkinToggle = document.getElementById("topbar-skin-toggle");
-  if (topbarSkinToggle) {
-    topbarSkinToggle.onclick = function () {
-      if (window.vocabTheme) window.vocabTheme.toggleSkin();
-    };
-  }
   try {
     if (window.vocabTheme) window.vocabTheme.sync();
     else {

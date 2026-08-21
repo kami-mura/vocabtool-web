@@ -56,13 +56,33 @@ html[data-skin="studio"][data-theme="dark"] {
 }
 
 /* ---------- 2. 字体与排版美学 ---------- */
-html[data-skin="studio"] body {
-  background: var(--bg);
-  color: var(--text);
+html[data-skin="studio"] body,
+html[data-skin="studio"] body.landing-body,
+html[data-skin="studio"] body.auth-body {
+  background: var(--bg) !important;
+  background-color: var(--bg) !important;
+  color: var(--text) !important;
   font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
   line-height: 1.68;
   letter-spacing: -0.01em;
   transition: background-color .25s ease, color .25s ease;
+}
+
+html[data-skin="studio"] .card-browser,
+html[data-skin="studio"] .manage-panel,
+html[data-skin="studio"] .real-extra-panel,
+html[data-skin="studio"] .auth-card,
+html[data-skin="studio"] .demo-card-face,
+html[data-skin="studio"] .demo-article,
+html[data-skin="studio"] .ai-article-body,
+html[data-skin="studio"] .speaking-needs-list,
+html[data-skin="studio"] .home-review-empty,
+html[data-skin="studio"] .today-overview-card,
+html[data-skin="studio"] .study-heatmap-card,
+html[data-skin="studio"] .account-menu-panel,
+html[data-skin="studio"] .account-api-modal-card {
+  background-color: var(--panel) !important;
+  border-color: var(--line) !important;
 }
 
 /* 典雅西文与衬线字体标题 */
