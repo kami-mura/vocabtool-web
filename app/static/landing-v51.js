@@ -1199,7 +1199,7 @@
       frontHtml =
         '<div class="reading-word-row">' +
         '<mark class="word-highlight">' + escapeHtml(target) + "</mark>" +
-        ' <button class="demo-audio" data-real-audio="' + escapeHtml(target) +
+        ' <button class="demo-audio reading-word-audio" data-real-audio="' + escapeHtml(target) +
         '" type="button">▶</button></div>' +
         (sentence && sentence !== target
           ? '<div class="reading-sentence-wrap">' +

@@ -654,8 +654,9 @@ button.landing-login-btn { border: none; cursor: pointer; }
 /* 复习卡内容过长时在卡内滚动，评分区保持可见，不溢出到卡片外 */
 #real-review .home-review-cards .demo-card-face.front {
   overflow-y: auto;
-  justify-content: safe center;
+  justify-content: center;
   -webkit-overflow-scrolling: touch;
+  padding-bottom: 28px;
 }
 #real-review .home-review-cards .demo-card-face.back {
   overflow: hidden;
@@ -702,11 +703,12 @@ button.landing-login-btn { border: none; cursor: pointer; }
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  margin-bottom: 8px;
+  gap: 0;
+  margin-bottom: 4px;
 }
-.reading-word-row mark { font-size: 28px; }
+.reading-word-row mark { font-size: 28px; line-height: 1.2; }
 .reading-word-row .demo-audio,
+.reading-word-audio,
 .reading-sentence-audio {
   display: inline-flex;
   align-items: center;
@@ -756,7 +758,7 @@ button.landing-login-btn { border: none; cursor: pointer; }
   justify-content: center;
 }
 .reading-sentence-wrap {
-  margin-top: 12px;
+  margin-top: 2px;
   text-align: center;
 }
 .sentence-refresh-panel {

@@ -172,7 +172,11 @@
 #real-review .home-review-cards .demo-rating .rating small {
   font-size: 12px;
 }
+#real-review .home-review-cards .demo-card-face.front {
+  padding-bottom: 28px;
+}
 #real-review .home-review-cards .reading-word-row .demo-audio,
+#real-review .home-review-cards .reading-word-audio,
 #real-review .home-review-cards .reading-sentence-audio {
   display: inline-flex;
   align-items: center;
