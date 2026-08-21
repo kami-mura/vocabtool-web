@@ -3257,7 +3257,6 @@
   if (realManageLibrary) {
     realManageLibrary.onclick = () => {
       if (realShowManagePanel) realShowManagePanel("real-library");
-      loadRealProfile();
     };
   }
   const realManageAddCard = document.getElementById("real-manage-add-card");
@@ -5006,7 +5005,6 @@
     } catch (_) { /* 静默 */ }
     await loadRealReview();
     loadRealArticle();
-    loadRealProfile();
     loadRealWords();
     loadRealBrowser();
     wireTodayOverviewButtons();
