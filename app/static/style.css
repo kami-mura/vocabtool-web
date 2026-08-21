@@ -147,10 +147,10 @@
 [data-theme="dark"] .queue-tab-new { color: #8fb4ff; border-color: #2c4a82; background: #14243f; }
 [data-theme="dark"] .queue-tab-due { color: #5fd6a0; border-color: #1e5c42; background: #12261c; }
 [data-theme="dark"] .queue-tab-again { color: #ff8a8a; border-color: #7a3232; background: #2b1515; }
-[data-theme="dark"] .rating.again { border-color: rgba(255, 255, 255, .3); color: #fff; background: linear-gradient(145deg, rgba(220, 78, 87, .88), rgba(190, 52, 62, .92)); }
-[data-theme="dark"] .rating.hard { border-color: rgba(255, 255, 255, .3); color: #fff; background: linear-gradient(145deg, rgba(235, 157, 43, .88), rgba(204, 112, 10, .92)); }
-[data-theme="dark"] .rating.good { border-color: rgba(255, 255, 255, .3); color: #fff; background: linear-gradient(145deg, rgba(54, 190, 72, .88), rgba(22, 145, 40, .92)); }
-[data-theme="dark"] .rating.easy { border-color: rgba(255, 255, 255, .3); color: #fff; background: linear-gradient(145deg, rgba(58, 143, 238, .88), rgba(22, 100, 200, .92)); }
+[data-theme="dark"] .rating.again { border-color: #7a3232; color: #ff8a8a; background: linear-gradient(180deg, #2b1515, #331818); }
+[data-theme="dark"] .rating.hard { border-color: #7a5420; color: #e8a84c; background: linear-gradient(180deg, #2a2010, #332514); }
+[data-theme="dark"] .rating.good { border-color: #7a5420; color: #f0b35c; background: linear-gradient(180deg, #2a2010, #332514); }
+[data-theme="dark"] .rating.easy { border-color: #1e5c42; color: #5fd6a0; background: linear-gradient(180deg, #12261c, #16301f); }
 [data-theme="dark"] .card-limit-notice { color: #ffb15c; }
 [data-theme="dark"] .file-button { border-color: #3a4a6e; background: #1c2433; }
 [data-theme="dark"] .auth-body {
@@ -1768,21 +1768,15 @@ button.landing-login-btn { border: none; cursor: pointer; }
 .flip-face .big-word { font-size: 34px; font-weight: 800; letter-spacing: .5px; }
 #show-answer { margin: 0 auto 14px; display: block; }
 #rating-row { display: flex; gap: 10px; justify-content: center; margin-top: 14px; }
-.rating {
-  display: flex; flex: 1; flex-direction: column; align-items: center; justify-content: center;
-  max-width: 140px; padding: 12px 8px; font-weight: 650; border-radius: 14px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .38), 0 6px 16px rgba(24, 32, 48, .16);
-  backdrop-filter: blur(10px) saturate(125%); -webkit-backdrop-filter: blur(10px) saturate(125%);
-  text-shadow: 0 1px 1px rgba(0, 0, 0, .2);
-}
+.rating { flex: 1; max-width: 140px; padding: 12px 8px; font-weight: 650; border-radius: 14px; }
 .rating b, .rating small { display: block; }
-.rating small { font-size: 10px; margin-top: 2px; opacity: .9; font-weight: 500; }
+.rating small { font-size: 10px; margin-top: 2px; opacity: .72; font-weight: 500; }
 .rating small:empty { display: none; }
-.rating.again { border-color: rgba(255, 255, 255, .55); color: #fff; background: linear-gradient(145deg, rgba(220, 78, 87, .82), rgba(190, 52, 62, .88)); }
-.rating.hard { border-color: rgba(255, 255, 255, .55); color: #fff; background: linear-gradient(145deg, rgba(235, 157, 43, .82), rgba(204, 112, 10, .88)); }
-.rating.good { border-color: rgba(255, 255, 255, .55); color: #fff; background: linear-gradient(145deg, rgba(54, 190, 72, .82), rgba(22, 145, 40, .88)); }
-.rating.easy { border-color: rgba(255, 255, 255, .55); color: #fff; background: linear-gradient(145deg, rgba(58, 143, 238, .82), rgba(22, 100, 200, .88)); }
-.rating:hover { transform: translateY(-1px); filter: brightness(1.06) saturate(1.02); }
+.rating.again { border-color: #f3c0c0; color: var(--unknown); background: linear-gradient(180deg, #fffafa, #fff2f2); }
+.rating.hard { border-color: #eed9b8; color: #b06a00; background: linear-gradient(180deg, #fffcf5, #fff5e6); }
+.rating.good { border-color: #f3d4a0; color: #c97f0a; background: linear-gradient(180deg, #fffdf8, #fff6e8); }
+.rating.easy { border-color: #b4e6cf; color: var(--known); background: linear-gradient(180deg, #f7fdf9, #eefaf4); }
+.rating:hover { transform: translateY(-1px); }
 .card-limit-notice { margin: 0 0 8px; color: #b06a00; font-weight: 700; }
 /* ---------- 制作新卡 / Anki 队列 ---------- */
 .studio-type, .studio-grid { margin-bottom: 14px; }

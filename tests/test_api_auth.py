@@ -74,8 +74,8 @@ def test_home_page_has_guest_search_demo_and_login_link(client):
     assert "onclick=" not in page.text
     assert "data-audio=" in page.text
     assert "data-demo-rating=" in page.text
-    assert "Again" in page.text and "Hard" in page.text and "Good" in page.text
-    assert "Easy" in page.text
+    assert "重来" in page.text and "困难" in page.text and "良好" in page.text
+    assert "简单" in page.text
     assert "体验学习卡片" in page.text
     assert "体验 AI 短文" in page.text
 

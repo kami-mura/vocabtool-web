@@ -52,7 +52,7 @@ assert.ok(source.includes("POSTER_COLOR_THEMES"), "包含多套色彩主题库")
 assert.ok(source.includes("POSTER_PATTERNS"), "包含多套艺术图案库");
 assert.ok(source.includes("study-poster-switch-theme"), "包含单独切换色彩主题按钮");
 assert.ok(source.includes("study-poster-switch-pattern"), "包含单独切换背景图案按钮");
-assert.ok(source.includes('previewLabel("hard", "1d")'), "Hard 按钮显示 FSRS 动态计算天数");
+assert.ok(source.includes('previewLabel("hard", "现在")'), "困难 按钮支持 previewLabel 动态计算");
 assert.ok(!source.includes("recent112"), "海报不再绘制热力图");
 
 console.log("dictation frontend checks passed");
