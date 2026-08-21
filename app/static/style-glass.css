@@ -173,7 +173,7 @@
   font-size: 12px;
 }
 #real-review .home-review-cards .demo-card-face.front {
-  padding-bottom: 28px;
+  padding: 16px 16px 84px;
 }
 #real-review .home-review-cards .reading-word-row .demo-audio,
 #real-review .home-review-cards .reading-word-audio,
@@ -190,6 +190,7 @@
   min-height: 28px;
   height: 28px;
   border-radius: 999px;
+  color: var(--text);
 }
 #real-review .home-review-cards .demo-audio-row .demo-audio,
 #real-review .home-review-cards .demo-flip {

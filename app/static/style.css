@@ -656,7 +656,7 @@ button.landing-login-btn { border: none; cursor: pointer; }
   overflow-y: auto;
   justify-content: center;
   -webkit-overflow-scrolling: touch;
-  padding-bottom: 28px;
+  padding: 16px 16px 84px;
 }
 #real-review .home-review-cards .demo-card-face.back {
   overflow: hidden;
@@ -724,7 +724,7 @@ button.landing-login-btn { border: none; cursor: pointer; }
   border-radius: 999px;
   border: 1px solid var(--line);
   background: var(--panel-2);
-  color: var(--accent);
+  color: var(--text);
   cursor: pointer;
 }
 .demo-back-word { margin: 0; font-size: 18px; font-weight: 800; color: var(--accent); }
