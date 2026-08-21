@@ -2574,24 +2574,17 @@
     }
 
     const authorFontSize = 36;
-    const quoteMarkH = 70;
-    const gapEnZh = 44;
-    const gapZhAuthor = 40;
+    const gapEnZh = 48;
+    const gapZhAuthor = 44;
 
-    const totalTextBlockH = quoteMarkH + (enLines.length * enLineHeight) + gapEnZh + (zhLines.length * zhLineHeight) + gapZhAuthor + authorFontSize;
+    const totalTextBlockH = (enLines.length * enLineHeight) + gapEnZh + (zhLines.length * zhLineHeight) + gapZhAuthor + authorFontSize;
 
     // 在 y: 730 ~ 1770 区域内垂直居中
     const readingCenterY = 730 + (1770 - 730) / 2;
     let cursorY = readingCenterY - totalTextBlockH / 2;
 
-    // 居中双引号 (Logo 蓝经典大标引)
-    ctx.textAlign = "center";
-    ctx.fillStyle = "#007AFF";
-    ctx.font = "bold 92px Georgia, serif";
-    ctx.fillText("“", W / 2, cursorY + 40);
-    cursorY += quoteMarkH + 20;
-
     // 英文名言 (经典直体人文衬线/刊物大字，典雅厚重)
+    ctx.textAlign = "center";
     ctx.fillStyle = "#0f172a";
     ctx.font = "bold " + enFontSize + "px " + enFontFamily;
     enLines.forEach((l) => {
