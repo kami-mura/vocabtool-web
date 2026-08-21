@@ -113,9 +113,9 @@ AI_FREE_DAILY_ARTICLE_LIMIT = max(0, _env_int("AI_FREE_DAILY_ARTICLE_LIMIT", 1))
 # 全站未登录用户每日 AI 查词总量上限；0 表示不限制。
 GUEST_AI_DAILY_LIMIT = max(0, _env_int("GUEST_AI_DAILY_LIMIT", 500))
 
-# TTS 音频缓存与引擎配置（mimo | edge）
+# TTS 音频缓存与引擎配置（edge 默认免费 | mimo 可选）
 TTS_CACHE_MAX_BYTES = _env_int("TTS_CACHE_MAX_BYTES", 512 * 1024 * 1024)
-TTS_PROVIDER = os.environ.get("TTS_PROVIDER", "mimo").strip().lower()
+TTS_PROVIDER = os.environ.get("TTS_PROVIDER", "edge").strip().lower()
 MIMO_API_KEY = os.environ.get("MIMO_API_KEY", "").strip()
 MIMO_API_BASE = os.environ.get("MIMO_API_BASE", "https://api.xiaomimimo.com/v1").strip().rstrip("/")
 MIMO_TTS_MODEL = os.environ.get("MIMO_TTS_MODEL", "mimo-v2.5-tts").strip()
