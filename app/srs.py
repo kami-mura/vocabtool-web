@@ -109,11 +109,11 @@ def _fsrs_card_from_model(card, now: dt.datetime | None = None) -> FSRSCard:
 
 def _interval_label(seconds: int) -> str:
     if seconds < 3600:
-        return f"{max(1, round(seconds / 60))} 分钟"
+        return f"{max(1, round(seconds / 60))}分钟"
     if seconds < 86_400:
-        return f"{max(1, round(seconds / 3600))} 小时"
+        return f"{max(1, round(seconds / 3600))}小时"
     days = seconds / 86_400
-    return f"{days:.1f} 天" if days < 2 and not days.is_integer() else f"{round(days)} 天"
+    return f"{days:.1f}天" if days < 2 and not days.is_integer() else f"{round(days)}天"
 
 
 def _day_interval_days(due: dt.datetime, review_time: dt.datetime) -> float:
@@ -219,7 +219,7 @@ def rating_previews(
             seconds = max(0, int((due - review_time).total_seconds()))
             due_day = due.astimezone(tz).date()
             day_gap = (due_day - today).days
-            label = f"{day_gap}d" if day_gap >= 1 else _interval_label(seconds)
+            label = f"{day_gap}天" if day_gap >= 1 else _interval_label(seconds)
         result[rating] = {
             "label": label,
             "due_at": _naive_utc(due).isoformat(),

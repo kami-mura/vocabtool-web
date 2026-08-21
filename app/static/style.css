@@ -737,6 +737,13 @@ button.landing-login-btn { border: none; cursor: pointer; }
   border-color: var(--text);
   filter: brightness(1.05);
 }
+.demo-audio.is-loading {
+  opacity: .5;
+  cursor: wait;
+}
+.demo-audio.is-playing {
+  opacity: 1;
+}
 .demo-back-word { margin: 0; font-size: 18px; font-weight: 800; color: var(--accent); }
 .demo-card-face.back p:not(.demo-front-text) { margin: 4px 0 0; color: var(--muted); font-size: 15px; line-height: 1.5; }
 .demo-card-face mark {

@@ -212,7 +212,7 @@ assert.ok(
 assert.ok(landingSource.includes("今天还可免费制作"), "制卡前显示今日还能制作多少张");
 assert.ok(landingSource.includes("<b>重来</b><small>现在</small>"), "重来 下方显示 现在");
 assert.ok(landingSource.includes('previewLabel("hard", "现在")'), "困难 按钮支持 previewLabel 动态计算");
-assert.ok(landingSource.includes('previewLabel("good", "学完")'), "良好 按钮支持 previewLabel 动态计算");
+assert.ok(landingSource.includes('previewLabel("good", "1天")'), "良好 按钮支持 previewLabel 动态计算");
 assert.ok(landingSource.includes("拼写更正："), "词源结果显示拼写更正说明");
 assert.ok(
   landingSource.includes("以下显示正确拼写的词源结果"),

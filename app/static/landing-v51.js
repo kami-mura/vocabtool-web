@@ -921,10 +921,10 @@
   function setAudioButton(button, state) {
     if (!button) return;
     const base = audioBaseLabel(button);
+    button.classList.toggle("is-loading", state === "generating");
+    button.classList.toggle("is-playing", state === "playing");
     if (state === "playing") {
       button.innerHTML = base.replace("▶", "⏸");
-    } else if (state === "generating") {
-      button.innerHTML = "生成中…";
     } else {
       button.innerHTML = base;
     }
@@ -1271,8 +1271,8 @@
       '<div class="demo-rating">' +
       '<button class="rating again" data-real-rating="again" data-real-card="' + card.id + '" type="button"><b>重来</b><small>现在</small></button>' +
       '<button class="rating hard" data-real-rating="hard" data-real-card="' + card.id + '" type="button"><b>困难</b><small>' + escapeHtml(previewLabel("hard", "现在")) + "</small></button>" +
-      '<button class="rating good" data-real-rating="good" data-real-card="' + card.id + '" type="button"><b>良好</b><small>' + escapeHtml(previewLabel("good", "学完")) + "</small></button>" +
-      '<button class="rating easy" data-real-rating="easy" data-real-card="' + card.id + '" type="button"><b>简单</b><small>' + escapeHtml(previewLabel("easy", "学完")) + "</small></button>" +
+      '<button class="rating good" data-real-rating="good" data-real-card="' + card.id + '" type="button"><b>良好</b><small>' + escapeHtml(previewLabel("good", "1天")) + "</small></button>" +
+      '<button class="rating easy" data-real-rating="easy" data-real-card="' + card.id + '" type="button"><b>简单</b><small>' + escapeHtml(previewLabel("easy", "2天")) + "</small></button>" +
       "</div>";
     return (
       '<div class="demo-card home-review-card' +
