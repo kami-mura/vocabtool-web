@@ -1244,9 +1244,13 @@
         (hasFrontAudio ? ' <button class="demo-audio reading-word-audio" data-real-audio="' + escapeHtml(target) + '" type="button">▶</button>' : "") +
         "</p>";
     }
+    function sanitizeCardBack(back) {
+      if (!back) return "";
+      return String(back).replace(/\n+\s*💡\s*助记[：:][\s\S]*$/i, "").trim();
+    }
     let backInner;
     if (isSpeaking) {
-      backInner = '<div class="card-answer">' + speakingRows(card.back).map((row) =>
+      backInner = '<div class="card-answer">' + speakingRows(sanitizeCardBack(card.back)).map((row) =>
         '<div class="speaking-expression">' +
         '<button class="demo-audio reading-word-audio" data-real-audio="' + escapeHtml(row.en) + '" type="button">▶</button>' +
         '<div class="speaking-expression-text"><span class="speaking-en">' + escapeHtml(row.en) + "</span>" +
@@ -1254,7 +1258,7 @@
         "</div></div>"
       ).join("") + "</div>";
     } else if (isDictation) {
-      const rawBack = (card.back || "").trim();
+      const rawBack = sanitizeCardBack(card.back || "").trim();
       const lines = rawBack.split("\n").map((l) => l.trim()).filter(Boolean);
       const filteredLines = lines.filter((line) => {
         const lower = line.toLowerCase();
@@ -1287,7 +1291,7 @@
         sentenceHtml +
         "</div>";
     } else {
-      backInner = '<div class="card-answer">' + renderMarkdown(card.back, target) +
+      backInner = '<div class="card-answer">' + renderMarkdown(sanitizeCardBack(card.back), target) +
         (card.card_type === "cloze" ? ' <button class="demo-audio reading-word-audio" data-real-audio="' + escapeHtml(target) + '" type="button">▶</button>' : "") +
         "</div>";
     }
@@ -4009,7 +4013,7 @@
           renderMarkdown(card.front, card.word);
         const back = card.card_type === "speaking"
           ? escapeHtml(card.back).replace(/\s*\|\|\s*/g, "<br>")
-          : renderMarkdown(card.back, card.word);
+          : renderMarkdown(String(card.back || "").replace(/\n+\s*💡\s*助记[：:][\s\S]*$/i, "").trim(), card.word);
         return (
           '<div class="browser-card-wrap">' +
           '<label class="browser-select-check" data-browser-select-wrap="' + card.id + '" title="选择这张卡">' +

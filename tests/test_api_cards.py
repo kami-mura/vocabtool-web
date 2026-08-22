@@ -1584,3 +1584,44 @@ def test_cards_browse_returns_ngsl_rank_on_default_sort(client):
 
     time_sort = client.get("/api/cards/browse", params={"sort": "time"}).json()
     assert time_sort["cards"][0]["ngsl_rank"] is not None
+
+
+def test_clean_card_back_mnemonic_residue(client):
+    """验证卡片背面历史残留的「💡 助记」会被清洗与序列化过滤。"""
+    register(client, "clean-mnemonic@example.com")
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.email == "clean-mnemonic@example.com").one()
+        card = Card(
+            user_id=user.id,
+            word="serendipity",
+            card_type="reading",
+            front="Finding this was pure **serendipity**.",
+            back="n. | accidental discovery | 意外发现的惊喜\n\n💡 助记：🍀 意外邂逅 ➔ 🎁 喜出望外。偶然得宝。",
+            state="new",
+        )
+        db.add(card)
+        db.commit()
+        card_id = card.id
+    finally:
+        db.close()
+
+    # 1. 接口返回时被动态清洗过滤
+    res = client.get("/api/cards?card_type=reading")
+    assert res.status_code == 200
+    new_cards = res.json()["new"]
+    target_card = next(c for c in new_cards if c["id"] == card_id)
+    assert "💡 助记" not in target_card["back"]
+    assert "意外发现的惊喜" in target_card["back"]
+
+    # 2. 数据库迁移与后台清洗执行
+    from app import card_builder
+    db = SessionLocal()
+    try:
+        card_builder.refresh_sentence_cards(db, user.id)
+        db_card = db.query(Card).filter(Card.id == card_id).one()
+        assert "💡 助记" not in db_card.back
+        assert "意外发现的惊喜" in db_card.back
+    finally:
+        db.close()
+

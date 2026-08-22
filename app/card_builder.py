@@ -103,10 +103,11 @@ def _sentence_front(sentence: str, word: str, cloze: bool = False) -> str:
 
 
 def _remove_standalone_word(back: str, word: str) -> str:
-    parts = back.split("\n\n", 1)
+    cleaned = back or ""
+    parts = cleaned.split("\n\n", 1)
     if len(parts) == 2 and parts[0].strip().lower() == word.strip().lower():
-        return parts[1].lstrip()
-    return back
+        cleaned = parts[1].lstrip()
+    return re.sub(r"\n+\s*💡\s*助记[：:][\s\S]*$", "", cleaned).rstrip()
 
 
 def refresh_sentence_cards(db: Session, user_id: int) -> int:
@@ -131,6 +132,21 @@ def refresh_sentence_cards(db: Session, user_id: int) -> int:
     ):
         if str(card.word or "").strip().lower() in str(card.front or "").lower():
             card.front = card.word
+            changed += 1
+
+    for card in (
+        db.query(Card)
+        .filter(
+            Card.user_id == user_id,
+            Card.back.like("%💡%助记%"),
+        )
+        .order_by(Card.id)
+        .limit(_SENTENCE_REFRESH_MAX_CARDS)
+        .all()
+    ):
+        cleaned_back = _remove_standalone_word(card.back, card.word)
+        if cleaned_back != card.back:
+            card.back = cleaned_back
             changed += 1
     cards = (
         db.query(Card)

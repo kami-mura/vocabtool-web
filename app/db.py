@@ -1135,6 +1135,24 @@ def _migrate_saved_words() -> None:
         connection.execute(text("ALTER TABLE word_status RENAME TO word_status_legacy"))
 
 
+def _migrate_clean_card_back_mnemonic() -> None:
+    """清理历史写入卡片背面的「💡 助记」文本残留，还原为纯净释义。"""
+    import re
+
+    with engine.begin() as connection:
+        rows = connection.execute(
+            text("SELECT id, back FROM cards WHERE back LIKE '%💡%助记%' OR back LIKE '%💡 助记%'")
+        ).fetchall()
+        for row in rows:
+            back = str(row.back or "")
+            cleaned = re.sub(r"\n+\s*💡\s*助记[：:][\s\S]*$", "", back).rstrip()
+            if cleaned != back:
+                connection.execute(
+                    text("UPDATE cards SET back = :back WHERE id = :card_id"),
+                    {"back": cleaned, "card_id": row.id},
+                )
+
+
 def reserve_sqlite_write(db: Session) -> None:
     """在任何读取前取得 SQLite 写锁，避免读事务升级写锁时立即失败。
 
@@ -1192,6 +1210,7 @@ _SCHEMA_MIGRATIONS: list[tuple[str, Callable[[], None]]] = [
     ("027_anki_multi_template_cards", _migrate_anki_multi_template_cards),
     ("028_user_api_credentials_free_quota", _migrate_user_api_credentials_and_free_quota),
     ("029_free_article_quota", _migrate_free_article_quota),
+    ("030_clean_card_back_mnemonic", _migrate_clean_card_back_mnemonic),
 ]
 
 

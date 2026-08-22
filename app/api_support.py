@@ -786,12 +786,17 @@ def _card_dict(
     # 口语卡在数据库里用稳定哈希作 word（避免与正面中文重复/超长冲突），
     # 对外展示时统一用正面表达需求，避免用户看到无意义 ID。
     display_word = card.front if card.card_type == "speaking" else card.word
+    cleaned_back = (
+        re.sub(r"\n+\s*💡\s*助记[：:][\s\S]*$", "", str(card.back or "")).rstrip()
+        if card.back
+        else ""
+    )
     return {
         "id": card.id,
         "word": display_word,
         "card_type": card.card_type,
         "front": card.front,
-        "back": card.back,
+        "back": cleaned_back,
         "context": card.context or "",
         "buried": bool(card.buried),
         "revision": int(card.revision or 0),

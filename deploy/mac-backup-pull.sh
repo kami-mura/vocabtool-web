@@ -73,7 +73,7 @@ ssh_options=(
   -o ServerAliveCountMax=2
 )
 remote_candidates=(
-  "vocab-server"
+  "linux-me"
   "shangcunyu@192.168.10.171"
 )
 
