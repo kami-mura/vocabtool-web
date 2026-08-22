@@ -869,8 +869,8 @@ def _anki_model(model_id: int, deck_id: int, modified: int) -> dict[str, object]
             {
                 "name": "Card 1",
                 "ord": 0,
-                "qfmt": "{{Front}}",
-                "afmt": "{{FrontSide}}<hr id=answer>{{Back}}",
+                "qfmt": '<div class="card-front">{{Front}}</div>',
+                "afmt": '{{FrontSide}}<hr id=answer><div class="card-back">{{Back}}</div>',
                 "did": None,
                 "bqfmt": "",
                 "bafmt": "",
@@ -898,14 +898,25 @@ def _anki_model(model_id: int, deck_id: int, modified: int) -> dict[str, object]
             for index, name in enumerate(names)
         ],
         "css": (
-            ".card { font-family: Arial; font-size: 28px; line-height: 1.6; "
-            "text-align: center; "
-            "color: #111; background: white; }\n"
+            ".card { font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", "
+            "Roboto, \"PingFang SC\", \"Microsoft YaHei\", sans-serif; "
+            "margin: 0; padding: 24px 20px; text-align: center; "
+            "background: #f3f4f6; color: #1f2937; }\n"
+            ".card-front { font-size: 30px; line-height: 1.7; font-weight: 600; "
+            "color: #111827; }\n"
+            ".card-back { font-size: 24px; line-height: 1.65; }\n"
+            "hr#answer { width: 40%; margin: 20px auto; border: none; "
+            "border-top: 1px solid rgba(17, 24, 39, 0.18); }\n"
+            "@media (max-width: 600px) {\n"
+            ".card { padding: 16px 12px; }\n"
+            ".card-front { font-size: 26px; }\n"
+            ".card-back { font-size: 21px; }\n"
+            "}\n"
+            ".nightMode .card { background: #111827; color: #e5e7eb; }\n"
+            ".nightMode .card-front { color: #f3f4f6; }\n"
+            ".nightMode hr#answer { border-top-color: rgba(229, 231, 235, 0.25); }\n"
             ".target-word { color: #2f6fed; font-weight: 700; }\n"
             ".nightMode .target-word { color: #8fb0f8; }\n"
-            "@media (max-width: 600px) {\n"
-            "  .card { font-size: 22px; line-height: 1.5; }\n"
-            "}"
         ),
         "latexPre": "",
         "latexPost": "",

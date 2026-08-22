@@ -138,9 +138,14 @@ def test_export_renders_target_word_and_uses_vocabtool_name(client, tmp_path):
     model = next(iter(json.loads(models_raw).values()))
     deck = next(iter(json.loads(decks_raw).values()))
     assert model["name"] == "vocabtool"
-    assert "font-size: 28px; line-height: 1.6; text-align: center;" in model["css"]
+    assert 'font-family: -apple-system' in model["css"]
+    assert '"PingFang SC"' in model["css"]
+    assert 'class="card-front"' in model["tmpls"][0]["qfmt"]
+    assert 'class="card-back"' in model["tmpls"][0]["afmt"]
+    assert "font-size: 30px; line-height: 1.7;" in model["css"]
+    assert "font-size: 24px; line-height: 1.65;" in model["css"]
     assert "@media (max-width: 600px)" in model["css"]
-    assert "font-size: 22px; line-height: 1.5;" in model["css"]
+    assert ".nightMode .card { background: #111827;" in model["css"]
     assert ".target-word { color: #2f6fed; font-weight: 700; }" in model["css"]
     assert ".nightMode .target-word { color: #8fb0f8; }" in model["css"]
     assert deck["name"] == "vocabtool"
