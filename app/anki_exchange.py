@@ -869,8 +869,8 @@ def _anki_model(model_id: int, deck_id: int, modified: int) -> dict[str, object]
             {
                 "name": "Card 1",
                 "ord": 0,
-                "qfmt": '<div class="card-front">{{Front}}</div>',
-                "afmt": '{{FrontSide}}<hr id=answer><div class="card-back">{{Back}}</div>',
+                "qfmt": '<div class="card-box"><div class="card-front">{{Front}}</div></div>',
+                "afmt": '{{FrontSide}}<hr id="answer"><div class="card-box"><div class="card-back">{{Back}}</div></div>',
                 "did": None,
                 "bqfmt": "",
                 "bafmt": "",
@@ -902,6 +902,9 @@ def _anki_model(model_id: int, deck_id: int, modified: int) -> dict[str, object]
             "Roboto, \"PingFang SC\", \"Microsoft YaHei\", sans-serif; "
             "margin: 0; padding: 24px 20px; text-align: center; "
             "background: #f3f4f6; color: #1f2937; }\n"
+            ".card-box { max-width: 620px; margin: 0 auto; padding: 28px 24px; "
+            "background: #ffffff; border-radius: 16px; "
+            "box-shadow: 0 2px 8px rgba(17, 24, 39, 0.06); }\n"
             ".card-front { font-size: 30px; line-height: 1.7; font-weight: 600; "
             "color: #111827; }\n"
             ".card-back { font-size: 24px; line-height: 1.65; }\n"
@@ -909,10 +912,13 @@ def _anki_model(model_id: int, deck_id: int, modified: int) -> dict[str, object]
             "border-top: 1px solid rgba(17, 24, 39, 0.18); }\n"
             "@media (max-width: 600px) {\n"
             ".card { padding: 16px 12px; }\n"
+            ".card-box { padding: 20px 16px; }\n"
             ".card-front { font-size: 26px; }\n"
             ".card-back { font-size: 21px; }\n"
             "}\n"
             ".nightMode .card { background: #111827; color: #e5e7eb; }\n"
+            ".nightMode .card-box { background: #1f2937; "
+            "box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4); }\n"
             ".nightMode .card-front { color: #f3f4f6; }\n"
             ".nightMode hr#answer { border-top-color: rgba(229, 231, 235, 0.25); }\n"
             ".target-word { color: #2f6fed; font-weight: 700; }\n"
