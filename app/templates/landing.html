@@ -21,7 +21,6 @@
   <link rel="stylesheet" href="{{ static_url('style.css') }}">
   <link rel="stylesheet" href="{{ static_url('style-glass.css') }}" id="skin-glass">
   <link rel="stylesheet" href="{{ static_url('style-liquid.css') }}" id="skin-liquid">
-  <link rel="stylesheet" href="{{ static_url('style-app.css') }}">
 </head>
 <body class="landing-body" data-logged-in="{{ 'true' if logged_in else 'false' }}">
   <svg class="ui-icon-sprite" aria-hidden="true">
@@ -41,22 +40,6 @@
       <a class="topbar-logo" href="/" aria-label="返回首页">V</a>
       <a class="landing-brand" href="/" aria-label="vocabtool 首页">vocabtool</a>
     </div>
-    <nav class="mobile-nav" id="mobile-nav" aria-label="主导航">
-      <button type="button" class="mobile-nav-btn" data-mobile-view="study">
-        <span class="mobile-nav-ic" aria-hidden="true"><svg class="ui-icon"><use href="#icon-study"></use></svg></span><span>{% if logged_in %}今日{% else %}卡片{% endif %}</span>
-      </button>
-      <button type="button" class="mobile-nav-btn" data-mobile-view="search">
-        <span class="mobile-nav-ic" aria-hidden="true"><svg class="ui-icon"><use href="#icon-search"></use></svg></span><span>查词</span>
-      </button>
-      {% if logged_in %}
-      <button type="button" class="mobile-nav-btn" data-mobile-view="cards">
-        <span class="mobile-nav-ic" aria-hidden="true"><svg class="ui-icon"><use href="#icon-cards"></use></svg></span><span>词库</span>
-      </button>
-      {% endif %}
-      <button type="button" class="mobile-nav-btn" data-mobile-view="article">
-        <span class="mobile-nav-ic" aria-hidden="true"><svg class="ui-icon"><use href="#icon-article"></use></svg></span><span>阅读</span>
-      </button>
-    </nav>
     <div class="topbar-right">
       {% if logged_in %}
       <div class="account-menu" id="account-menu">
@@ -77,11 +60,6 @@
 
   <main class="landing-main">
     <section class="landing-hero" id="landing-hero">
-      <div class="app-view-heading">
-        <p class="app-view-eyebrow">查词</p>
-        <h1>理解一个词，从这里开始</h1>
-        <p>查释义、看词源，或者直接问一个英语问题。</p>
-      </div>
       <div class="logo">V</div>
       <h1>查单词、<mark class="word-highlight">记词汇</mark>，读文章</h1>
       <form id="landing-search-form" class="landing-search">
@@ -100,13 +78,6 @@
     </section>
 
     <section class="landing-section" id="real-review"{% if not logged_in %} hidden{% endif %}>
-      <div class="review-focus-head">
-        <button id="review-focus-close" type="button" aria-label="退出专注复习">×</button>
-        <div>
-          <p>今日学习</p>
-          <strong>专注完成眼前这一张</strong>
-        </div>
-      </div>
       <div id="real-review-empty" class="home-review-empty">
         <p>🎉 恭喜你完成今天的学习任务！</p>
         <button id="real-extra-open" class="ghost small" type="button">继续学习</button>
@@ -195,14 +166,6 @@
     </section>
 
     <section class="landing-section today-overview" id="today-overview"{% if not logged_in %} hidden{% endif %}>
-      <div class="app-view-heading app-view-heading-today">
-        <div>
-          <p class="app-view-eyebrow">今日</p>
-          <h1>继续向前一点</h1>
-          <p>完成到期卡片，再认识几个新词。</p>
-        </div>
-        <time id="app-today-date"></time>
-      </div>
       <div class="today-overview-card">
         <div class="today-overview-main">
           <div class="today-overview-ring" aria-hidden="true">
@@ -305,8 +268,7 @@
     </section>
 
     <section class="landing-section" id="real-article-panel"{% if not logged_in %} hidden{% endif %}>
-      <div class="landing-section-head app-view-heading app-view-heading-compact">
-        <p class="app-view-eyebrow">阅读</p>
+      <div class="landing-section-head">
         <h2>今日短文</h2>
         <p class="hint">使用今天点过「重来」的单词，每篇最多 12 个目标词</p>
       </div>
@@ -326,11 +288,6 @@
     </section>
 
     <section class="landing-section manage-area" id="manage-area"{% if not logged_in %} hidden{% endif %}>
-      <div class="app-view-heading app-view-heading-compact">
-        <p class="app-view-eyebrow">词库</p>
-        <h2>整理与制作学习卡片</h2>
-        <p>管理生词、浏览卡片，或者从新的材料开始制作。</p>
-      </div>
       <div class="manage-tabs" role="tablist" aria-label="管理功能">
         <button type="button" class="manage-button" data-manage-panel="real-library" role="tab" aria-selected="false">生词库</button>
         <button type="button" class="manage-button" data-manage-panel="real-card-browser" role="tab" aria-selected="false">我的卡片</button>
@@ -518,6 +475,22 @@
       </div>
     </section>
   </main>
+  <nav class="mobile-nav" id="mobile-nav" aria-label="主导航">
+    <button type="button" class="mobile-nav-btn" data-mobile-view="search">
+      <span class="mobile-nav-ic" aria-hidden="true"><svg class="ui-icon"><use href="#icon-search"></use></svg></span><span>查词</span>
+    </button>
+    <button type="button" class="mobile-nav-btn" data-mobile-view="study">
+      <span class="mobile-nav-ic" aria-hidden="true"><svg class="ui-icon"><use href="#icon-study"></use></svg></span><span>学习</span>
+    </button>
+    <button type="button" class="mobile-nav-btn" data-mobile-view="article">
+      <span class="mobile-nav-ic" aria-hidden="true"><svg class="ui-icon"><use href="#icon-article"></use></svg></span><span>文章</span>
+    </button>
+    {% if logged_in %}
+    <button type="button" class="mobile-nav-btn" data-mobile-view="cards">
+      <span class="mobile-nav-ic" aria-hidden="true"><svg class="ui-icon"><use href="#icon-cards"></use></svg></span><span>卡片</span>
+    </button>
+    {% endif %}
+  </nav>
   <div id="floating-lookup" class="floating-lookup" role="dialog" aria-label="查词结果" aria-live="polite" hidden>
     <div id="floating-lookup-body"></div>
   </div>
