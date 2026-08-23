@@ -21,9 +21,20 @@
   <link rel="stylesheet" href="{{ static_url('style.css') }}">
   <link rel="stylesheet" href="{{ static_url('style-glass.css') }}" id="skin-glass">
   <link rel="stylesheet" href="{{ static_url('style-liquid.css') }}" id="skin-liquid">
-  <link rel="stylesheet" href="{{ static_url('style-motion.css') }}">
 </head>
 <body class="landing-body" data-logged-in="{{ 'true' if logged_in else 'false' }}">
+  <svg class="ui-icon-sprite" aria-hidden="true">
+    <symbol id="icon-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"></circle><path d="M4 21a8 8 0 0 1 16 0"></path></symbol>
+    <symbol id="icon-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></symbol>
+    <symbol id="icon-study" viewBox="0 0 24 24"><path d="M4 5.5A3.5 3.5 0 0 1 7.5 2H11v17H7.5A3.5 3.5 0 0 0 4 22Z"></path><path d="M20 5.5A3.5 3.5 0 0 0 16.5 2H13v17h3.5A3.5 3.5 0 0 1 20 22Z"></path></symbol>
+    <symbol id="icon-article" viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6Z"></path><path d="M14 2v6h6M9 13h6M9 17h6"></path></symbol>
+    <symbol id="icon-cards" viewBox="0 0 24 24"><path d="m12 2 9 5-9 5-9-5Z"></path><path d="m3 12 9 5 9-5M3 17l9 5 9-5"></path></symbol>
+    <symbol id="icon-dice" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="4"></rect><circle cx="8" cy="8" r="1" fill="currentColor" stroke="none"></circle><circle cx="16" cy="8" r="1" fill="currentColor" stroke="none"></circle><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"></circle><circle cx="8" cy="16" r="1" fill="currentColor" stroke="none"></circle><circle cx="16" cy="16" r="1" fill="currentColor" stroke="none"></circle></symbol>
+    <symbol id="icon-palette" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18h1.5a2 2 0 0 0 0-4H12a2 2 0 0 1 0-4h3a6 6 0 0 0 0-12Z"></path><circle cx="7.5" cy="10" r="1" fill="currentColor" stroke="none"></circle><circle cx="9.5" cy="6.5" r="1" fill="currentColor" stroke="none"></circle><circle cx="14.5" cy="6.5" r="1" fill="currentColor" stroke="none"></circle><circle cx="17" cy="10" r="1" fill="currentColor" stroke="none"></circle></symbol>
+    <symbol id="icon-image" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"></rect><circle cx="9" cy="9" r="2"></circle><path d="m21 15-4-4L7 20"></path></symbol>
+    <symbol id="icon-download" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"></path></symbol>
+    <symbol id="icon-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"></rect><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path></symbol>
+  </svg>
   <header class="topbar">
     <div class="topbar-left">
       <a class="topbar-logo" href="/" aria-label="返回首页">V</a>
@@ -32,7 +43,7 @@
     <div class="topbar-right">
       {% if logged_in %}
       <div class="account-menu" id="account-menu">
-        <button id="account-menu-toggle" class="account-menu-summary" data-ico="account" type="button"><span class="ic nav-emoji" aria-hidden="true">👤</span>个人</button>
+        <button id="account-menu-toggle" class="account-menu-summary" data-ico="account" type="button"><span class="ic nav-emoji" aria-hidden="true"><svg class="ui-icon"><use href="#icon-user"></use></svg></span>个人</button>
         <div id="account-menu-panel" class="account-menu-panel" hidden>
           <p class="account-email">邮箱：<strong id="home-email">…</strong></p>
           <button id="account-api-key-open" class="small" type="button">AI API 设置</button>
@@ -466,17 +477,17 @@
   </main>
   <nav class="mobile-nav" id="mobile-nav" aria-label="主导航">
     <button type="button" class="mobile-nav-btn" data-mobile-view="search">
-      <span class="mobile-nav-ic" aria-hidden="true">🔍</span><span>查词</span>
+      <span class="mobile-nav-ic" aria-hidden="true"><svg class="ui-icon"><use href="#icon-search"></use></svg></span><span>查词</span>
     </button>
     <button type="button" class="mobile-nav-btn" data-mobile-view="study">
-      <span class="mobile-nav-ic" aria-hidden="true">📚</span><span>学习</span>
+      <span class="mobile-nav-ic" aria-hidden="true"><svg class="ui-icon"><use href="#icon-study"></use></svg></span><span>学习</span>
     </button>
     <button type="button" class="mobile-nav-btn" data-mobile-view="article">
-      <span class="mobile-nav-ic" aria-hidden="true">📖</span><span>文章</span>
+      <span class="mobile-nav-ic" aria-hidden="true"><svg class="ui-icon"><use href="#icon-article"></use></svg></span><span>文章</span>
     </button>
     {% if logged_in %}
     <button type="button" class="mobile-nav-btn" data-mobile-view="cards">
-      <span class="mobile-nav-ic" aria-hidden="true">🗂</span><span>卡片</span>
+      <span class="mobile-nav-ic" aria-hidden="true"><svg class="ui-icon"><use href="#icon-cards"></use></svg></span><span>卡片</span>
     </button>
     {% endif %}
   </nav>
@@ -548,11 +559,11 @@
         </div>
         <div class="study-poster-sidebar">
           <div class="study-poster-actions">
-            <button id="study-poster-refresh-quote" class="ghost" type="button">🎲 换一句格言</button>
-            <button id="study-poster-switch-theme" class="ghost" type="button">🎨 切换色彩主题</button>
-            <button id="study-poster-switch-pattern" class="ghost" type="button">🖼️ 切换背景图案</button>
-            <button id="study-poster-download" class="primary" type="button">📥 保存高清海报</button>
-            <button id="study-poster-copy" class="ghost" type="button">📋 复制图片</button>
+            <button id="study-poster-refresh-quote" class="ghost" type="button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-dice"></use></svg>换一句格言</button>
+            <button id="study-poster-switch-theme" class="ghost" type="button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-palette"></use></svg>切换色彩主题</button>
+            <button id="study-poster-switch-pattern" class="ghost" type="button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-image"></use></svg>切换背景图案</button>
+            <button id="study-poster-download" class="primary" type="button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-download"></use></svg>保存高清海报</button>
+            <button id="study-poster-copy" class="ghost" type="button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-copy"></use></svg>复制图片</button>
           </div>
           <p id="study-poster-status" class="hint" role="status" aria-live="polite"></p>
           <p class="hint study-poster-mobile-hint">📱 手机端可长按海报图片直接保存或发送给好友</p>
@@ -562,7 +573,6 @@
   </div>
   {% endif %}
   <script src="{{ static_url('theme-sync.js') }}"></script>
-  <script src="{{ static_url('ui-polish.js') }}"></script>
   <script src="{{ static_url('landing-v51.js') }}"></script>
 </body>
 </html>

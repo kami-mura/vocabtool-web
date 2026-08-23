@@ -179,3 +179,277 @@ select:focus-visible {
   border-color: rgba(64, 156, 255, .6);
   box-shadow: 0 0 0 4px rgba(64, 156, 255, .2);
 }
+
+/* ============================================================
+   最终视觉收敛：安静、内容优先的学习工具
+   ============================================================ */
+:root {
+  --radius: 16px;
+  --radius-sm: 12px;
+  --shadow: 0 1px 2px rgba(16, 24, 40, .05);
+  --shadow-lg: 0 10px 30px rgba(16, 24, 40, .12);
+}
+
+.ui-icon-sprite {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+.ui-icon {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* 标题和 Logo 保持静止，避免学习入口像展示页。 */
+.home-hero h1,
+.landing-hero h1 {
+  color: var(--text);
+  background: none;
+  animation: none;
+  -webkit-background-clip: border-box;
+  background-clip: border-box;
+}
+.home-hero > .logo,
+.landing-hero > .logo {
+  animation: none;
+}
+.logo,
+.topbar-logo {
+  box-shadow: 0 1px 2px rgba(0, 122, 255, .2);
+}
+
+/* 实色内容面；阴影只用于真正悬浮的菜单、弹窗和提示。 */
+.topbar,
+[data-theme="dark"] .topbar {
+  background: var(--panel);
+  border-bottom-color: var(--line);
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.card:not(.card-browser),
+.word-result,
+.stat,
+.auth-card,
+.today-overview-card,
+.study-heatmap-card,
+.demo-card-face,
+.demo-article {
+  background: var(--panel);
+  background-image: none;
+  border-color: var(--line);
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.auth-card {
+  border-radius: 20px;
+}
+.demo-card-face {
+  border-radius: 20px;
+}
+.account-menu-summary {
+  box-shadow: none;
+}
+
+/* 搜索区拆成清晰的模式、输入和提交三部分，不再套玻璃大胶囊。 */
+.landing-search,
+.landing-search:focus-within {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  animation: none;
+}
+.landing-search-input {
+  border-radius: 16px;
+}
+.landing-search-input:focus-within {
+  border-color: rgba(0, 122, 255, .55);
+  box-shadow: 0 0 0 4px rgba(0, 122, 255, .14);
+}
+.landing-search .search-mode-btn.active {
+  color: #fff;
+}
+
+button,
+input,
+textarea,
+select {
+  border-radius: 12px;
+}
+button.primary,
+.landing-login-btn,
+.today-overview-actions #today-overview-start,
+.today-overview-actions #today-overview-extra {
+  color: #fff;
+  background: var(--accent);
+  background-image: none;
+  border-color: var(--accent);
+  border-radius: 12px;
+  box-shadow: none;
+}
+button.primary:hover,
+button.primary:active,
+.landing-login-btn:hover,
+.today-overview-actions #today-overview-start:hover,
+.today-overview-actions #today-overview-start:active,
+.today-overview-actions #today-overview-extra:hover,
+.today-overview-actions #today-overview-extra:active {
+  color: #fff;
+  background: #0a66de;
+  background-image: none;
+  border-color: #0a66de;
+  box-shadow: none;
+  filter: none;
+  transform: none;
+}
+.today-overview-actions button:not(#today-overview-start):not(#today-overview-extra) {
+  color: var(--muted);
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+.today-overview-actions button:not(#today-overview-start):not(#today-overview-extra):hover,
+.today-overview-actions button:not(#today-overview-start):not(#today-overview-extra):active {
+  color: var(--text);
+  background: var(--panel-2);
+  border-color: transparent;
+  box-shadow: none;
+  transform: none;
+}
+
+/* 登录后优先展示学习任务，查词入口保持紧凑可用。 */
+.landing-body[data-logged-in="true"] .landing-hero {
+  padding: 18px 0 0;
+}
+.landing-body[data-logged-in="true"] .landing-hero > .logo,
+.landing-body[data-logged-in="true"] .landing-hero > h1 {
+  display: none;
+}
+.landing-body[data-logged-in="true"] .landing-search {
+  margin-top: 0;
+}
+.landing-body[data-logged-in="true"] .landing-section-head {
+  text-align: left;
+}
+
+/* 单张复习卡保持阅读焦点，不横铺整个桌面。 */
+#real-review .home-review-cards,
+#real-review .real-review-manage-row,
+#real-review .real-review-toolbar {
+  width: 100%;
+  max-width: 640px;
+  margin-left: auto;
+  margin-right: auto;
+}
+#real-review .home-review-cards .demo-card {
+  max-width: 640px;
+}
+
+/* 评分色保持固定语义：红、橙、蓝、绿。 */
+.rating.again {
+  color: #d43d3d;
+  border-color: #efcaca;
+  background: #fff7f7;
+}
+.rating.hard {
+  color: #ad6500;
+  border-color: #ead2aa;
+  background: #fff9ef;
+}
+.rating.good {
+  color: #076bd8;
+  border-color: #b9d7f8;
+  background: #f2f8ff;
+}
+.rating.easy {
+  color: #168a55;
+  border-color: #b9e2ce;
+  background: #f2fbf6;
+}
+.rating:hover {
+  transform: none;
+}
+[data-theme="dark"] .rating.again { color: #ff8585; border-color: #693434; background: #2b1b1b; }
+[data-theme="dark"] .rating.hard { color: #f0ad55; border-color: #65491f; background: #2a2216; }
+[data-theme="dark"] .rating.good { color: #79b9ff; border-color: #315983; background: #17283d; }
+[data-theme="dark"] .rating.easy { color: #63d79e; border-color: #285f46; background: #16291f; }
+
+.study-poster-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+@media (max-width: 820px) {
+  .mobile-nav,
+  [data-theme="dark"] .mobile-nav {
+    background: var(--panel);
+    border-top-color: var(--line);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .mobile-nav-ic {
+    width: 34px;
+    height: 26px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    transition: color .16s ease, background-color .16s ease;
+  }
+  .mobile-nav-btn.active .mobile-nav-ic {
+    color: var(--accent);
+    background: rgba(0, 122, 255, .11);
+    transform: none;
+  }
+}
+
+@media (max-width: 600px) {
+  #guest-demo-cards .demo-cards {
+    display: grid;
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: min(86vw, 420px);
+    justify-content: start;
+    gap: 14px;
+    padding: 2px 2px 12px;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+  #guest-demo-cards .demo-cards::-webkit-scrollbar {
+    display: none;
+  }
+  #guest-demo-cards .demo-card {
+    height: min(380px, 60vh);
+    scroll-snap-align: start;
+  }
+  #real-review .home-review-cards .demo-audio,
+  #real-review .home-review-cards .reading-word-row .demo-audio,
+  #real-review .home-review-cards .reading-word-audio,
+  #real-review .home-review-cards .reading-sentence-audio,
+  #real-review .home-review-cards .speaking-expression .demo-audio,
+  #guest-demo-cards .demo-audio {
+    min-width: 40px;
+    min-height: 40px;
+    height: 40px;
+    padding: 0 12px;
+  }
+  #guest-demo-cards .demo-rating .rating {
+    min-height: 44px;
+  }
+}
