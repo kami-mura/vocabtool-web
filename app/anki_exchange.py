@@ -905,7 +905,7 @@ def _anki_model(model_id: int, deck_id: int, modified: int) -> dict[str, object]
             ".card-box { max-width: 620px; margin: 0 auto; padding: 28px 24px; "
             "background: #ffffff; border-radius: 16px; "
             "box-shadow: 0 2px 8px rgba(17, 24, 39, 0.06); }\n"
-            ".card-front { font-size: 30px; line-height: 1.7; font-weight: 600; "
+            ".card-front { font-size: 24px; line-height: 1.7; font-weight: 600; "
             "color: #111827; }\n"
             ".card-back { font-size: 24px; line-height: 1.65; }\n"
             "hr#answer { width: 40%; margin: 20px auto; border: none; "
