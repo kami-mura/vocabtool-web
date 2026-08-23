@@ -4,7 +4,7 @@
   const box = document.getElementById("landing-search-result");
   if (!form || !box) return;
 
-  /* ---------- 手机端底部导航：一个 Tab 一个主界面 ---------- */
+  /* ---------- 应用导航：登录后桌面/手机共用，游客仅手机分屏 ---------- */
   const mobileNav = document.getElementById("mobile-nav");
   const mobileNavButtons = document.querySelectorAll(".mobile-nav-btn[data-mobile-view]");
   const mobileMQ = window.matchMedia("(max-width: 820px)");
@@ -28,17 +28,16 @@
     return mobileMQ.matches;
   }
 
-  /* 手机端与桌面端学习区顺序各自独立：
-     桌面端数据卡（今日学习）在学习卡片上方，手机端学习卡片在最上方。 */
+  function usesAppNavigation() {
+    return isLoggedIn || isMobileLayout();
+  }
+
+  /* 今日概览始终先于复习卡，打开页面先知道今天要做什么。 */
   function arrangeLearningOrder() {
     const realReview = document.getElementById("real-review");
     const todayOverview = document.getElementById("today-overview");
     if (!realReview || !todayOverview) return;
-    if (isMobileLayout()) {
-      if (realReview.nextElementSibling !== todayOverview) {
-        realReview.insertAdjacentElement("afterend", todayOverview);
-      }
-    } else if (todayOverview.nextElementSibling !== realReview) {
+    if (todayOverview.nextElementSibling !== realReview) {
       realReview.insertAdjacentElement("beforebegin", todayOverview);
     }
   }
@@ -50,12 +49,15 @@
   }
 
   function applyMobileView(view, scrollTop) {
-    if (!mobileNav || !isMobileLayout()) {
+    if (!mobileNav || !usesAppNavigation()) {
       restoreMobileSections();
       currentMobileView = null;
+      delete document.body.dataset.appView;
       return;
     }
     currentMobileView = view;
+    document.body.dataset.appView = view;
+    if (view !== "study") document.body.classList.remove("review-focus");
     mobileSections.forEach(({ el, view: sectionView, originalHidden }) => {
       el.hidden = sectionView !== view || originalHidden;
     });
@@ -84,11 +86,12 @@
     const applyCurrent = () => applyMobileView(currentMobileView || defaultView, false);
     const onMqChange = (event) => {
       arrangeLearningOrder();
-      if (event.matches) {
+      if (event.matches || isLoggedIn) {
         applyCurrent();
       } else {
         restoreMobileSections();
         currentMobileView = null;
+        delete document.body.dataset.appView;
         mobileNavButtons.forEach((btn) => btn.classList.remove("active"));
       }
     };
@@ -98,7 +101,7 @@
       mobileMQ.addListener(onMqChange);
     }
     arrangeLearningOrder();
-    if (isMobileLayout()) applyCurrent();
+    if (usesAppNavigation()) applyCurrent();
   }
 
   function escapeHtml(s) {
@@ -1871,11 +1874,34 @@
     } catch (_) { /* 概览失败不打扰学习 */ }
   }
 
+  function setAppTodayDate() {
+    const dateEl = document.getElementById("app-today-date");
+    if (!dateEl) return;
+    dateEl.dateTime = new Date().toISOString().slice(0, 10);
+    dateEl.textContent = new Intl.DateTimeFormat("zh-CN", {
+      month: "long",
+      day: "numeric",
+      weekday: "long",
+    }).format(new Date());
+  }
+
+  function enterReviewFocus() {
+    if (!isLoggedIn) return;
+    document.body.classList.add("review-focus");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function exitReviewFocus() {
+    document.body.classList.remove("review-focus");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   function wireTodayOverviewButtons() {
     const start = document.getElementById("today-overview-start");
     if (start) {
       start.addEventListener("click", () => {
-        if (isMobileLayout()) applyMobileView("study", false);
+        if (isLoggedIn || isMobileLayout()) applyMobileView("study", false);
+        enterReviewFocus();
         const target = document.getElementById("real-review") ||
           document.getElementById("guest-demo-cards");
         if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -1890,7 +1916,7 @@
     const article = document.getElementById("today-overview-article");
     if (article) {
       article.addEventListener("click", () => {
-        if (isMobileLayout()) applyMobileView("article", false);
+        if (isLoggedIn || isMobileLayout()) applyMobileView("article", false);
         const target = document.getElementById("real-article-panel") ||
           document.getElementById("guest-demo-article");
         if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -1899,8 +1925,9 @@
     const extra = document.getElementById("today-overview-extra");
     if (extra) {
       extra.addEventListener("click", () => {
-        if (isMobileLayout()) applyMobileView("study", false);
+        if (isLoggedIn || isMobileLayout()) applyMobileView("study", false);
         if (realExtraPanel) realExtraPanel.hidden = false;
+        enterReviewFocus();
         const target = document.getElementById("real-review");
         if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
       });
@@ -1909,6 +1936,13 @@
     if (poster) {
       poster.addEventListener("click", openStudyPoster);
     }
+    const focusClose = document.getElementById("review-focus-close");
+    if (focusClose) focusClose.addEventListener("click", exitReviewFocus);
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && document.body.classList.contains("review-focus")) {
+        exitReviewFocus();
+      }
+    });
   }
 
   /* ---------- 9:16 竖屏学习打卡海报生成引擎 ---------- */
@@ -5032,6 +5066,7 @@
     loadRealBrowser();
     wireTodayOverviewButtons();
     initStudyPoster();
+    setAppTodayDate();
     loadTodayOverview();
   }
 
@@ -5443,7 +5478,7 @@
     realShowManagePanelOnly = showPanel;
     realShowManagePanel = (id) => {
       showPanel(id, true);
-      if (isMobileLayout()) {
+      if (isLoggedIn || isMobileLayout()) {
         applyMobileView("cards", false);
       }
       const area = document.querySelector(".manage-area");
