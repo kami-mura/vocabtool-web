@@ -149,11 +149,15 @@ def test_export_renders_target_word_and_uses_vocabtool_name(client, tmp_path):
     assert "font-size: 24px; line-height: 1.65;" in model["css"]
     assert "max-width: 620px" in model["css"]
     assert "border-radius: 16px" in model["css"]
+    assert "background: #ffffff; color: #1f2937;" in model["css"]
+    assert "background: #f3f4f6" not in model["css"]
     assert "@media (max-width: 600px)" in model["css"]
     assert ".card-front { font-size: 26px; }" in model["css"]
     assert ".nightMode .card-box { background: #1f2937;" in model["css"]
-    assert ".target-word { color: #2f6fed; font-weight: 700; }" in model["css"]
-    assert ".nightMode .target-word { color: #8fb0f8; }" in model["css"]
+    assert "rgba(0, 122, 255, 0.16)" in model["css"]
+    assert "color: #007aff;" in model["css"]
+    assert ".nightMode .target-word" in model["css"]
+    assert "rgba(64, 156, 255, 0.22)" in model["css"]
     assert "font-size: 28px;" not in model["css"]
     assert deck["name"] == "vocabtool"
 

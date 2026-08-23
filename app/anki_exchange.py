@@ -901,7 +901,7 @@ def _anki_model(model_id: int, deck_id: int, modified: int) -> dict[str, object]
             ".card { font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", "
             "Roboto, \"PingFang SC\", \"Microsoft YaHei\", sans-serif; "
             "margin: 0; padding: 24px 20px; text-align: center; "
-            "background: #f3f4f6; color: #1f2937; }\n"
+            "background: #ffffff; color: #1f2937; }\n"
             ".card-box { max-width: 620px; margin: 0 auto; padding: 28px 24px; "
             "background: #ffffff; border-radius: 16px; "
             "box-shadow: 0 2px 8px rgba(17, 24, 39, 0.06); }\n"
@@ -921,8 +921,13 @@ def _anki_model(model_id: int, deck_id: int, modified: int) -> dict[str, object]
             "box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4); }\n"
             ".nightMode .card-front { color: #f3f4f6; }\n"
             ".nightMode hr#answer { border-top-color: rgba(229, 231, 235, 0.25); }\n"
-            ".target-word { color: #2f6fed; font-weight: 700; }\n"
-            ".nightMode .target-word { color: #8fb0f8; }\n"
+            ".target-word { padding: 0 2px; border-radius: 0; "
+            "background: linear-gradient(transparent 58%, "
+            "rgba(0, 122, 255, 0.16) 58%, rgba(0, 122, 255, 0.16) 94%, "
+            "transparent 94%); color: #007aff; font-weight: 600; }\n"
+            ".nightMode .target-word { background: linear-gradient(transparent 58%, "
+            "rgba(64, 156, 255, 0.22) 58%, rgba(64, 156, 255, 0.22) 94%, "
+            "transparent 94%); color: #0a84ff; }\n"
         ),
         "latexPre": "",
         "latexPost": "",
