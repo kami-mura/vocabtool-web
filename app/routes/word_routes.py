@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import random
-
 from fastapi import APIRouter
 
 from ..api_support import (
@@ -25,21 +23,10 @@ from ..schemas import (
     PriorityWordsIn,
     TopicWordsIn,
     VocabularyProfileIn,
-    VocabularyTestSubmitIn,
     WordBatchDeleteIn,
 )
 
 router = APIRouter()
-
-VOCABULARY_TEST_LEVELS = tuple(range(1_000, 21_001, 1_000))
-VOCABULARY_TEST_BASE_LEVEL = 5_000
-VOCABULARY_TEST_WINDOW = 100
-VOCABULARY_TEST_WORDS_PER_LEVEL = 5
-
-
-class _VocabularyTestSubmitIn(VocabularyTestSubmitIn):
-    level: int | None = None
-
 
 # ---------- 生词库 ----------
 
@@ -173,118 +160,6 @@ def update_ngsl_profile(
     db.commit()
     db.refresh(profile)
     return {"ok": True, **_profile_dict(profile)}
-
-
-def _vocabulary_test_level(rank: int) -> int | None:
-    return next(
-        (
-            level
-            for level in VOCABULARY_TEST_LEVELS
-            if abs(rank - level) <= VOCABULARY_TEST_WINDOW
-        ),
-        None,
-    )
-
-
-@router.get("/words/vocabulary-test")
-def start_vocabulary_test(
-    request: Request,
-    level: int = VOCABULARY_TEST_BASE_LEVEL,
-    db: Session = Depends(get_db),
-):
-    """从指定千词档位附近随机抽五词。"""
-    _require_user(db, request)
-    if level not in VOCABULARY_TEST_LEVELS:
-        raise HTTPException(status_code=400, detail="词汇测试档位无效")
-    words: list[str] = []
-    for word, rank in vocab.load_ngsl().items():
-        if abs(rank - level) <= VOCABULARY_TEST_WINDOW:
-            words.append(word)
-    if len(words) < VOCABULARY_TEST_WORDS_PER_LEVEL:
-        raise HTTPException(status_code=503, detail="词汇测试题库暂不可用")
-    rng = random.SystemRandom()
-    questions = [
-        {"word": word, "level": level}
-        for word in rng.sample(words, VOCABULARY_TEST_WORDS_PER_LEVEL)
-    ]
-    return {
-        "questions": questions,
-        "level": level,
-        "words_per_level": VOCABULARY_TEST_WORDS_PER_LEVEL,
-    }
-
-
-@router.post("/words/vocabulary-test")
-def finish_vocabulary_test(
-    body: _VocabularyTestSubmitIn,
-    request: Request,
-    db: Session = Depends(get_db),
-):
-    """验证升降路径，按当前档位减去错词数换算并保存。"""
-    user = _require_user(db, request)
-    start_level = (
-        body.level if body.level is not None else VOCABULARY_TEST_BASE_LEVEL
-    )
-    if start_level not in VOCABULARY_TEST_LEVELS:
-        raise HTTPException(status_code=400, detail="词汇测试档位无效")
-    seen: set[str] = set()
-    if len(body.answers) % VOCABULARY_TEST_WORDS_PER_LEVEL:
-        raise HTTPException(status_code=400, detail="词汇测试答案不完整，请重新测试")
-    groups: list[tuple[int, int]] = []
-    for offset in range(0, len(body.answers), VOCABULARY_TEST_WORDS_PER_LEVEL):
-        chunk = body.answers[offset : offset + VOCABULARY_TEST_WORDS_PER_LEVEL]
-        chunk_levels: set[int] = set()
-        known_count = 0
-        for answer in chunk:
-            word = answer.word.strip().lower()
-            rank = vocab.rank_of(word)
-            level = _vocabulary_test_level(rank) if rank is not None else None
-            if not word or word in seen or level is None:
-                raise HTTPException(status_code=400, detail="词汇测试答案无效，请重新测试")
-            seen.add(word)
-            chunk_levels.add(level)
-            known_count += int(answer.known)
-        if len(chunk_levels) != 1:
-            raise HTTPException(status_code=400, detail="词汇测试答案无效，请重新测试")
-        groups.append((chunk_levels.pop(), known_count))
-
-    expected_level = start_level
-    final_level = 0
-    final_known = 0
-    for index, (level, known_count) in enumerate(groups):
-        if level != expected_level:
-            raise HTTPException(status_code=400, detail="词汇测试答题顺序无效，请重新测试")
-        at_lower_boundary = level == VOCABULARY_TEST_LEVELS[0]
-        at_upper_boundary = level == VOCABULARY_TEST_LEVELS[-1]
-        terminal = 3 <= known_count <= 4
-        if known_count == VOCABULARY_TEST_WORDS_PER_LEVEL:
-            terminal = terminal or at_upper_boundary
-            if not terminal:
-                expected_level += 1_000
-        elif known_count <= 2:
-            terminal = terminal or at_lower_boundary
-            if not terminal:
-                expected_level -= 1_000
-        if terminal:
-            if index != len(groups) - 1:
-                raise HTTPException(status_code=400, detail="词汇测试答案过多，请重新测试")
-            final_level = level
-            final_known = known_count
-            break
-    if not final_level:
-        raise HTTPException(status_code=400, detail="词汇测试尚未完成")
-
-    known_rank = max(0, final_level - (VOCABULARY_TEST_WORDS_PER_LEVEL - final_known) * 200)
-    profile = _vocabulary_profile(db, user)
-    profile.ngsl_known_rank = known_rank
-    profile.updated_at = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
-    db.commit()
-    return {
-        "ok": True,
-        "known_rank": known_rank,
-        "known_answers": sum(int(answer.known) for answer in body.answers),
-        "question_count": len(body.answers),
-    }
 
 
 @router.post("/words/topic")

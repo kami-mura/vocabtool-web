@@ -36,7 +36,6 @@
         <div id="account-menu-panel" class="account-menu-panel" hidden>
           <p class="account-email">邮箱：<strong id="home-email">…</strong></p>
           <button id="account-api-key-open" class="small" type="button">AI API 设置</button>
-          <button id="account-vocabulary-test" class="small" type="button">词汇量测试</button>
           <button id="account-theme-toggle" class="small" type="button"><span id="account-theme-toggle-label">☾ 夜间模式</span></button>
           <button id="home-logout" class="danger" type="button">退出登录</button>
         </div>
@@ -419,28 +418,6 @@
         <p class="account-api-key-note">加密保存在服务器，保存后不再显示明文。网站免费 API 每日额度：查询 50 次、制卡 50 张、短文 1 次；使用自己的 Key 不占免费额度。</p>
       </div>
     </div>
-  </div>
-  <div id="vocabulary-test-modal" class="vocabulary-test-modal" role="dialog" aria-modal="true" aria-labelledby="vocabulary-test-title" hidden>
-    <section class="vocabulary-test-card">
-      <button id="vocabulary-test-close" class="vocabulary-test-close" type="button" aria-label="关闭">×</button>
-      <h2 id="vocabulary-test-title">词汇量测试</h2>
-      <p id="vocabulary-test-help" class="hint">从 5000 词档开始，根据结果自动升降难度。只有能说出一个明确含义时才选“认识”。</p>
-      <div id="vocabulary-test-loading" class="vocabulary-test-loading" hidden>正在准备题目…</div>
-      <div id="vocabulary-test-question" class="vocabulary-test-question" hidden>
-        <div id="vocabulary-test-progress" class="vocabulary-test-progress"></div>
-        <div id="vocabulary-test-options" class="vocabulary-test-options"></div>
-        <p class="hint">勾选表示认识；不确定的词不要勾选</p>
-        <button id="vocabulary-test-submit-level" class="primary" type="button">确认选择</button>
-      </div>
-      <div id="vocabulary-test-result" class="vocabulary-test-result" hidden>
-        <p>估算词汇量</p>
-        <strong id="vocabulary-test-estimate">0</strong>
-        <span>词</span>
-        <p id="vocabulary-test-result-detail" class="hint"></p>
-        <button id="vocabulary-test-restart" class="primary" type="button">重新测试</button>
-      </div>
-      <p id="vocabulary-test-status" class="hint" role="status" aria-live="polite"></p>
-    </section>
   </div>
   {% endif %}
   <script src="{{ static_url('theme-sync.js') }}"></script>
