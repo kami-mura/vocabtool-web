@@ -17,7 +17,7 @@
 
 ## 二、全部 AI API 调用点与推荐参数
 
-日常学习任务统一使用 `deepseek-v4-flash`。这些任务主要要求格式稳定和低延迟，
+日常学习任务统一使用 `deepseek-flash`。这些任务主要要求格式稳定和低延迟，
 不需要深度推理，因此默认 `thinking=disabled`。只有用户显式要求深度分析时才开启
 思考；短文生成固定使用思考模式 `max`，优先保证一篇长文覆盖全部目标词。
 
@@ -43,7 +43,7 @@ DeepSeek V4 的思考模式不使用 `temperature`。开启思考时只发送
 ```python
 # 快速模式：查词、制卡、短文默认值
 client.chat.completions.create(
-    model="deepseek-v4-flash",
+    model="deepseek-flash",
     messages=messages,
     temperature=0.2,
     max_tokens=2048,
@@ -52,7 +52,7 @@ client.chat.completions.create(
 
 # 思考模式：只给明确的复杂任务使用；不传 temperature
 client.chat.completions.create(
-    model="deepseek-v4-flash",
+    model="deepseek-flash",
     messages=messages,
     reasoning_effort="low",
     extra_body={"thinking": {"type": "enabled"}},

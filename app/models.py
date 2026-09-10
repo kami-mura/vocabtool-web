@@ -423,7 +423,7 @@ class ReviewRequest(Base):
 
 
 class WordEntry(Base):
-    """deepseek-v4-flash 释义缓存：全站共享，一个单词只生成一次。"""
+    """deepseek-flash 释义缓存：全站共享，一个单词只生成一次。"""
 
     __tablename__ = "word_entries"
 

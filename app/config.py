@@ -123,15 +123,15 @@ MIMO_TTS_MODEL = os.environ.get("MIMO_TTS_MODEL", "mimo-v2.5-tts").strip()
 MIMO_TTS_VOICE_EN = os.environ.get("MIMO_TTS_VOICE_EN", "mimo_default").strip()
 MIMO_TTS_VOICE_ZH = os.environ.get("MIMO_TTS_VOICE_ZH", "mimo_default").strip()
 
-# 可选：deepseek-v4-flash 释义。Key 只从服务器环境变量读取，绝不下发到浏览器。
+# 可选：deepseek-flash 释义。Key 只从服务器环境变量读取，绝不下发到浏览器。
 AI_PROVIDER = os.environ.get("AI_PROVIDER", "deepseek").strip().lower()
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 OPENAI_BASE_URL = os.environ.get("OPENAI_BASE_URL", "")
 OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
 DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
 DEEPSEEK_BASE_URL = os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
-DEEPSEEK_MODEL = os.environ.get("DEEPSEEK_MODEL", "deepseek-v4-flash")
-# deepseek-v4-flash 默认思考模式会让制卡慢 15 倍以上；关闭后同一模型
+DEEPSEEK_MODEL = os.environ.get("DEEPSEEK_MODEL", "deepseek-flash")
+# deepseek-flash 默认思考模式会让制卡慢 15 倍以上；关闭后同一模型
 # 单批（10 词）从约 60-110 秒降到约 4 秒。设为 false 可保留思考模式。
 DEEPSEEK_DISABLE_THINKING = os.environ.get("DEEPSEEK_DISABLE_THINKING", "true").strip().lower() in {
     "1", "true", "yes", "on"

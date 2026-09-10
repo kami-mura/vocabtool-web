@@ -209,7 +209,7 @@ def _safe_api_error(exc: Exception, action: str, user_api_key=None) -> str:
     """把 SDK 错误转换为可操作提示；日志和响应都不包含 API Key。
 
     模型名按当前 provider 动态生成：配 OpenAI 兼容网关的部署
-    不应看到“deepseek-v4-flash”字样的排障提示。
+    不应看到“deepseek-flash”字样的排障提示。
     """
     status = getattr(exc, "status_code", None)
     error_name = type(exc).__name__
@@ -425,7 +425,7 @@ def _chat_completion(
     """限制全进程并发，避免多个用户同时请求时拖垮应用线程池。
 
     对 DeepSeek 提供商统一附加 `thinking: {"type": "disabled"}`：
-    同一 deepseek-v4-flash 模型关闭思考模式后，制卡/查词等所有
+    同一 deepseek-flash 模型关闭思考模式后，制卡/查词等所有
     AI 调用速度提升约 15 倍。设 DEEPSEEK_DISABLE_THINKING=false 可恢复。
     reasoning_effort 只由文章生成传入（low/high/max），
     其它调用不传，保持快速。
