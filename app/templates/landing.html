@@ -82,11 +82,8 @@
           <select id="real-extra-type">
             <option value="all" selected>全部类型</option>
             <option value="general">通用卡</option>
-            <option value="dictation">听写卡</option>
             <option value="reading">阅读卡</option>
             <option value="cloze">Cloze 卡</option>
-            <option value="speaking">口语卡</option>
-            <option value="anki">Anki 导入</option>
           </select>
         </label>
         <label>数量 <input id="real-extra-count" type="number" min="1" max="100" value="5"></label>
@@ -261,11 +258,8 @@
               <select id="real-browser-type">
                 <option value="all">全部类型</option>
                 <option value="general">通用卡</option>
-                <option value="dictation">听写卡</option>
                 <option value="reading">阅读卡</option>
                 <option value="cloze">Cloze 卡</option>
-                <option value="speaking">口语卡</option>
-                <option value="anki">Anki 导入卡</option>
               </select>
               <div class="browser-sort-wrap">
                 <label for="real-browser-sort">排序方式</label>
@@ -319,10 +313,8 @@
             <div class="card-step" id="card-step-1">
               <div class="card-type-boxes" id="real-card-types">
                 <button type="button" class="card-type-option" data-card-type="general"><strong>通用卡</strong><span>单词 → 核心释义</span></button>
-                <button type="button" class="card-type-option" data-card-type="dictation"><strong>听写卡</strong><span>发音/释义 → 拼写检验</span></button>
                 <button type="button" class="card-type-option" data-card-type="reading"><strong>阅读卡</strong><span>在语境中识别</span></button>
                 <button type="button" class="card-type-option" data-card-type="cloze"><strong>Cloze 卡</strong><span>从语境主动提取</span></button>
-                <button type="button" class="card-type-option" data-card-type="speaking"><strong>口语卡</strong><span>交际意图 → 英文表达</span></button>
               </div>
               <p class="hint" id="real-card-step1-hint">请先点击选择卡片类型</p>
             </div>
@@ -341,9 +333,8 @@
                       <option value="ngsl">按 NGSL 排名选词</option>
                       <option value="saved">从生词库选择</option>
                     </optgroup>
-                    <optgroup label="AI 与口语">
+                    <optgroup label="AI 生成">
                       <option value="topic">AI 按主题生成词表</option>
-                      <option value="needs">选择口语表达素材</option>
                     </optgroup>
                   </select>
                 </label>
@@ -369,16 +360,6 @@
                 <div id="real-card-topic-fields" hidden>
                   <label>主题 <input id="real-card-topic" type="text" placeholder="如：旅游"></label>
                   <label>个数 <input id="real-card-topic-count" type="number" value="20"></label>
-                </div>
-                <div id="real-needs-fields" hidden>
-                  <div class="speaking-needs-toolbar">
-                    <input id="real-needs-search" type="search" maxlength="50" placeholder="搜索口语素材…">
-                    <button id="real-needs-select-all" class="small" type="button">全选</button>
-                    <button id="real-needs-clear" class="small" type="button">清空</button>
-                    <label class="speaking-needs-random">随机选<input id="real-needs-random-count" type="number" min="1" max="50" value="10">个<button id="real-needs-random" class="small" type="button">随机</button></label>
-                    <span id="real-needs-count" class="hint">已选 0 个</span>
-                  </div>
-                  <div id="real-needs-list" class="speaking-needs-list"></div>
                 </div>
                 <div id="real-card-ngsl-filter-row" class="ngsl-fields-row">
                   <label class="check-row"><input id="real-card-ngsl-filter" type="checkbox"> 按 NGSL 排名范围筛选</label>

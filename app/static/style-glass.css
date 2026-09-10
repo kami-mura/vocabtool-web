@@ -155,14 +155,6 @@
   line-height: 1.7;
   color: var(--text);
 }
-#real-review .home-review-cards .speaking-en {
-  font-size: 22px;
-  line-height: 1.5;
-}
-#real-review .home-review-cards .speaking-note {
-  font-size: 16px;
-  line-height: 1.55;
-}
 #real-review .home-review-cards .demo-rating .rating {
   padding: 10px 16px;
 }
@@ -179,7 +171,6 @@
 #real-review .home-review-cards .reading-word-row .demo-audio,
 #real-review .home-review-cards .reading-word-audio,
 #real-review .home-review-cards .reading-sentence-audio,
-#real-review .home-review-cards .speaking-expression .demo-audio,
 #guest-demo-cards .demo-audio {
   display: inline-flex;
   align-items: center;

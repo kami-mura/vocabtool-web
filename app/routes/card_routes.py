@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import logging
 import math
 import threading
@@ -9,7 +8,7 @@ import threading
 import anyio
 from fastapi import APIRouter, BackgroundTasks, Response
 
-from .. import anki_exchange, speaking_needs, wordlists
+from .. import anki_exchange, wordlists
 from ..api_support import (
     ALLOWED_CARD_TYPES,
     GENERATABLE_CARD_TYPES,
@@ -254,16 +253,6 @@ def _parse_card_target_list(text: str) -> list[str]:
     )
 
 
-def _parse_expression_needs(text: str) -> list[str]:
-    """口语卡的目标列表：每行一个中文表达需求，不做拉丁字母过滤。"""
-    return _parse_line_list(
-        text,
-        separators=r"[\n;；]+",
-        max_len=100,
-        validator=lambda value: bool(re.search(r"[\u4e00-\u9fff]", value)),
-    )
-
-
 @router.post("/card-studio/targets")
 def card_studio_targets(
     body: CardTargetsIn, request: Request, db: Session = Depends(get_db)
@@ -338,7 +327,7 @@ def card_studio_targets(
         card_words = {
             str(row[0] or "").split(" [", 1)[0]
             for row in db.query(Card.word)
-            .filter(Card.user_id == user.id, Card.card_type != "speaking")
+            .filter(Card.user_id == user.id)
             .distinct()
             .all()
         }
@@ -352,25 +341,6 @@ def card_studio_targets(
             (row.word, vocab.rank_of(row.word), 0)
             for row in rows
             if row.word not in card_words
-        ]
-    elif body.source == "expressions":
-        # 口语表达需求列表：每行一个中文需求。口语卡的 word 是 need-id、
-        # front 才是需求原文，去重时与同类型卡的 front 比对。
-        fronts = _parse_expression_needs(body.text)
-        if body.card_type in GENERATABLE_CARD_TYPES:
-            existing_fronts = {
-                str(row[0] or "")
-                for row in db.query(Card.front).filter(
-                    Card.user_id == user.id,
-                    Card.card_type == body.card_type,
-                )
-            }
-        else:
-            existing_fronts = set()
-        candidates = [
-            (front, None, 0)
-            for front in fronts
-            if front not in existing_fronts
         ]
     else:
         raise HTTPException(status_code=400, detail="无效目标词来源")
@@ -550,225 +520,6 @@ def list_wordlists(request: Request, db: Session = Depends(get_db)):
     }
 
 
-@router.get("/card-studio/needs")
-def card_studio_needs(request: Request, db: Session = Depends(get_db)):
-    """内置口语表达需求集：按分类返回，并标出用户已制过卡的条目。"""
-    user = _require_user(db, request)
-    own = {
-        str(row[0] or "")
-        for row in db.query(Card.front)
-        .filter(Card.user_id == user.id, Card.card_type == "speaking")
-        .all()
-    }
-    return {
-        "categories": [
-            {
-                "id": group["id"],
-                "name": group["name"],
-                "needs": [
-                    {
-                        "id": need["id"],
-                        "front": need["front"],
-                        "has_card": need["front"] in own,
-                    }
-                    for need in group["needs"]
-                ],
-            }
-            for group in speaking_needs.categories()
-        ],
-        "total": len(speaking_needs.NEEDS),
-    }
-
-
-def _create_speaking_cards(
-    db: Session,
-    user: User,
-    words: list[str],
-    user_credential=None,
-) -> dict:
-    """口语卡制卡：每行一个表达需求，AI 在反面生成 3 个常用表达。"""
-    fronts = _parse_expression_needs("\n".join(words))[: config.MAX_CARDS_PER_RUN]
-    if not fronts:
-        raise HTTPException(
-            status_code=400,
-            detail="没有可用于制卡的表达需求（每行一个，需包含中文）",
-        )
-
-    existing_rows = (
-        db.query(Card)
-        .filter(Card.user_id == user.id, Card.card_type == "speaking")
-        .all()
-    )
-    existing_by_front = {str(row.front or "") for row in existing_rows}
-    ai_fronts = [front for front in fronts if front not in existing_by_front]
-
-    ai_errors: dict[str, str] = {}
-    ai_requests = 0
-    ai_timings: dict[str, float | int] = {
-        "ai_wait_seconds": 0.0,
-        "format_retry_count": 0,
-        "db_write_seconds": 0.0,
-    }
-    generated: dict[str, dict] = {}
-    if ai_fronts:
-        # 先结束只读事务并释放连接：长 AI 调用期间不占用连接池。
-        db.commit()
-        if user_credential:
-            generated, ai_errors, ai_requests, ai_timings = (
-                ai_mod.generate_card_content_in_batches(
-                    db, user.id, ai_fronts, "speaking", user_credential
-                )
-            )
-        else:
-            generated, ai_errors, ai_requests, ai_timings = (
-                ai_mod.generate_card_content_in_batches(
-                    db, user.id, ai_fronts, "speaking"
-                )
-            )
-
-    existing_count = 0
-    existing_front_list: list[str] = []
-    failed: list[str] = []
-    prepared_cards: list[dict[str, str]] = []
-    for front in fronts:
-        if front in existing_by_front:
-            existing_count += 1
-            existing_front_list.append(front)
-            continue
-        content = generated.get(front)
-        if not content or not str(content.get("m") or "").strip():
-            failed.append(f"{front}：{ai_errors.get(front) or 'AI 没有返回可用表达'}")
-            continue
-        expressions = ai_mod._parse_speaking_expressions(
-            str(content.get("m") or "")
-        )
-        if len(expressions) < 2 or any(
-            ai_mod._speaking_expression_has_blank_slot(expression)
-            for expression in expressions
-        ):
-            failed.append(f"{front}：AI 返回的表达数量不足或包含空白占位，已跳过")
-            continue
-        prepared_cards.append(
-            {
-                "word": speaking_needs.need_id_for_front(front),
-                "front": front,
-                "back": " || ".join(expressions[:3]),
-                "context": json.dumps(
-                    {"defaults": speaking_needs.DEFAULT_CONTEXT_LABEL},
-                    ensure_ascii=False,
-                ),
-            }
-        )
-
-    seen_words: set[str] = set()
-    deduped_cards: list[dict[str, str]] = []
-    for item in prepared_cards:
-        if item["word"] in seen_words:
-            existing_count += 1
-            continue
-        seen_words.add(item["word"])
-        deduped_cards.append(item)
-    prepared_cards = deduped_cards
-
-    db_write_started = time.time()
-    _require_storage_space(
-        db,
-        user.id,
-        sum(
-            _utf8_size(item["word"])
-            + _utf8_size(item["front"])
-            + _utf8_size(item["back"])
-            + _utf8_size(item["context"])
-            for item in prepared_cards
-        ),
-    )
-
-    def _new_card(item: dict[str, str]) -> Card:
-        return Card(
-            user_id=user.id,
-            word=item["word"],
-            card_type="speaking",
-            front=item["front"],
-            back=item["back"],
-            context=item["context"],
-            state="new",
-            due_at=None,
-            reps=0,
-            lapses=0,
-            interval_days=0.0,
-            ease=2.5,
-        )
-
-    created_now = len(prepared_cards)
-    created_front_list = [item["front"] for item in prepared_cards]
-    for item in prepared_cards:
-        db.add(_new_card(item))
-    try:
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        created_now = 0
-        created_front_list = []
-        seen_again: set[str] = set()
-        for start in range(0, len(prepared_cards), 500):
-            chunk = prepared_cards[start : start + 500]
-            rows = (
-                db.query(Card.word)
-                .filter(
-                    Card.user_id == user.id,
-                    Card.word.in_([item["word"] for item in chunk]),
-                    Card.card_type == "speaking",
-                )
-                .all()
-            )
-            existing_words_now = {row[0] for row in rows}
-            for item in chunk:
-                if item["word"] in existing_words_now or item["word"] in seen_again:
-                    existing_count += 1
-                    existing_front_list.append(item["front"])
-                    continue
-                seen_again.add(item["word"])
-                db.add(_new_card(item))
-                created_front_list.append(item["front"])
-                created_now += 1
-        db.commit()
-
-    total = db.query(Card).filter(Card.user_id == user.id).count()
-    audio_texts: list[str] = []
-    audio_seen: set[str] = set()
-    for item in prepared_cards[:200]:
-        for expression in item["back"].split(" || "):
-            text = ai_mod._speaking_expression_audio_text(expression)
-            if text and text not in audio_seen:
-                audio_seen.add(text)
-                audio_texts.append(text)
-            if len(audio_texts) >= 200:
-                break
-        if len(audio_texts) >= 200:
-            break
-
-    ai_error_summary = next(
-        (str(message) for message in ai_errors.values() if str(message).strip()), ""
-    )
-    return {
-        "ok": True,
-        "created": created_now,
-        "created_words": created_front_list,
-        "existing": existing_count,
-        "existing_words": existing_front_list,
-        "failed": failed,
-        "error": ai_error_summary if created_now == 0 and failed else "",
-        "ai_requests": ai_requests,
-        "total": total,
-        "audio_texts": audio_texts,
-        "timings": {
-            "ai_wait_seconds": float(ai_timings.get("ai_wait_seconds", 0.0)),
-            "format_retry_count": int(ai_timings.get("format_retry_count", 0)),
-            "db_write_seconds": round(time.time() - db_write_started, 1),
-        },
-    }
-
-
 @router.get("/card-studio/quota")
 def get_card_studio_quota(request: Request, db: Session = Depends(get_db)):
     user = _require_user(db, request)
@@ -822,30 +573,6 @@ def create_cards_from_studio(
         raise HTTPException(status_code=429, detail="制卡请求过多，请稍后再试")
     if body.card_type not in GENERATABLE_CARD_TYPES:
         raise HTTPException(status_code=400, detail="无效卡片类型")
-    try:
-        if body.card_type == "speaking":
-            result = _with_limit_notice(
-                _create_speaking_cards(db, user, input_words, user_credential)
-            )
-            ai_mod.mark_card_generation_done(
-                user.id,
-                {
-                    "created": result.get("created", 0),
-                    "existing": result.get("existing", 0),
-                    "failed": result.get("failed", []),
-                    "error": result.get("error", ""),
-                    "limit_notice": result.get("limit_notice", ""),
-                    "total": result.get("created", 0)
-                    + result.get("existing", 0)
-                    + len(result.get("failed", [])),
-                },
-            )
-            return result
-    except HTTPException:
-        raise
-    except Exception:
-        ai_mod.mark_card_generation_done(user.id, {"error": "制卡内部错误，请稍后刷新查看"})
-        raise
     words = _parse_card_target_list("\n".join(input_words))[: config.MAX_CARDS_PER_RUN]
     if not words:
         raise HTTPException(status_code=400, detail="没有可用于制卡的词条")
@@ -981,13 +708,6 @@ def create_cards_from_studio(
                 front = display_word
                 back = meaning
                 context = ""
-            elif body.card_type == "dictation":
-                sentence = card_builder.complete_sentence(
-                    str(content.get("e") or "").strip()
-                )
-                front = meaning
-                back = meaning
-                context = sentence if sentence else ""
             else:
                 sentence = card_builder.complete_sentence(
                     str(content.get("e") or "").strip()
@@ -2501,8 +2221,6 @@ def generate_study_article(
             }
         elif card_type == "cloze" and "\n\n" in back_text:
             detail = {"pos": "", "sense": back_text.rsplit("\n\n", 1)[-1].strip()}
-        elif card_type == "speaking":
-            continue
         else:
             detail = {"pos": "", "sense": back_text}
         if detail["sense"]:

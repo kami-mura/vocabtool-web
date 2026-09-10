@@ -4,11 +4,9 @@ from types import SimpleNamespace
 from app import ai, api_keys, config
 from app.ai import (
     _STREAMLIT_SIMPLE_LOOKUP_PROMPT,
-    _build_speaking_front_prompts,
     _card_fields_from_streamlit_result,
     _card_generation_batch_size,
     _parse_ai_card_batch,
-    _parse_speaking_expressions,
 )
 
 
@@ -203,31 +201,6 @@ def test_structured_reading_and_cloze_validation_requires_target_and_fields():
     assert set(parsed) == {"jog"}
 
 
-def test_speaking_structured_parser_requires_exactly_three_unique_expressions():
-    def payload(expressions):
-        return json.dumps(
-            {"items": [{"id": "I01", "expressions": expressions}]},
-            ensure_ascii=False,
-        )
-
-    two = [
-        {"text": "I can help.", "note": "自然"},
-        {"text": "I would be happy to help.", "note": "正式"},
-    ]
-    four = two + [
-        {"text": "Sure, I can help out.", "note": "随意"},
-        {"text": "I can help you.", "note": "额外"},
-    ]
-    three = [
-        {"text": "I can help.", "note": "自然"},
-        {"text": "I would be happy to help.", "note": "正式礼貌"},
-        {"text": "Sure, I can help out.", "note": "随意"},
-    ]
-    assert _parse_ai_card_batch(payload(two), ["帮忙"], "speaking") == {}
-    assert _parse_ai_card_batch(payload(four), ["帮忙"], "speaking") == {}
-    assert set(_parse_ai_card_batch(payload(three), ["帮忙"], "speaking")) == {"帮忙"}
-
-
 def test_general_card_parser_accepts_every_matched_row():
     """通用卡保留旧文本解析，同时校验中文核心释义。"""
     parsed = _parse_ai_card_batch(
@@ -265,88 +238,6 @@ def test_old_streamlit_prompt_builders_and_batch_sizes():
     assert _card_generation_batch_size("cloze") == 5
     assert _card_generation_batch_size("reading") == 10
     assert _card_generation_batch_size("general") == 10
-    assert _card_generation_batch_size("speaking") == 10
-
-
-def test_speaking_prompt_and_parser():
-    _system, user = _build_speaking_front_prompts("婉拒朋友的邀约（不想去，又不想扫兴）")
-    assert '"expressions"' in user
-    assert "exactly 3 complete expressions" in user
-    assert "formal" in user and "casual" in user
-
-    parsed = _parse_ai_card_batch(
-        """```text
-婉拒朋友的邀约（不想去，又不想扫兴） ||| ||| 1. I'd love to, but I've already got plans. —— 最常用，不伤人 || 2. I'm going to have to pass this time. —— 稍正式 || 3. Not this time, maybe next time. —— 轻松口语 ||| ||| |||
-```""",
-        ["婉拒朋友的邀约（不想去，又不想扫兴）"],
-        "speaking",
-    )
-    assert set(parsed) == {"婉拒朋友的邀约（不想去，又不想扫兴）"}
-    expressions = _parse_speaking_expressions(
-        parsed["婉拒朋友的邀约（不想去，又不想扫兴）"]["m"]
-    )
-    assert len(expressions) == 3
-    assert all("——" in expression for expression in expressions)
-    assert expressions[0].startswith("I'd love to")
-
-
-def test_speaking_parser_requires_at_least_two_expressions():
-    parsed = _parse_ai_card_batch(
-        """```text
-某个需求 ||| ||| 1. Only one option here. —— 提示 ||| ||| |||
-```""",
-        ["某个需求"],
-        "speaking",
-    )
-    assert parsed == {}
-
-
-def test_speaking_parser_accepts_multiline_expression_rows():
-    content = """```text
-总结讨论内容 ||| ||| 1. Let me wrap up what we discussed. —— 总结要点
-2. To sum up, the main points are these. —— 常用开场
-3. So in a nutshell, we agreed on the next steps. —— 口语 ||| ||| |||
-礼貌打断并补充一句 ||| ||| 1. Sorry to jump in, but I have a point. —— 礼貌打断
-2. Can I add something here? —— 更委婉
-3. Just to add to that, I think we should wait. —— 轻松 ||| ||| |||
-```"""
-    parsed = _parse_ai_card_batch(
-        content, ["总结讨论内容", "礼貌打断并补充一句"], "speaking"
-    )
-    assert set(parsed) == {"总结讨论内容", "礼貌打断并补充一句"}
-    assert len(_parse_speaking_expressions(parsed["总结讨论内容"]["m"])) == 3
-
-
-def test_speaking_parser_does_not_use_order_fallback_for_unknown_need():
-    content = """```text
-总结讨论内容。 ||| ||| 1. Let me wrap up what we discussed. —— 总结要点 || 2. To sum up, here are the main points. —— 常用开场 || 3. So in a nutshell, that is the plan. —— 口语 ||| ||| |||
-礼貌打断并补充一句（换个说法） ||| ||| 1. Sorry to jump in, but I have a point. —— 礼貌打断 || 2. Can I add something here? —— 更委婉 || 3. Just to add to that, I would wait. —— 轻松 ||| ||| |||
-```"""
-    parsed = _parse_ai_card_batch(
-        content, ["总结讨论内容", "礼貌打断并补充一句"], "speaking"
-    )
-    assert set(parsed) == {"总结讨论内容"}
-    assert "Let me wrap up" in parsed["总结讨论内容"]["m"]
-
-
-def test_speaking_parser_rejects_blank_slots():
-    parsed = _parse_ai_card_batch(
-        """```text
-问路时礼貌开头 ||| ||| 1. Excuse me, how do I get to ___? —— 提示 || 2. Could you point me to Central Station? —— 更正式 || 3. Is the City Library near here? —— 口语 ||| ||| |||
-```""",
-        ["问路时礼貌开头"],
-        "speaking",
-    )
-    assert parsed == {}
-
-
-def test_speaking_expression_parser_tolerates_newlines_and_single_pipes():
-    expressions = _parse_speaking_expressions(
-        "1. First option. —— 提示\n2. Second option. —— 提示 | 3. Third option. —— 提示"
-    )
-    assert len(expressions) == 3
-    assert expressions[0].startswith("First option.")
-    assert expressions[2].startswith("Third option.")
 
 
 def test_batch_card_generation_requeues_only_incomplete_words(monkeypatch):

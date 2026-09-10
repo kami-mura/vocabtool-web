@@ -54,7 +54,6 @@ h3 { font-size: 17px; font-weight: 700; }
 .auth-card,
 .demo-card-face,
 .demo-article,
-.speaking-needs-list,
 .home-review-empty {
   background: #ffffff;
   border-color: #e7eaf0;
@@ -152,8 +151,7 @@ select:focus-visible {
 [data-theme="dark"] .review-manage-menu,
 [data-theme="dark"] .home-review-empty,
 [data-theme="dark"] .auth-card,
-[data-theme="dark"] .toast,
-[data-theme="dark"] .speaking-needs-list {
+[data-theme="dark"] .toast {
   background: #1a2130;
   border-color: #2c3850;
   box-shadow: none;

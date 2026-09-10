@@ -1,6 +1,6 @@
 "use strict";
 
-// 守护栏杆：提取目标词的三条本地路径（粘贴词表 / AI 主题 / 口语需求）
+// 守护栏杆：提取目标词的两条本地路径（粘贴词表 / AI 主题）
 // 必须送后端做同类型去重（见 docs/审查整改清单.md 之外的产品修改：
 // 提取时去掉已有相同卡片类型的词）。此前仅在勾选 NGSL 筛选时才走后端。
 
@@ -30,20 +30,9 @@ function testWordlistAndTopicAlwaysRefined() {
   );
 }
 
-function testNeedsRefinedViaExpressions() {
-  assert.ok(
-    /refineRealCardExpressions\(words\);/.test(source),
-    "口语需求提取必须调用 refineRealCardExpressions（按 front 与同类型卡去重）"
-  );
-  assert.ok(
-    /source:\s*"expressions"/.test(source),
-    "口语需求去重必须走后端 expressions 来源"
-  );
-}
-
 function testRefineSendsCardType() {
   const start = source.indexOf("async function refineRealCardTargets");
-  const end = source.indexOf("async function refineRealCardExpressions");
+  const end = source.indexOf("if (realCardNgslFilter)", start);
   assert.ok(start >= 0 && end > start, "缺少 refineRealCardTargets 函数");
   const body = source.slice(start, end);
   assert.ok(
@@ -54,6 +43,5 @@ function testRefineSendsCardType() {
 
 testNoEarlyReturnInRefine();
 testWordlistAndTopicAlwaysRefined();
-testNeedsRefinedViaExpressions();
 testRefineSendsCardType();
 console.log("card targets dedup checks passed");

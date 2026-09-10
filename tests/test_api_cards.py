@@ -1,4 +1,3 @@
-import re
 
 from app import vocab
 from app.db import SessionLocal
@@ -57,7 +56,7 @@ def test_full_learning_flow(client):
 
 def test_generated_card_types_keep_their_front_formats(client):
     register(client, "sentence-cards@example.com")
-    for card_type in ("general", "reading", "cloze", "dictation"):
+    for card_type in ("general", "reading", "cloze"):
         generated = client.post(
             "/api/card-studio/cards",
             json={
@@ -69,10 +68,7 @@ def test_generated_card_types_keep_their_front_formats(client):
         assert generated.json()["created"] == 1
         queue = client.get("/api/cards", params={"card_type": card_type}).json()
         card = queue["new"][0]
-        if card_type == "dictation":
-            assert card["front"] == "n. | a test meaning | 测试释义"
-            assert card["back"] == "n. | a test meaning | 测试释义"
-        elif card_type == "general":
+        if card_type == "general":
             assert not card["back"].lower().startswith("quasar\n")
             assert card["front"] == "quasar"
         else:
@@ -99,18 +95,6 @@ def test_studio_ai_cards_follow_old_streamlit_formats(client):
     ).json()["new"][0]
     assert general_card["front"] == "taxi"
     assert general_card["back"] == "测试释义"
-
-    dictation = client.post(
-        "/api/card-studio/cards",
-        json={"words": ["opportunity"], "card_type": "dictation"},
-    )
-    assert dictation.status_code == 200
-    assert dictation.json()["created"] == 1
-    dictation_card = client.get(
-        "/api/cards", params={"card_type": "dictation"}
-    ).json()["new"][0]
-    assert dictation_card["front"] == "n. | a test meaning | 测试释义"
-    assert dictation_card["back"] == "n. | a test meaning | 测试释义"
 
     reading = client.post(
         "/api/card-studio/cards",
@@ -174,21 +158,6 @@ def test_corpus_card_creation_preserves_user_case(client):
     assert made.json()["created"] == 2
     queue = client.get("/api/cards").json()["queue"]
     assert sorted(item["word"] for item in queue) == ["March", "march"]
-
-
-def test_builtin_speaking_needs_are_categorized(client):
-    register(client, "speaking-needs@example.com")
-    data = client.get("/api/card-studio/needs").json()
-    assert data["total"] >= 400
-    assert len(data["categories"]) >= 20
-    all_fronts = [
-        need["front"] for group in data["categories"] for need in group["needs"]
-    ]
-    assert "对朋友说：婉拒邀请（不想去又不扫兴）" in all_fronts
-    assert all(front.startswith("对") and "说：" in front for front in all_fronts)
-    assert all(not need["has_card"] for group in data["categories"] for need in group["needs"])
-
-
 def test_free_card_generation_truncates_to_fifty_and_warns(
     client, monkeypatch
 ):
@@ -273,80 +242,6 @@ def test_free_card_generation_uses_today_remaining_quota(client, monkeypatch):
     assert "还可免费制作 30 张" in data["limit_notice"]
     assert "只制作前 30 张" in data["limit_notice"]
     assert "免费制卡额度已用完" not in data.get("error", "")
-
-
-def test_speaking_cards_generate_three_expressions_and_prefetch_audio(client):
-    register(client, "speaking-cards@example.com")
-    needs = [
-        "对朋友说：婉拒邀请（不想去又不扫兴）",
-        "对路人说：礼貌地问路",
-        "对对方说：请对方说慢一点",
-    ]
-    res = client.post(
-        "/api/card-studio/cards",
-        json={"card_type": "speaking", "words": needs},
-    )
-    assert res.status_code == 200, res.text
-    data = res.json()
-    assert data["created"] == 3
-    assert data["failed"] == []
-    assert data["created_words"] == needs
-    assert len(data["audio_texts"]) >= 3
-    assert all(re.search(r"[A-Za-z]", text) for text in data["audio_texts"])
-
-    queue = client.get("/api/cards", params={"card_type": "speaking"}).json()
-    new_cards = queue["new"]
-    assert len(new_cards) == 3
-    card = next(item for item in new_cards if item["front"] == needs[0])
-    assert card["card_type"] == "speaking"
-    # API 层 word 展示正面中文，而不是内部哈希。
-    assert card["word"] == needs[0]
-    assert "Alex" in card["defaults"]
-    assert "City Library" in card["defaults"]
-    assert card["back"].count(" || ") == 2
-    assert "I'd love to" in card["back"]
-
-    # 再次提交同一批：全部跳过，不重复消耗 AI。
-    again = client.post(
-        "/api/card-studio/cards",
-        json={"card_type": "speaking", "words": needs},
-    )
-    assert again.json()["created"] == 0
-    assert again.json()["existing"] == 3
-
-    # 已制卡条目在需求集里标记出来。
-    needs_data = client.get("/api/card-studio/needs").json()
-    marked = [
-        need
-        for group in needs_data["categories"]
-        for need in group["needs"]
-        if need["front"] == needs[0]
-    ]
-    assert marked and marked[0]["has_card"] is True
-
-    # 口语卡内部哈希不会污染生词库。
-    assert client.get("/api/words").json()["words"] == []
-
-
-def test_speaking_cards_accept_custom_needs_and_skip_short_backs(client):
-    register(client, "speaking-custom@example.com")
-    res = client.post(
-        "/api/card-studio/cards",
-        json={
-            "card_type": "speaking",
-            "words": ["自定义需求：和邻居打招呼", "hello how are you"],
-        },
-    )
-    assert res.status_code == 200, res.text
-    data = res.json()
-    # 纯英文行没有中文需求会被过滤；自定义中文需求正常制卡。
-    assert data["created"] == 1
-    assert data["created_words"] == ["自定义需求：和邻居打招呼"]
-    browse = client.get("/api/cards/browse", params={"card_type": "speaking"}).json()
-    assert len(browse["cards"]) == 1
-    assert browse["cards"][0]["front"] == "自定义需求：和邻居打招呼"
-
-
 def test_phrase_cards_appear_in_learning_cards_not_saved_words(client):
     register(client, "phrase-mid@example.com")
     generated = client.post(
@@ -1494,56 +1389,6 @@ def test_anki_import_gzip_uses_apkg_decompress_limit(client, monkeypatch):
     )
     assert response.status_code == 400
     assert "模拟解析失败" in response.json()["detail"]
-
-
-def test_expressions_targets_exclude_existing_same_type_fronts(client):
-    """口语表达需求提取：已有同类型卡的需求（按 front 比对）被去重，
-    未制卡的需求保留；换类型提取不去重。"""
-    register(client, "expressions-dedup@example.com")
-    existing_need = "对朋友说：婉拒邀请（不想去又不扫兴）"
-    created = client.post(
-        "/api/card-studio/cards",
-        json={"card_type": "speaking", "words": [existing_need]},
-    )
-    assert created.status_code == 200
-    assert created.json()["created"] == 1
-
-    targets = client.post(
-        "/api/card-studio/targets",
-        json={
-            "source": "expressions",
-            "text": existing_need + "\n对路人说：礼貌地问路",
-            "card_type": "speaking",
-        },
-    ).json()
-    words = [item["word"] for item in targets["words"]]
-    assert existing_need not in words  # 已有 speaking 卡 → 去重
-    assert "对路人说：礼貌地问路" in words
-
-    # 换一种卡片类型：同一需求不去重（目标卡类型不同）。
-    other = client.post(
-        "/api/card-studio/targets",
-        json={
-            "source": "expressions",
-            "text": existing_need,
-            "card_type": "general",
-        },
-    ).json()
-    assert [item["word"] for item in other["words"]] == [existing_need]
-
-    # 纯英文/无中文的行不是合法表达需求，被解析器过滤；
-    # existing_need 已有 speaking 卡，同样被去重 → 结果为空。
-    latin_only = client.post(
-        "/api/card-studio/targets",
-        json={
-            "source": "expressions",
-            "text": "just english words\n" + existing_need,
-            "card_type": "speaking",
-        },
-    ).json()
-    assert latin_only["words"] == []
-
-
 def test_cards_browse_returns_ngsl_rank_on_default_sort(client):
     """默认时间排序也必须返回 ngsl_rank：此前只有 NGSL 排序分支带该字段，
     默认视图全部显示「不在 NGSL 词表」。"""

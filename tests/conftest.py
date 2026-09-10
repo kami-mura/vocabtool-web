@@ -75,16 +75,6 @@ def _fake_ai_card_generation_for_api_tests(monkeypatch, request):
                     "m": "测试释义",
                     "e": f"The {word} appears clearly in this test sentence, so you can answer.",
                 }
-            elif card_template == "speaking":
-                results[word] = {
-                    "w": word,
-                    "m": (
-                        "1. I'd love to, but I've got other plans. —— 最常用，不伤人"
-                        " || 2. I'm going to have to pass this time. —— 稍正式"
-                        " || 3. Not this time, maybe next time. —— 轻松口语"
-                    ),
-                    "e": "",
-                }
             else:
                 results[word] = {
                     "w": word,

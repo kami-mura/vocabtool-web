@@ -65,8 +65,8 @@ from .models import (
     WordEntry,
 )
 
-ALLOWED_CARD_TYPES = {"general", "reading", "cloze", "anki", "speaking", "dictation"}
-GENERATABLE_CARD_TYPES = {"general", "reading", "cloze", "speaking", "dictation"}
+ALLOWED_CARD_TYPES = {"general", "reading", "cloze"}
+GENERATABLE_CARD_TYPES = {"general", "reading", "cloze"}
 ALLOWED_READING_FONTS = {"book", "classic", "sans", "palatino"}
 _LOOKUP_CACHE_VERSION = "streamlit-simple-v9-pos-format"
 
@@ -775,14 +775,6 @@ def _card_dict(
         if card.card_type == "anki"
         else ""
     )
-    defaults = (
-        _json_context_field(card.context, "defaults")
-        if card.card_type == "speaking"
-        else ""
-    )
-    # 口语卡在数据库里用稳定哈希作 word（避免与正面中文重复/超长冲突），
-    # 对外展示时统一用正面表达需求，避免用户看到无意义 ID。
-    display_word = card.front if card.card_type == "speaking" else card.word
     cleaned_back = (
         re.sub(r"\n+\s*💡\s*助记[：:][\s\S]*$", "", str(card.back or "")).rstrip()
         if card.back
@@ -790,7 +782,7 @@ def _card_dict(
     )
     return {
         "id": card.id,
-        "word": display_word,
+        "word": card.word,
         "card_type": card.card_type,
         "front": card.front,
         "back": cleaned_back,
@@ -820,7 +812,6 @@ def _card_dict(
             else None
         ),
         "deck": deck,
-        "defaults": defaults,
         "session_repeat": session_repeat,
         "session_correct_streak": max(0, session_correct_streak),
         "session_required_correct": 2,

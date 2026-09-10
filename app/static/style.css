@@ -641,8 +641,7 @@ button.landing-login-btn { border: none; cursor: pointer; }
   overflow: hidden;
   justify-content: safe center;
 }
-#real-review .home-review-cards .card-answer,
-#real-review .home-review-cards .dictation-back-wrap {
+#real-review .home-review-cards .card-answer {
   flex: 1 1 auto;
   min-height: 0;
   width: 100%;
@@ -654,8 +653,7 @@ button.landing-login-btn { border: none; cursor: pointer; }
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
 }
-#real-review .home-review-cards .card-answer > *,
-#real-review .home-review-cards .dictation-back-wrap > * {
+#real-review .home-review-cards .card-answer > * {
   min-width: 0;
   max-width: 100%;
 }
@@ -689,9 +687,7 @@ button.landing-login-btn { border: none; cursor: pointer; }
 .demo-audio,
 .reading-word-row .demo-audio,
 .reading-word-audio,
-.reading-sentence-audio,
-.dictation-word-row .demo-audio,
-.speaking-expression .demo-audio {
+.reading-sentence-audio {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1920,55 +1916,6 @@ button.landing-login-btn { border: none; cursor: pointer; }
 }
 .studio-group button { white-space: nowrap; }
 .studio-group-actions { display: flex; align-items: center; gap: 8px; }
-.speaking-needs-toolbar {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 6px 0 8px;
-}
-#studio-needs-search { flex: 1 1 100%; }
-.speaking-needs-random {
-  display: flex !important; align-items: center; gap: 6px;
-  margin: 0 !important; color: var(--muted); font-size: 12px; font-weight: 650;
-}
-.speaking-needs-random input { width: 52px !important; }
-.speaking-needs-list {
-  max-height: 380px; overflow-y: auto; border: 1px solid var(--border);
-  border-radius: 10px; padding: 8px;
-}
-.speaking-need-group { margin-bottom: 6px; }
-.speaking-category-row {
-  display: flex !important; align-items: center; gap: 8px;
-  margin: 0 0 6px !important; padding: 7px 9px;
-  border: 1px solid var(--border); border-radius: 10px;
-  cursor: pointer; color: var(--text); font-size: 13px;
-}
-.speaking-category-row input { width: auto; flex: none; }
-.speaking-category-row:hover { background: var(--panel-2); }
-.speaking-category-name { flex: 1; font-weight: 700; }
-.speaking-category-name .hint { font-weight: 400; }
-.speaking-category-toggle { flex: none; margin: 0 !important; }
-.speaking-need-items { display: grid; gap: 2px; padding: 0 4px 8px; }
-.speaking-need-item {
-  display: flex !important; align-items: center; gap: 7px;
-  margin: 0 !important; padding: 4px 7px; border-radius: 8px;
-  font-size: 12px; color: var(--text);
-}
-.speaking-need-item:hover { background: var(--panel-2); }
-.speaking-need-item input { width: auto; flex: none; }
-.speaking-need-item em { font-style: normal; }
-.speaking-expression {
-  display: flex; align-items: flex-start; gap: 10px; padding: 8px 0;
-  border-bottom: 1px dashed var(--border);
-}
-.speaking-expression:last-child { border-bottom: 0; }
-.speaking-expression .small { flex: none; margin-top: 1px; }
-.speaking-expression-text { display: grid; gap: 2px; min-width: 0; }
-.speaking-en { font-weight: 700; color: var(--text); }
-.speaking-note { font-size: 12px; color: var(--muted); }
-.speaking-defaults {
-  display: block; font-size: 12px; color: var(--muted);
-  margin-bottom: 8px; opacity: .85;
-}
-.speaking-browser-line { display: inline-block; margin: 2px 0; }
-.speaking-browser-line .small { margin-right: 4px; }
 .error-text { color: var(--unknown); font-size: 13px; }
 .apkg-import-section { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: center; margin-bottom: 22px; }
 .apkg-import { display: grid; gap: 10px; }
@@ -4032,192 +3979,3 @@ svg {
   display: inline-flex;
   align-items: center;
 }
-
-/* ---------- 听写卡 (Dictation Card) ---------- */
-.dictation-front-wrap,
-.dictation-back-wrap {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 100%;
-  text-align: center;
-  gap: 10px;
-}
-.dictation-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 12px;
-  border-radius: 999px;
-  background: var(--accent-soft, rgba(16, 185, 129, 0.12));
-  color: var(--accent, #10b981);
-  font-size: 12px;
-  font-weight: 600;
-}
-.dictation-audio-wrap {
-  margin: 4px 0;
-}
-.dictation-audio-btn {
-  display: inline-flex !important;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 20px !important;
-  border-radius: 999px !important;
-  background: var(--accent) !important;
-  color: #fff !important;
-  font-size: 14px !important;
-  font-weight: 600;
-  cursor: pointer;
-  transition: transform 0.15s, opacity 0.15s;
-}
-.dictation-audio-btn:hover {
-  opacity: 0.92;
-  transform: scale(1.03);
-}
-.dictation-meaning-box {
-  color: var(--text);
-  font-size: 21px;
-  line-height: 1.5;
-  font-weight: 700;
-  max-width: 90%;
-  margin: 4px 0 8px;
-  padding: 8px 16px;
-  border-radius: 10px;
-  background: var(--bg-soft, rgba(0, 0, 0, 0.03));
-  border: 1px dashed var(--line);
-}
-.dictation-meaning-box[hidden] {
-  display: none !important;
-}
-.dictation-input-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: min(360px, 94%);
-  margin: 0 auto;
-}
-.dictation-input {
-  flex: 1;
-  min-height: 44px;
-  padding: 8px 14px;
-  border: 1.5px solid var(--line);
-  border-radius: 12px;
-  background: var(--bg);
-  color: var(--text);
-  font-size: 21px;
-  font-family: inherit;
-  outline: none;
-  text-align: center;
-  transition: border-color 0.2s, box-shadow 0.2s;
-}
-.dictation-input:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft, rgba(16, 185, 129, 0.2));
-}
-.dictation-hint-btn {
-  padding: 8px 14px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--panel);
-  color: var(--muted);
-  font-size: 14px;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background 0.15s, color 0.15s;
-}
-.dictation-hint-btn:hover {
-  background: var(--accent-soft);
-  color: var(--accent);
-  border-color: var(--accent);
-}
-.dictation-word-row {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 4px;
-}
-.dictation-word-row mark {
-  font-size: 28px;
-}
-.dictation-word-row .demo-audio {
-  margin-top: 0;
-  padding: 3px 12px;
-}
-.dictation-user-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  padding: 3px 10px;
-  border-radius: 8px;
-  font-size: 18px;
-  line-height: 1.4;
-  vertical-align: middle;
-}
-.dictation-user-tag.is-correct {
-  background: rgba(16, 185, 129, 0.15);
-  color: var(--accent, #10b981);
-  font-weight: 700;
-}
-.dictation-user-tag.is-empty {
-  background: rgba(156, 163, 175, 0.12);
-  color: var(--muted);
-  font-size: 16px;
-}
-.dictation-user-tag.is-wrong {
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.25);
-  color: var(--text);
-}
-.dictation-user-tag .diff-prefix {
-  color: var(--muted);
-  font-size: 16px;
-}
-.dictation-user-tag .diff-char {
-  display: inline-block;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 20px;
-  font-weight: 700;
-  padding: 0 1px;
-}
-.dictation-user-tag .diff-char.is-match {
-  color: #10b981;
-}
-.dictation-user-tag .diff-char.is-wrong {
-  color: #ef4444;
-  background: rgba(239, 68, 68, 0.18);
-  border-radius: 2px;
-}
-.dictation-user-tag .diff-char.is-missing {
-  color: #f59e0b;
-  text-decoration: underline;
-}
-.dictation-user-tag .diff-char.is-extra {
-  color: #ef4444;
-  text-decoration: line-through;
-}
-.dictation-meaning-text,
-.dictation-meaning-text p,
-.dictation-sentence-text,
-.dictation-sentence-wrap p,
-#real-review .home-review-cards .demo-card-face.back .dictation-meaning-text,
-#real-review .home-review-cards .demo-card-face.back .dictation-sentence-text {
-  font-size: 21px !important;
-  font-weight: 700 !important;
-  line-height: 1.5 !important;
-  color: var(--text) !important;
-  margin: 4px 0 2px !important;
-  text-align: center;
-  max-width: 100%;
-}
-.dictation-sentence-wrap {
-  margin-top: 6px;
-  text-align: center;
-}
-.dictation-sentence-text mark,
-.dictation-sentence-wrap mark {
-  color: var(--accent);
-  font-weight: 700;
-}
-

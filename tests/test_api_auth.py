@@ -651,7 +651,7 @@ def test_landing_groups_target_sources_and_offers_one_ngsl_filter(client):
     assert page.status_code == 200
     assert '<optgroup label="自己提供内容">' in page.text
     assert '<optgroup label="系统词库">' in page.text
-    assert '<optgroup label="AI 与口语">' in page.text
+    assert '<optgroup label="AI 生成">' in page.text
     assert '<option value="corpus">从文章或文本提取</option>' in page.text
     assert '<option value="wordlist">粘贴单词或短语</option>' in page.text
     assert '<option value="file">从文件提取</option>' in page.text
@@ -659,7 +659,6 @@ def test_landing_groups_target_sources_and_offers_one_ngsl_filter(client):
     assert '<option value="ngsl">按 NGSL 排名选词</option>' in page.text
     assert '<option value="saved">从生词库选择</option>' in page.text
     assert '<option value="topic">AI 按主题生成词表</option>' in page.text
-    assert '<option value="needs">选择口语表达素材</option>' in page.text
     assert 'id="real-card-list-fields"' in page.text
     assert 'id="real-card-list-id"' in page.text
     assert page.text.count('id="real-card-ngsl-filter"') == 1

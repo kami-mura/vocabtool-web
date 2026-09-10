@@ -30,7 +30,6 @@
     ".auth-card",
     ".ai-article-result",
     ".landing-search-result",
-    ".speaking-needs-list",
   ].join(",");
 
   const revealObserver =
@@ -49,7 +48,7 @@
 
   function setRevealDelay(el) {
     const group = el.parentElement;
-    if (!group || !group.matches(".demo-cards, .stat-grid, .word-results, .speaking-needs-list")) {
+    if (!group || !group.matches(".demo-cards, .stat-grid, .word-results")) {
       return;
     }
     const index = Array.prototype.indexOf.call(group.children, el);

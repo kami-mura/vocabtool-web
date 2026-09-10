@@ -64,7 +64,7 @@ def list_words(
     card_words = {
         str(row[0] or "").split(" [", 1)[0]
         for row in db.query(Card.word)
-        .filter(Card.user_id == user.id, Card.card_type != "speaking")
+        .filter(Card.user_id == user.id)
         .distinct()
         .all()
     }

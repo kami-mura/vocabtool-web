@@ -895,22 +895,6 @@
     frameId = requestAnimationFrame(frame);
   }
 
-  function speakingRows(back) {
-    return String(back || "")
-      .split(/\s*\|\|\s*/)
-      .map((raw) => raw.trim())
-      .filter(Boolean)
-      .map((expression) => {
-        const numbered = expression.replace(/^\s*\d+[.)、]\s*/, "");
-        const dashIndex = numbered.indexOf("——");
-        if (dashIndex < 0) return { en: numbered, note: "" };
-        return {
-          en: numbered.slice(0, dashIndex).trim(),
-          note: numbered.slice(dashIndex + 2).trim(),
-        };
-      });
-  }
-
   let realAudio = null;
   let realAudioButton = null;
   let realAudioPending = null;
@@ -1060,24 +1044,15 @@
     // 避免整个队列一次性触发大量 TTS 生成。
     const card = realReviewQueue[0];
     if (!card) return;
-    if (card.card_type === "speaking") {
-      speakingRows(card.back).forEach((row) => {
-        if (row.en && !realAudioPrefetched.has(row.en)) {
-          realAudioPrefetched.add(row.en);
-          texts.push(row.en);
-        }
-      });
-    } else {
-      const target = plainTargetWord(card.word);
-      if (target && !realAudioPrefetched.has(target)) {
-        realAudioPrefetched.add(target);
-        texts.push(target);
-      }
-      const sentence = card.context || card.front;
-      if (sentence && sentence !== card.word && !realAudioPrefetched.has(sentence)) {
-        realAudioPrefetched.add(sentence);
-        texts.push(sentence);
-      }
+    const target = plainTargetWord(card.word);
+    if (target && !realAudioPrefetched.has(target)) {
+      realAudioPrefetched.add(target);
+      texts.push(target);
+    }
+    const sentence = card.context || card.front;
+    if (sentence && sentence !== card.word && !realAudioPrefetched.has(sentence)) {
+      realAudioPrefetched.add(sentence);
+      texts.push(sentence);
     }
     if (texts.length) {
       fetch("/api/tts/prefetch", {
@@ -1119,62 +1094,19 @@
     const card = realReviewQueue[0];
     if (!card) return;
     const texts = [];
-    if (card.card_type === "speaking") {
-      speakingRows(card.back).forEach((row) => {
-        if (row.en) texts.push(row.en);
-      });
-    } else {
-      const target = plainTargetWord(card.word || card.front);
-      if (target) texts.push(target);
-      const sentence = card.context || card.front;
-      if (sentence && sentence !== target) texts.push(sentence);
-    }
+    const target = plainTargetWord(card.word || card.front);
+    if (target) texts.push(target);
+    const sentence = card.context || card.front;
+    if (sentence && sentence !== target) texts.push(sentence);
     await warmUpAudioTexts(texts);
-  }
-
-  function renderDictationDiff(userText, targetWord) {
-    const t = (targetWord || "").trim();
-    if (!userText || !userText.trim()) {
-      return '<span class="dictation-user-tag is-empty">（未输入）</span>';
-    }
-    const u = userText.trim();
-    if (u.toLowerCase() === t.toLowerCase()) {
-      return '<span class="dictation-user-tag is-correct">✨ 拼写正确</span>';
-    }
-    let diffHtml = "";
-    const maxLen = Math.max(u.length, t.length);
-    for (let i = 0; i < maxLen; i += 1) {
-      const uc = u[i] || "";
-      const tc = t[i] || "";
-      if (uc.toLowerCase() === tc.toLowerCase()) {
-        diffHtml += '<span class="diff-char is-match">' + escapeHtml(uc) + "</span>";
-      } else if (!uc) {
-        diffHtml += '<span class="diff-char is-missing" title="缺失">' + escapeHtml(tc) + "</span>";
-      } else if (!tc) {
-        diffHtml += '<span class="diff-char is-extra" title="多余">' + escapeHtml(uc) + "</span>";
-      } else {
-        diffHtml += '<span class="diff-char is-wrong" title="应为 ' + escapeHtml(tc) + '">' + escapeHtml(uc) + "</span>";
-      }
-    }
-    return '<span class="dictation-user-tag is-wrong"><span class="diff-prefix">输入：</span>' + diffHtml + "</span>";
   }
 
   function flipReviewCard(cardEl) {
     if (!cardEl) return;
-    const input = cardEl.querySelector(".dictation-input");
-    if (input) {
-      const target = input.dataset.realDictationTarget || "";
-      const tagEl = cardEl.querySelector(".dictation-user-tag");
-      if (tagEl) {
-        tagEl.outerHTML = renderDictationDiff(input.value, target);
-      }
-    }
     cardEl.classList.toggle("flipped");
   }
 
   function realReviewCardHtml(card) {
-    const isSpeaking = card.card_type === "speaking";
-    const isDictation = card.card_type === "dictation";
     const target = plainTargetWord(card.word);
     const previews = card.rating_previews || {};
     const previewLabel = (rating, fallback) => {
@@ -1182,47 +1114,17 @@
       return label || fallback;
     };
     const sentence = card.context || card.front;
-    // Cloze/口语卡正面不放音频：Cloze 挖空（例句会读答案）、口语（回答会剧透答案）；听写卡正面放发音。
-    const hasFrontAudio = card.card_type !== "cloze" && !isSpeaking;
-    let frontButtons = "";
-    if (hasFrontAudio && !isDictation) {
-      frontButtons =
-        '<button class="demo-audio" data-real-audio="' + escapeHtml(target) + '" type="button">▶</button>';
-      if (sentence && sentence !== target) {
-        frontButtons +=
-          '<button class="demo-audio" data-real-audio="' + escapeHtml(sentence) + '" type="button">▶</button>';
-      }
-    }
-    let frontInner;
-    if (isSpeaking) {
-      frontInner = escapeHtml(card.front);
-    } else if (isDictation) {
-      frontInner = escapeHtml(card.front || "");
-    } else {
-      frontInner = renderMarkdown(card.front, target);
-      if (!frontInner.includes("target-word")) {
-        if (card.card_type === "general") {
-          frontInner = '<mark class="word-highlight">' + frontInner + "</mark>";
-        } else if (card.card_type === "cloze") {
-          frontInner = frontInner.replace(/(_{2,})/g, '<mark class="word-highlight">$1</mark>');
-        }
+    // Cloze 卡正面不放音频：挖空例句会读答案。
+    let frontInner = renderMarkdown(card.front, target);
+    if (!frontInner.includes("target-word")) {
+      if (card.card_type === "general") {
+        frontInner = '<mark class="word-highlight">' + frontInner + "</mark>";
+      } else if (card.card_type === "cloze") {
+        frontInner = frontInner.replace(/(_{2,})/g, '<mark class="word-highlight">$1</mark>');
       }
     }
     let frontHtml;
-    if (isDictation) {
-      frontHtml =
-        '<div class="dictation-front-wrap">' +
-        '<div class="dictation-badge">🎧 听写卡</div>' +
-        '<div class="dictation-audio-wrap">' +
-        '<button class="demo-audio dictation-audio-btn" data-real-audio="' + escapeHtml(target) + '" type="button">▶ 播放发音</button>' +
-        "</div>" +
-        '<div class="dictation-meaning-box" hidden>' + frontInner + "</div>" +
-        '<div class="dictation-input-row">' +
-        '<input type="text" class="dictation-input" data-real-dictation-target="' + escapeHtml(target) + '" placeholder="输入英文拼写..." autocomplete="off" spellcheck="false" autocapitalize="none">' +
-        '<button type="button" class="dictation-hint-btn" data-real-dictation-hint="' + escapeHtml(target) + '" title="点击提示释义或首字母">💡 提示释义</button>' +
-        "</div>" +
-        "</div>";
-    } else if (card.card_type === "reading") {
+    if (card.card_type === "reading") {
       // 阅读卡正面：目标词一行（带播放按钮），下方直接显示完整例句，
       // 不再需要点击“例句”按钮展开（例句就是学习内容，直接可见）。
       frontHtml =
@@ -1240,60 +1142,16 @@
     } else {
       frontHtml =
         '<p class="demo-front-text">' + frontInner +
-        (hasFrontAudio ? ' <button class="demo-audio reading-word-audio" data-real-audio="' + escapeHtml(target) + '" type="button">▶</button>' : "") +
+        (card.card_type !== "cloze" ? ' <button class="demo-audio reading-word-audio" data-real-audio="' + escapeHtml(target) + '" type="button">▶</button>' : "") +
         "</p>";
     }
     function sanitizeCardBack(back) {
       if (!back) return "";
       return String(back).replace(/\n+\s*💡\s*助记[：:][\s\S]*$/i, "").trim();
     }
-    let backInner;
-    if (isSpeaking) {
-      backInner = '<div class="card-answer">' + speakingRows(sanitizeCardBack(card.back)).map((row) =>
-        '<div class="speaking-expression">' +
-        '<button class="demo-audio reading-word-audio" data-real-audio="' + escapeHtml(row.en) + '" type="button">▶</button>' +
-        '<div class="speaking-expression-text"><span class="speaking-en">' + escapeHtml(row.en) + "</span>" +
-        (row.note ? '<span class="speaking-note">' + escapeHtml(row.note) + "</span>" : "") +
-        "</div></div>"
-      ).join("") + "</div>";
-    } else if (isDictation) {
-      const rawBack = sanitizeCardBack(card.back || "").trim();
-      const lines = rawBack.split("\n").map((l) => l.trim()).filter(Boolean);
-      const filteredLines = lines.filter((line) => {
-        const lower = line.toLowerCase();
-        if (lower === target.toLowerCase() || lower === ("**" + target.toLowerCase() + "**")) {
-          return false;
-        }
-        if (sentence && (line === sentence.trim() || line === sentence)) {
-          return false;
-        }
-        return true;
-      });
-      const cleanMeaning = filteredLines.join("\n\n");
-
-      const sentenceHtml =
-        sentence && sentence !== target
-          ? '<div class="reading-sentence-wrap dictation-sentence-wrap">' +
-            '<div class="reading-sentence-content">' +
-            '<p class="demo-front-text dictation-sentence-text">' + renderMarkdown(sentence, target) + ' <button class="demo-audio reading-sentence-audio" data-real-audio="' +
-            escapeHtml(sentence) + '" type="button">▶</button></p>' +
-            "</div></div>"
-          : "";
-      backInner =
-        '<div class="card-answer dictation-answer">' +
-        '<div class="reading-word-row dictation-word-row">' +
-        '<mark class="word-highlight">' + escapeHtml(target) + "</mark>" +
-        ' <button class="demo-audio reading-word-audio" data-real-audio="' + escapeHtml(target) + '" type="button">▶</button>' +
-        ' <span class="dictation-user-tag is-empty">（未输入）</span>' +
-        "</div>" +
-        (cleanMeaning ? '<p class="demo-front-text dictation-meaning-text">' + renderMarkdown(cleanMeaning, target) + "</p>" : "") +
-        sentenceHtml +
-        "</div>";
-    } else {
-      backInner = '<div class="card-answer">' + renderMarkdown(sanitizeCardBack(card.back), target) +
-        (card.card_type === "cloze" ? ' <button class="demo-audio reading-word-audio" data-real-audio="' + escapeHtml(target) + '" type="button">▶</button>' : "") +
-        "</div>";
-    }
+    const backInner = '<div class="card-answer">' + renderMarkdown(sanitizeCardBack(card.back), target) +
+      (card.card_type === "cloze" ? ' <button class="demo-audio reading-word-audio" data-real-audio="' + escapeHtml(target) + '" type="button">▶</button>' : "") +
+      "</div>";
     const showBury = (realReviewAgainCounts.get(card.id) || 0) >= 3;
     const backHtml = backInner +
       (showBury
@@ -1310,7 +1168,6 @@
     return (
       '<div class="demo-card home-review-card' +
       (card.card_type === "general" ? " general-card" : "") +
-      (isDictation ? " dictation-card" : "") +
       '" data-real-card="' + card.id +
       '" data-review-signature="' + realCardSignature(card) + '">' +
       '<div class="demo-card-inner">' +
@@ -1370,12 +1227,6 @@
       box.querySelectorAll(".home-review-card.flipped").forEach((el) => {
         el.classList.remove("flipped");
       });
-      if (head && head.card_type === "dictation") {
-        setTimeout(() => {
-          const input = box.querySelector(".dictation-input");
-          if (input && !isMobileLayout()) input.focus();
-        }, 50);
-      }
     }
     // 没有学习任务时不显示卡片与卡片管理行。
     box.hidden = cards.length === 0;
@@ -2234,28 +2085,6 @@
   const realReviewCards = document.getElementById("real-review-cards");
   if (realReviewCards) {
     realReviewCards.addEventListener("click", (e) => {
-      const hintBtn = e.target.closest("[data-real-dictation-hint]");
-      if (hintBtn) {
-        const target = hintBtn.dataset.realDictationHint || "";
-        const cardEl = hintBtn.closest(".home-review-card");
-        const meaningBox = cardEl ? cardEl.querySelector(".dictation-meaning-box") : null;
-        if (meaningBox && meaningBox.hidden) {
-          meaningBox.hidden = false;
-          hintBtn.textContent = "💡 提示首字母";
-          return;
-        }
-        const input = cardEl ? cardEl.querySelector(".dictation-input") : null;
-        if (input && target) {
-          const current = input.value || "";
-          if (!current) {
-            input.value = target.slice(0, 1);
-          } else if (current.length < target.length) {
-            input.value = target.slice(0, current.length + 1);
-          }
-          input.focus();
-        }
-        return;
-      }
       const buryButton = e.target.closest("[data-real-bury]");
       if (buryButton) {
         buryRealCard(buryButton);
@@ -2274,19 +2103,9 @@
         return;
       }
       // 手机端没有翻转按钮：点击卡片空白区域翻面。
-      if (isMobileLayout() && !e.target.closest("button, a, audio, input, .demo-audio-row, .dictation-input-row")) {
+      if (isMobileLayout() && !e.target.closest("button, a, audio, input, .demo-audio-row")) {
         const cardEl = e.target.closest(".home-review-card");
         if (cardEl) flipReviewCard(cardEl);
-      }
-    });
-
-    realReviewCards.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && e.target.classList.contains("dictation-input")) {
-        e.preventDefault();
-        const cardEl = e.target.closest(".home-review-card");
-        if (cardEl && !cardEl.classList.contains("flipped")) {
-          flipReviewCard(cardEl);
-        }
       }
     });
   }
@@ -2855,12 +2674,8 @@
         return;
       }
       results.innerHTML = data.cards.map((card) => {
-        const front =
-          (card.defaults ? '<span class="hint">' + escapeHtml(card.defaults) + "</span><br>" : "") +
-          renderMarkdown(card.front, card.word);
-        const back = card.card_type === "speaking"
-          ? escapeHtml(card.back).replace(/\s*\|\|\s*/g, "<br>")
-          : renderMarkdown(String(card.back || "").replace(/\n+\s*💡\s*助记[：:][\s\S]*$/i, "").trim(), card.word);
+        const front = renderMarkdown(card.front, card.word);
+        const back = renderMarkdown(String(card.back || "").replace(/\n+\s*💡\s*助记[：:][\s\S]*$/i, "").trim(), card.word);
         return (
           '<div class="browser-card-wrap">' +
           '<label class="browser-select-check" data-browser-select-wrap="' + card.id + '" title="选择这张卡">' +
@@ -3252,9 +3067,7 @@
   const realCardFile = document.getElementById("real-card-file");
   const realCardNgslSourceFields = document.getElementById("real-card-ngsl-source-fields");
   const realCardTopicFields = document.getElementById("real-card-topic-fields");
-  const realNeedsFields = document.getElementById("real-needs-fields");
   const realCardListFields = document.getElementById("real-card-list-fields");
-  const realCardNgslFilterRow = document.getElementById("real-card-ngsl-filter-row");
   const realCardNgslFilter = document.getElementById("real-card-ngsl-filter");
   const realCardNgslFilterFields = document.getElementById("real-card-ngsl-filter-fields");
   const realCardNgslFilterHint = document.getElementById("real-card-ngsl-filter-hint");
@@ -3296,9 +3109,7 @@
     if (realCardFileFields) realCardFileFields.hidden = source !== "file";
     if (realCardNgslSourceFields) realCardNgslSourceFields.hidden = source !== "ngsl";
     if (realCardTopicFields) realCardTopicFields.hidden = source !== "topic";
-    if (realNeedsFields) realNeedsFields.hidden = source !== "needs";
     if (realCardListFields) realCardListFields.hidden = source !== "builtin";
-    if (realCardNgslFilterRow) realCardNgslFilterRow.hidden = source === "needs";
     if (realCardNgslFilter) {
       if (source === "ngsl") {
         realCardNgslFilter.checked = true;
@@ -3316,10 +3127,6 @@
     renderRealCardNgslFilterFields();
     if (source === "builtin") {
       loadRealCardLists();
-    }
-    if (source === "needs") {
-      if (realCardType !== "speaking") setRealCardType("speaking");
-      loadRealSpeakingNeeds();
     }
   }
 
@@ -3362,24 +3169,6 @@
     return (data.words || []).map((item) => item.word);
   }
 
-  // 口语表达需求去重：口语卡的 word 是 need-id、front 才是需求原文，
-  // 因此走 expressions 来源与已有同类型卡的 front 比对。
-  async function refineRealCardExpressions(fronts) {
-    const res = await fetch("/api/card-studio/targets", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        source: "expressions",
-        text: fronts.join("\n"),
-        count: 5000,
-        card_type: realCardType,
-      }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.detail || "表达需求去重失败");
-    return (data.words || []).map((item) => item.word);
-  }
-
   if (realCardNgslFilter) {
     realCardNgslFilter.onchange = renderRealCardNgslFilterFields;
   }
@@ -3388,205 +3177,6 @@
     realCardSource.onchange = renderRealCardSourceFields;
   }
   renderRealCardSourceFields();
-
-  /* ---------- 口语素材（内置表达需求集） ---------- */
-  let realNeeds = null;
-  let realNeedsLoaded = false;
-
-  async function loadRealSpeakingNeeds(force) {
-    if (realNeedsLoaded && !force) return;
-    realNeedsLoaded = false;
-    const box = document.getElementById("real-needs-list");
-    if (box) box.innerHTML = '<span class="hint">正在加载口语素材…</span>';
-    try {
-      const res = await fetch("/api/card-studio/needs", {
-        headers: { "Content-Type": "application/json" },
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.detail || "加载失败");
-      realNeeds = data;
-      realNeedsLoaded = true;
-      renderRealSpeakingNeeds();
-    } catch (err) {
-      if (box) {
-        box.innerHTML =
-          '<span class="hint">口语素材加载失败，请刷新页面重试；也可以用“单词表”粘贴需求（每行一个）。</span>';
-      }
-    }
-  }
-
-  function renderRealSpeakingNeeds() {
-    const box = document.getElementById("real-needs-list");
-    if (!box || !realNeeds) return;
-    const categories = realNeeds.categories || [];
-    box.innerHTML = categories.map((group, groupIndex) =>
-      '<div class="speaking-need-group">' +
-      '<label class="speaking-category-row">' +
-      '<input type="checkbox" data-category-check="' + groupIndex + '">' +
-      '<span class="speaking-category-name">' + escapeHtml(group.name) +
-      ' <span class="hint">' + group.needs.length + " 条</span></span>" +
-      '<button type="button" class="speaking-category-toggle small" data-category-expand="' + groupIndex + '" aria-expanded="false">展开</button>' +
-      "</label>" +
-      '<div class="speaking-need-items" data-category-items="' + groupIndex + '" hidden>' +
-      group.needs.map((need) =>
-        '<label class="speaking-need-item">' +
-        '<input type="checkbox" data-need-front="' + escapeHtml(need.front) + '"' +
-        (need.has_card ? " disabled" : "") + ">" +
-        '<span>' + escapeHtml(need.front) +
-        (need.has_card ? ' <em class="hint">已制卡</em>' : "") +
-        "</span></label>"
-      ).join("") +
-      "</div></div>"
-    ).join("");
-    box.querySelectorAll("input[data-need-front]").forEach((input) => {
-      input.addEventListener("change", () => {
-        updateRealSpeakingNeedsCount();
-        refreshRealCategoryChecks();
-      });
-    });
-    box.querySelectorAll("input[data-category-check]").forEach((checkbox) => {
-      checkbox.addEventListener("change", () => {
-        const index = Number(checkbox.dataset.categoryCheck);
-        const group = categories[index];
-        if (!group) return;
-        const inputs = [...box.querySelectorAll("input[data-need-front]:not(:disabled)")];
-        const groupInputs = inputs.filter((input) =>
-          group.needs.some((need) => need.front === input.dataset.needFront)
-        );
-        groupInputs.forEach((input) => {
-          input.checked = checkbox.checked;
-        });
-        updateRealSpeakingNeedsCount();
-        refreshRealCategoryChecks();
-      });
-    });
-    box.querySelectorAll("button[data-category-expand]").forEach((button) => {
-      button.addEventListener("click", (event) => {
-        event.preventDefault();
-        const index = Number(button.dataset.categoryExpand);
-        setRealCategoryExpanded(index, button.getAttribute("aria-expanded") !== "true");
-      });
-    });
-    const search = document.getElementById("real-needs-search");
-    if (search) {
-      search.addEventListener("input", () => applyRealSpeakingNeedsSearch(search.value));
-    }
-    updateRealSpeakingNeedsCount();
-    refreshRealCategoryChecks();
-  }
-
-  function refreshRealCategoryChecks() {
-    const box = document.getElementById("real-needs-list");
-    if (!box || !realNeeds) return;
-    (realNeeds.categories || []).forEach((group, index) => {
-      const checkbox = box.querySelector('input[data-category-check="' + index + '"]');
-      if (!checkbox) return;
-      const groupInputs = [...box.querySelectorAll("input[data-need-front]:not(:disabled)")]
-        .filter((input) => group.needs.some((need) => need.front === input.dataset.needFront));
-      const checked = groupInputs.filter((input) => input.checked);
-      checkbox.checked = groupInputs.length > 0 && checked.length === groupInputs.length;
-      checkbox.indeterminate = checked.length > 0 && checked.length < groupInputs.length;
-    });
-  }
-
-  function applyRealSpeakingNeedsSearch(query) {
-    const box = document.getElementById("real-needs-list");
-    if (!box) return;
-    const q = String(query || "").trim().toLowerCase();
-    box.querySelectorAll(".speaking-need-item").forEach((item) => {
-      item.hidden = Boolean(q) && !item.textContent.toLowerCase().includes(q);
-    });
-    box.querySelectorAll(".speaking-need-group").forEach((group, index) => {
-      const items = [...group.querySelectorAll(".speaking-need-item")];
-      const visible = items.some((item) => !item.hidden);
-      group.hidden = !visible;
-      if (q && visible) setRealCategoryExpanded(index, true);
-    });
-  }
-
-  function setRealCategoryExpanded(index, expanded) {
-    const box = document.getElementById("real-needs-list");
-    if (!box) return;
-    const button = box.querySelector('button[data-category-expand="' + index + '"]');
-    const items = box.querySelector('div[data-category-items="' + index + '"]');
-    if (!button || !items) return;
-    items.hidden = !expanded;
-    button.textContent = expanded ? "收起" : "展开";
-    button.setAttribute("aria-expanded", String(expanded));
-  }
-
-  function updateRealSpeakingNeedsCount() {
-    const box = document.getElementById("real-needs-list");
-    const count = box
-      ? [...box.querySelectorAll("input[data-need-front]:checked")].length
-      : 0;
-    const el = document.getElementById("real-needs-count");
-    if (el) el.textContent = "已选 " + count + " 个";
-  }
-
-  function selectedRealSpeakingFronts() {
-    const box = document.getElementById("real-needs-list");
-    if (!box) return [];
-    return [...box.querySelectorAll("input[data-need-front]:checked")]
-      .map((input) => input.dataset.needFront);
-  }
-
-  const realNeedsSelectAll = document.getElementById("real-needs-select-all");
-  if (realNeedsSelectAll) {
-    realNeedsSelectAll.onclick = () => {
-      const box = document.getElementById("real-needs-list");
-      if (!box) return;
-      box.querySelectorAll("input[data-need-front]:not(:disabled)").forEach((input) => {
-        input.checked = true;
-      });
-      const categories = (realNeeds && realNeeds.categories) || [];
-      categories.forEach((_group, index) => setRealCategoryExpanded(index, true));
-      updateRealSpeakingNeedsCount();
-      refreshRealCategoryChecks();
-    };
-  }
-  const realNeedsClear = document.getElementById("real-needs-clear");
-  if (realNeedsClear) {
-    realNeedsClear.onclick = () => {
-      const box = document.getElementById("real-needs-list");
-      if (!box) return;
-      box.querySelectorAll("input[data-need-front]:checked").forEach((input) => {
-        input.checked = false;
-      });
-      updateRealSpeakingNeedsCount();
-      refreshRealCategoryChecks();
-    };
-  }
-  const realNeedsRandom = document.getElementById("real-needs-random");
-  if (realNeedsRandom) {
-    realNeedsRandom.onclick = () => {
-      const box = document.getElementById("real-needs-list");
-      if (!box) return;
-      const status = document.getElementById("real-card-status");
-      const countInput = document.getElementById("real-needs-random-count");
-      const count = Math.max(1, Math.min(50, Number(countInput.value) || 10));
-      const available = [...box.querySelectorAll("input[data-need-front]:not(:disabled)")];
-      if (!available.length) {
-        if (status) status.textContent = "口语素材里没有可选条目";
-        return;
-      }
-      for (let index = available.length - 1; index > 0; index--) {
-        const other = Math.floor(Math.random() * (index + 1));
-        [available[index], available[other]] = [available[other], available[index]];
-      }
-      box.querySelectorAll("input[data-need-front]:checked").forEach((input) => {
-        input.checked = false;
-      });
-      available.slice(0, Math.min(count, available.length)).forEach((input) => {
-        input.checked = true;
-      });
-      const categories = (realNeeds && realNeeds.categories) || [];
-      categories.forEach((_group, index) => setRealCategoryExpanded(index, true));
-      updateRealSpeakingNeedsCount();
-      refreshRealCategoryChecks();
-      if (status) status.textContent = "已随机选择 " + Math.min(count, available.length) + " 个表达需求";
-    };
-  }
 
   const realCardExtract = document.getElementById("real-card-extract");
   if (realCardExtract) {
@@ -3645,10 +3235,6 @@
             .split("\n").map((s) => s.trim()).filter(Boolean);
           if (!words.length) throw new Error("请先输入单词");
           words = await refineRealCardTargets(words, source);
-        } else if (source === "needs") {
-          words = selectedRealSpeakingFronts();
-          if (!words.length) throw new Error("请先勾选表达需求");
-          words = await refineRealCardExpressions(words);
         } else if (source === "topic") {
           const topic = document.getElementById("real-card-topic").value.trim();
           const count = Number(document.getElementById("real-card-topic-count").value) || 20;
