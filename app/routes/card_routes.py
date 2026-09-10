@@ -6,9 +6,9 @@ import math
 import threading
 
 import anyio
-from fastapi import APIRouter, BackgroundTasks, Response
+from fastapi import APIRouter, BackgroundTasks
 
-from .. import anki_exchange, wordlists
+from .. import wordlists
 from ..api_support import (
     ALLOWED_CARD_TYPES,
     GENERATABLE_CARD_TYPES,
@@ -63,7 +63,7 @@ from ..api_support import (
     vocab,
 )
 from ..db import SessionLocal, is_sqlite_busy_error, reserve_sqlite_write
-from ..models import AnkiReviewLog, WordEntry
+from ..models import WordEntry
 from ..schemas import (
     CardsBatchDeleteIn,
     CardStudioCreateIn,
@@ -867,91 +867,6 @@ def create_cards_from_studio(
 # ---------- 卡片复习 ----------
 
 
-@router.get("/cards/anki/export")
-def export_cards_to_anki(request: Request, db: Session = Depends(get_db)):
-    """导出当前用户全部卡片及学习进度为可由 Anki 导入的 .apkg。"""
-    user = _require_user(db, request)
-    if not check_request_rate(
-        db,
-        action="anki-export",
-        identity=f"u{user.id}",
-        limit=20,
-        window_minutes=60,
-    ):
-        raise HTTPException(status_code=429, detail="Anki 导出过于频繁，请稍后再试")
-    try:
-        package, count = anki_exchange.export_apkg(db, user.id)
-        db.commit()  # 仅保存首次生成的稳定 Anki guid，不改学习状态。
-    except anki_exchange.AnkiExchangeError as exc:
-        db.rollback()
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except Exception:
-        db.rollback()
-        raise
-    filename = "vocabtool.apkg"
-    return Response(
-        content=package,
-        media_type="application/octet-stream",
-        headers={
-            "Content-Disposition": f'attachment; filename="{filename}"',
-            "X-VocabFlow-Card-Count": str(count),
-        },
-    )
-
-
-@router.post("/cards/anki/import")
-async def import_cards_from_anki(
-    request: Request,
-    filename: str,
-    db: Session = Depends(get_db),
-):
-    """事务性合并 Anki 包；不删除卡片，较新的站内进度不会被覆盖。"""
-    user = _require_user(db, request)
-    if not filename.lower().endswith(".apkg"):
-        raise HTTPException(status_code=400, detail="请选择 .apkg 文件")
-    if not check_request_rate(
-        db,
-        action="anki-import",
-        identity=f"u{user.id}",
-        limit=20,
-        window_minutes=60,
-    ):
-        raise HTTPException(status_code=429, detail="Anki 导入过于频繁，请稍后再试")
-    data = await _read_limited_body(request, config.MAX_APKG_UPLOAD_BYTES)
-    data, filename = _decode_upload_body(
-        request,
-        data,
-        filename,
-        decompress_limit=config.MAX_APKG_UPLOAD_BYTES,
-    )
-    if not _try_heavy_import_slot():
-        raise HTTPException(status_code=429, detail="服务器导入任务繁忙，请稍后重试")
-    try:
-        parsed = await run_in_threadpool(
-            anki_exchange.parse_apkg, data, config.MAX_APKG_CARDS
-        )
-        estimated_bytes = sum(
-            _utf8_size(str(item.get(key, "")))
-            for item in parsed.get("cards", [])
-            for key in ("word", "front", "back", "context")
-        ) + int(parsed.get("review_count", 0) or 0) * 112
-        _require_storage_space(db, user.id, estimated_bytes)
-        result = anki_exchange.import_parsed(db, user.id, parsed)
-        db.commit()
-        return {"ok": True, **result}
-    except anki_exchange.AnkiExchangeError as exc:
-        db.rollback()
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except IntegrityError as exc:
-        db.rollback()
-        raise HTTPException(
-            status_code=409,
-            detail="Anki 卡片与现有数据冲突，未导入任何内容",
-        ) from exc
-    finally:
-        _release_heavy_import_slot()
-
-
 @router.get("/cards/settings")
 def get_review_settings(request: Request, db: Session = Depends(get_db)):
     user = _require_user(db, request)
@@ -1355,9 +1270,8 @@ def daily_cards(
             raise HTTPException(status_code=400, detail="无效卡片类型")
         base = base.filter(Card.card_type == card_type)
 
-    # 队列载荷上限：叠加 Anki 单次最多导入 1 万张卡，积压数千张到期卡时
-    # 全量返回会让单次响应达到数十 MB。剩余数始终用真实计数，客户端
-    # 学完本地队列后的既有刷新机制会拉取后续批次。
+    # 队列载荷上限：积压数千张到期卡时全量返回会让单次响应达到数十 MB。
+    # 剩余数始终用真实计数，客户端学完本地队列后的既有刷新机制会拉取后续批次。
     _DUE_QUEUE_LIMIT = 1000
     _REPEAT_QUEUE_LIMIT = 500
 
@@ -1569,22 +1483,6 @@ def undo_last_review(request: Request, db: Session = Depends(get_db)):
     )
     if latest_for_card is None or latest_for_card.id != log.id:
         raise HTTPException(status_code=409, detail="这张卡片已有更新的评分，请刷新后重试")
-    # 评分之后又导入过更新的 Anki 进度时拒绝撤回：否则会用它覆盖
-    # 刚导入的 due/reps/lapses 与 FSRS 状态。
-    newer_import = (
-        db.query(AnkiReviewLog.source_key)
-        .filter(
-            AnkiReviewLog.user_id == user.id,
-            AnkiReviewLog.card_id == log.card_id,
-            AnkiReviewLog.reviewed_at > log.reviewed_at,
-        )
-        .first()
-    )
-    if newer_import:
-        raise HTTPException(
-            status_code=409,
-            detail="评分后已导入更新的 Anki 进度，不能撤回",
-        )
     card.state = log.previous_state or ("new" if log.is_new else "review")
     card.due_at = log.previous_due_at
     card.interval_days = float(log.interval_days or 0)
@@ -2164,7 +2062,7 @@ def generate_study_article(
         card_id for card_id, rating in today_logs if rating == "again"
     }
     def _card_words(card_ids: set[int]) -> list[str]:
-        """按卡片取单词并去重；Anki 卡去掉词头后的 [提示] 后缀。"""
+        """按卡片取单词并去重。"""
         words: list[str] = []
         seen: set[str] = set()
         if not card_ids:

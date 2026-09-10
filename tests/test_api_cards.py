@@ -1161,37 +1161,6 @@ def test_batch_delete_cards_by_card_ids(client):
     assert client.get(
         "/api/cards/browse", params={"card_type": "reading"}
     ).json()["total"] == 0
-
-
-def test_batch_delete_matches_anki_label_suffix(client):
-    register(client, "batch-delete-suffix@example.com")
-    user_id = (
-        SessionLocal()
-        .query(User.id)
-        .filter(User.email == "batch-delete-suffix@example.com")
-        .scalar()
-    )
-    db = SessionLocal()
-    try:
-        db.add(
-            Card(
-                user_id=user_id,
-                word="run [abc123]",
-                card_type="anki",
-                front="run",
-                back="back",
-            )
-        )
-        db.commit()
-    finally:
-        db.close()
-
-    result = client.post("/api/cards/delete-batch", json={"words": ["run"]})
-    assert result.status_code == 200
-    assert result.json()["deleted"] == 1
-    assert client.get("/api/words", params={"q": "run"}).json()["words"] == []
-
-
 def test_batch_delete_card_returns_word_to_library(client):
     register(client, "batch-delete-card@example.com")
     client.post(
@@ -1362,33 +1331,6 @@ def test_card_targets_builtin_rank_filter_flag_applies_range(client):
     assert response.status_code == 200
     assert response.json()["words"]
     assert all(1 <= item["rank"] <= 500 for item in response.json()["words"])
-
-
-def test_anki_import_gzip_uses_apkg_decompress_limit(client, monkeypatch):
-    import gzip
-
-    from app import config
-    from app.anki_exchange import AnkiExchangeError
-
-    register(client, "apkg-gzip-limit@example.com")
-
-    def fake_parse(_data, _max_cards):
-        raise AnkiExchangeError("模拟解析失败")
-
-    monkeypatch.setattr("app.routes.card_routes.anki_exchange.parse_apkg", fake_parse)
-    monkeypatch.setattr(config, "MAX_UPLOAD_BYTES", 1024)
-    monkeypatch.setattr(config, "MAX_APKG_UPLOAD_BYTES", 4096)
-    payload = gzip.compress(b"x" * 2048)
-    response = client.post(
-        "/api/cards/anki/import?filename=cards.apkg",
-        content=payload,
-        headers={
-            "Content-Type": "application/octet-stream",
-            "x-upload-encoding": "gzip",
-        },
-    )
-    assert response.status_code == 400
-    assert "模拟解析失败" in response.json()["detail"]
 def test_cards_browse_returns_ngsl_rank_on_default_sort(client):
     """默认时间排序也必须返回 ngsl_rank：此前只有 NGSL 排序分支带该字段，
     默认视图全部显示「不在 NGSL 词表」。"""

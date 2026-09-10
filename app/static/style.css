@@ -1838,7 +1838,7 @@ button.landing-login-btn { border: none; cursor: pointer; }
 .rating.easy { border-color: #b4e6cf; color: var(--known); background: linear-gradient(180deg, #f7fdf9, #eefaf4); }
 .rating:hover { transform: translateY(-1px); }
 .card-limit-notice { margin: 0 0 8px; color: #b06a00; font-weight: 700; }
-/* ---------- 制作新卡 / Anki 队列 ---------- */
+/* ---------- 制作新卡 / 复习队列 ---------- */
 .studio-type, .studio-grid { margin-bottom: 14px; }
 .studio-type { padding: 16px 20px; }
 .studio-type .card-type-boxes { max-width: 760px; }

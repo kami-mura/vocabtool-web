@@ -770,11 +770,6 @@ def _card_dict(
 ) -> dict:
     if now is None:
         now = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
-    deck = (
-        _json_context_field(card.context, "deck")
-        if card.card_type == "anki"
-        else ""
-    )
     cleaned_back = (
         re.sub(r"\n+\s*💡\s*助记[：:][\s\S]*$", "", str(card.back or "")).rstrip()
         if card.back
@@ -811,23 +806,11 @@ def _card_dict(
             if card.due_at
             else None
         ),
-        "deck": deck,
         "session_repeat": session_repeat,
         "session_correct_streak": max(0, session_correct_streak),
         "session_required_correct": 2,
         "rating_previews": srs.rating_previews(card, session_repeat=session_repeat),
     }
-
-
-def _json_context_field(context: str, key: str) -> str:
-    """从卡片 context 的 JSON 里读取一个字符串字段，异常时返回空串。"""
-    if not context:
-        return ""
-    try:
-        value = json.loads(context).get(key)
-    except (TypeError, ValueError, AttributeError):
-        return ""
-    return str(value or "")
 
 
 def _cookie_secure(request: Request) -> bool:

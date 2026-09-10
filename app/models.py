@@ -3,7 +3,6 @@ from __future__ import annotations
 import datetime as dt
 
 from sqlalchemy import (
-    BigInteger,
     Boolean,
     Column,
     DateTime,
@@ -312,9 +311,8 @@ class SavedWord(Base):
 class Card(Base):
     __tablename__ = "cards"
     __table_args__ = (
-        # 站内生成卡仍按 (user, word, type) 去重；Anki 卡例外：一个 note 的
-        # 多模板（Basic+Reverse、多 Cloze ordinal）会解析出同词多卡，
-        # 其身份由 (user_id, anki_guid) 唯一约束保证。
+        # 站内生成卡按 (user, word, type) 去重。历史 Anki 卡保留部分唯一
+        # 索引与 anki_guid 约束，保证旧库 schema 与回滚兼容，不再有新卡写入。
         Index(
             "uq_cards_word_type_non_anki",
             "user_id",
@@ -349,7 +347,7 @@ class Card(Base):
     lapses = Column(Integer, default=0)
     revision = Column(Integer, default=0, nullable=False, server_default="0")
     buried = Column(Boolean, default=False, nullable=False, server_default="0")
-    # Anki note guid + template ordinal；用于重复导入时更新同一张卡而非复制。
+    # 历史 Anki 导入卡的 note guid；字段保留用于旧库兼容，不再写入。
     anki_guid = Column(String(128), nullable=True)
     created_at = Column(DateTime, default=_utcnow)
 
@@ -382,27 +380,6 @@ class ReviewLog(Base):
     previous_fsrs_state = Column(Text, nullable=True)
     fsrs_review_log = Column(Text, nullable=True)
     reviewed_at = Column(DateTime, default=_utcnow, index=True)
-
-
-class AnkiReviewLog(Base):
-    """从 Anki 包保留的原始复习历史；独立存储，避免影响站内今日统计和撤回。"""
-
-    __tablename__ = "anki_review_logs"
-
-    source_key = Column(String(64), primary_key=True)
-    user_id = Column(
-        Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
-    )
-    card_id = Column(
-        Integer, ForeignKey("cards.id", ondelete="CASCADE"), index=True, nullable=False
-    )
-    anki_review_id = Column(BigInteger, nullable=False)
-    rating = Column(Integer, nullable=False)
-    interval_days = Column(Float, default=0.0, nullable=False)
-    last_interval_days = Column(Float, default=0.0, nullable=False)
-    ease = Column(Float, default=2.5, nullable=False)
-    review_type = Column(Integer, default=1, nullable=False)
-    reviewed_at = Column(DateTime, nullable=False, index=True)
 
 
 class ReviewRequest(Base):
