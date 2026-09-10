@@ -197,7 +197,7 @@ assert.ok(
 );
 assert.match(
   glassStyleSource,
-  /\.general-card \.demo-front-text\s*\{[^}]*font-size\s*:\s*28px/,
+  /\.general-card \.demo-front-text\s*\{[^}]*font-size\s*:\s*(?:28px|var\(--fs-4xl\))/,
   "通用卡正面单词使用适中的 28px 字号"
 );
 assert.ok(!landingSource.includes("exclude_easy"), "制卡提取请求不再携带已移除的 Easy 过滤选项");
