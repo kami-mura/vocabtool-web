@@ -29,7 +29,7 @@
 }
 #real-review .home-review-cards .demo-card,
 #guest-demo-cards .demo-cards .demo-card {
-  height: 420px;
+  height: clamp(360px, 64vh, 460px);
 }
 .review-placeholder .demo-card-face {
   border-style: dashed;
@@ -130,7 +130,7 @@
 #real-review .home-review-cards .demo-card {
   width: 100%;
   max-width: 100%;
-  height: 440px;
+  height: clamp(360px, 64vh, 460px);
 }
 #real-review .home-review-cards .demo-card-face.front,
 #real-review .home-review-cards .demo-card-face.back {
@@ -209,7 +209,7 @@
   margin: 0 auto;
 }
 #guest-demo-cards .demo-cards .demo-card {
-  height: 420px;
+  height: clamp(360px, 64vh, 460px);
 }
 /* 演示卡：白纸面 + 更清晰的字号 */
 #guest-demo-cards .demo-card-face.front,

@@ -77,55 +77,6 @@
     });
   }
 
-  /* ---------- 卡片 3D 悬浮（只在支持精细指针的设备上启用） ---------- */
-  const TILT_SELECTOR = [
-    ".demo-card",
-    ".stat",
-    ".word-result",
-    ".auth-card",
-    ".landing-search-result",
-  ].join(",");
-
-  function setupTilt(root) {
-    if (!finePointer) return;
-    const nodes = (root || document).querySelectorAll(TILT_SELECTOR);
-    nodes.forEach((el) => {
-      if (el.dataset.uiTiltReady) return;
-      el.dataset.uiTiltReady = "1";
-      el.classList.add("ui-tilt");
-
-      let frame = null;
-      el.addEventListener("pointerenter", () => {
-        el.style.willChange = "transform";
-      });
-      el.addEventListener("pointermove", (event) => {
-        const rect = el.getBoundingClientRect();
-        if (!rect.width || !rect.height) return;
-        const px = (event.clientX - rect.left) / rect.width - 0.5;
-        const py = (event.clientY - rect.top) / rect.height - 0.5;
-        const strength = el.classList.contains("auth-card")
-          ? 2.5
-          : el.classList.contains("word-result")
-            ? 2
-            : 4.5;
-        if (frame) cancelAnimationFrame(frame);
-        frame = requestAnimationFrame(() => {
-          el.style.transform =
-            "perspective(900px) rotateX(" +
-            (-py * strength).toFixed(2) +
-            "deg) rotateY(" +
-            (px * strength).toFixed(2) +
-            "deg) translateY(-2px)";
-        });
-      });
-      el.addEventListener("pointerleave", () => {
-        if (frame) cancelAnimationFrame(frame);
-        el.style.transform = "";
-        el.style.willChange = "";
-      });
-    });
-  }
-
   /* ---------- 跟随鼠标的高光 ---------- */
   const SPOTLIGHT_SELECTOR = [
     ".card",
@@ -153,7 +104,6 @@
   function scan(root) {
     applyReveal(root);
     setupSpotlight(root);
-    setupTilt(root);
   }
 
   scan(document);
