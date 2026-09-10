@@ -25,7 +25,6 @@
 | --- | --- | ---: | --- | --- | ---: | --- |
 | 通用卡、阅读卡 | `generate_card_content_in_batches` / `_call_ai_card_batch` | 0.2–0.3 | 关闭 | 无 | 每 10 词 4096 | 60 秒；仅瞬时网络错误重试 1 次 |
 | Cloze 卡 | 同上，`card_template=cloze` | 0.1–0.2 | 关闭 | 无 | 每 5 词 2048 | 60 秒；重试 1 次 |
-| 口语卡 | 同上，`card_template=speaking` | 0.3–0.4 | 关闭 | 无 | 每 10 条 4096 | 60 秒；重试 1 次 |
 | 普通查词 `/api/lookups` | `explain_lookup` | 0.2；修复 0.15 | 关闭 | 无 | 2048 | 30 秒；错误输入修复 1 次 |
 | 词源速查 `/api/lookups/quick` | `quick_lookup` | 0.15；修复 0.1 | 关闭 | 无 | 2048 | 30 秒；只对瞬时错误重试 1 次 |
 | 词条简释 `/api/words/{word}/enrich` | `enrich_word` | 0.1 | 关闭 | 无 | 512 | 20 秒；重试 1 次 |
