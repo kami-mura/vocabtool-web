@@ -100,7 +100,6 @@
             <button id="real-manage-library" type="button" role="menuitem">生词库</button>
             <button id="real-manage-add-card" type="button" role="menuitem">制作新卡</button>
             <button id="real-manage-browser" type="button" role="menuitem">我的卡片</button>
-            <button id="real-review-refresh-sentences" type="button" role="menuitem">更新阅读卡例句</button>
             <div class="review-manage-daily">
               <label for="real-review-daily-new-limit">每天新学习</label>
               <div class="review-manage-daily-row">
@@ -265,21 +264,6 @@
                 </select>
               </div>
               <button id="real-browser-search" class="small primary" type="button">查询</button>
-            </div>
-            <div class="card-browser-filters sentence-refresh-panel">
-              <div class="sentence-refresh-label">
-                <span>阅读卡例句自动轮换</span>
-                <small class="hint">开启后每天凌晨 4 点自动为学习满 N 天的阅读卡生成新例句</small>
-              </div>
-              <select id="real-sentence-refresh-interval">
-                <option value="0">关闭</option>
-                <option value="3">每 3 天</option>
-                <option value="5">每 5 天</option>
-                <option value="10">每 10 天</option>
-              </select>
-              <button id="real-sentence-refresh-save" class="small" type="button">保存</button>
-              <button id="real-sentence-refresh-now" class="small" type="button">更新阅读卡例句</button>
-              <span id="real-sentence-refresh-status" class="hint"></span>
             </div>
             <p id="real-browser-total" class="hint card-browser-total">共 0 张卡片</p>
             <div id="real-browser-batch" class="card-browser-batch" hidden>

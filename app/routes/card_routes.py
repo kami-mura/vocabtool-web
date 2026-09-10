@@ -71,13 +71,6 @@ from ..schemas import (
     ReviewBatchIn,
     ReviewIn,
     ReviewSettingsIn,
-    SentenceRefreshPreferenceIn,
-)
-from ..sentence_refresh import (
-    find_cards_for_manual_refresh,
-    get_preference,
-    refresh_cards,
-    set_preference,
 )
 
 router = APIRouter()
@@ -884,69 +877,6 @@ def update_review_settings(
     preference.updated_at = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
     db.commit()
     return {"ok": True, "new_cards_per_day": preference.new_cards_per_day}
-
-
-@router.get("/cards/sentence-refresh-preference")
-def get_sentence_refresh_preference(request: Request, db: Session = Depends(get_db)):
-    user = _require_user(db, request)
-    pref = get_preference(db, user.id)
-    if pref is None:
-        return {"interval": 0, "enabled_at": None}
-    return {
-        "interval": pref.interval,
-        "enabled_at": (
-            pref.enabled_at.isoformat() if pref.enabled_at else None
-        ),
-    }
-
-
-@router.put("/cards/sentence-refresh-preference")
-def update_sentence_refresh_preference(
-    body: SentenceRefreshPreferenceIn,
-    request: Request,
-    db: Session = Depends(get_db),
-):
-    user = _require_user(db, request)
-    set_preference(db, user.id, body.interval)
-    return {"ok": True, "interval": body.interval}
-
-
-@router.post("/cards/refresh-sentences")
-def refresh_sentences_now(request: Request, db: Session = Depends(get_db)):
-    user = _require_user(db, request)
-    pref = get_preference(db, user.id)
-    enabled_at = pref.enabled_at if pref else None
-    if enabled_at is None:
-        enabled_at = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
-    cards = find_cards_for_manual_refresh(
-        db, user.id, enabled_at=enabled_at, limit=10
-    )
-    if not cards:
-        return {"updated": 0, "errors": []}
-    updated, errors = refresh_cards(db, user.id, cards)
-    return {"updated": updated, "errors": errors}
-
-
-@router.post("/cards/{card_id}/refresh-sentence")
-def refresh_single_card_sentence(
-    card_id: int, request: Request, db: Session = Depends(get_db)
-):
-    """手动为单张阅读卡换例句；失败时保留原句。"""
-    user = _require_user(db, request)
-    card = (
-        db.query(Card)
-        .filter(Card.id == card_id, Card.user_id == user.id)
-        .first()
-    )
-    if not card:
-        raise HTTPException(status_code=404, detail="卡片不存在")
-    if card.card_type != "reading":
-        raise HTTPException(status_code=400, detail="只有阅读卡支持换句")
-    updated, errors = refresh_cards(db, user.id, [card])
-    if updated:
-        return {"ok": True, "updated": 1, "errors": []}
-    message = errors[0] if errors else "换句失败"
-    return JSONResponse(status_code=400, content={"ok": False, "detail": message})
 
 
 @router.get("/cards/browse")

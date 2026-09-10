@@ -1898,25 +1898,6 @@
       if (realShowManagePanel) realShowManagePanel("real-card-browser");
     };
   }
-  const realReviewRefreshSentences = document.getElementById("real-review-refresh-sentences");
-  if (realReviewRefreshSentences) {
-    realReviewRefreshSentences.onclick = async () => {
-      setReviewStatus("正在更新阅读卡例句…");
-      try {
-        const res = await fetch("/api/cards/refresh-sentences", { method: "POST" });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.detail || "更新失败");
-        const updated = Number(data.updated) || 0;
-        setReviewStatus(updated > 0 ? "已更新 " + updated + " 张阅读卡例句" : "暂无可更新的阅读卡");
-        if (updated > 0) {
-          requestReviewRefresh();
-          loadRealBrowser();
-        }
-      } catch (err) {
-        setReviewStatus("更新失败：" + err.message);
-      }
-    };
-  }
 
   /* ---------- 彩蛋：连点顶部 V 图标 5 次，边牧跑过屏幕 ---------- */
   function triggerLogoEasterEgg() {
@@ -2580,9 +2561,6 @@
           '<div class="browser-card-content"><div><b>正面</b><p>' + front + "</p></div>" +
           '<div><b>背面</b><p>' + back + "</p></div>" +
           '<div class="browser-card-actions">' +
-          (card.card_type === "reading"
-            ? '<button class="small" data-real-refresh-sentence="' + card.id + '" type="button">换句</button>'
-            : "") +
           '<button class="small danger" data-real-delete-card="' + card.id +
           '" data-real-delete-word="' + escapeHtml(card.word) + '" type="button">删除这张卡</button>' +
           "</div></div></details></div>"
@@ -2729,81 +2707,9 @@
       }
     };
   }
-  async function loadSentenceRefreshPreference() {
-    try {
-      const res = await fetch("/api/cards/sentence-refresh-preference");
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.detail || "加载失败");
-      const select = document.getElementById("real-sentence-refresh-interval");
-      if (select) select.value = String(data.interval || 0);
-    } catch (err) {
-      // 加载失败保持默认关闭即可
-    }
-  }
-
-  async function saveSentenceRefreshPreference() {
-    const select = document.getElementById("real-sentence-refresh-interval");
-    const status = document.getElementById("real-sentence-refresh-status");
-    if (!select) return;
-    const interval = parseInt(select.value, 10) || 0;
-    try {
-      const res = await fetch("/api/cards/sentence-refresh-preference", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ interval }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.detail || "保存失败");
-      if (status) status.textContent = "已保存";
-    } catch (err) {
-      if (status) status.textContent = err.message || "保存失败";
-    }
-  }
-
-  async function refreshSentencesNow() {
-    const status = document.getElementById("real-sentence-refresh-status");
-    const button = document.getElementById("real-sentence-refresh-now");
-    if (button) button.disabled = true;
-    try {
-      const res = await fetch("/api/cards/refresh-sentences", { method: "POST" });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.detail || "刷新失败");
-      if (status) status.textContent = "已换 " + (data.updated || 0) + " 张";
-      loadRealBrowser();
-    } catch (err) {
-      if (status) status.textContent = err.message || "刷新失败";
-    } finally {
-      if (button) button.disabled = false;
-    }
-  }
-
-  const realSentenceRefreshSave = document.getElementById("real-sentence-refresh-save");
-  if (realSentenceRefreshSave) {
-    realSentenceRefreshSave.onclick = saveSentenceRefreshPreference;
-  }
-  const realSentenceRefreshNow = document.getElementById("real-sentence-refresh-now");
-  if (realSentenceRefreshNow) {
-    realSentenceRefreshNow.onclick = refreshSentencesNow;
-  }
-
   const realBrowserResults = document.getElementById("real-browser-results");
   if (realBrowserResults) {
     realBrowserResults.addEventListener("click", async (e) => {
-      const refreshSentence = e.target.closest("[data-real-refresh-sentence]");
-      if (refreshSentence) {
-        try {
-          const res = await fetch("/api/cards/" + refreshSentence.dataset.realRefreshSentence + "/refresh-sentence", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-          });
-          const data = await res.json().catch(() => ({}));
-          if (!res.ok) throw new Error(data.detail || "换句失败");
-          loadRealBrowser();
-        } catch (err) {
-          realBrowserResults.innerHTML = '<div class="empty-state">' + escapeHtml(err.message) + "</div>";
-        }
-        return;
-      }
       const del = e.target.closest("[data-real-delete-card]");
       if (!del) return;
       if (!confirm("确定删除这张卡？" + (del.dataset.realDeleteWord ? "（" + del.dataset.realDeleteWord + "）" : ""))) return;
@@ -3727,9 +3633,6 @@
       }
       const area = document.querySelector(".manage-area");
       if (area) area.scrollIntoView({ behavior: "smooth", block: "start" });
-      if (id === "real-card-browser" && typeof loadSentenceRefreshPreference === "function") {
-        loadSentenceRefreshPreference();
-      }
     };
     buttons.forEach((button) => {
       button.addEventListener("click", () => showPanel(button.dataset.managePanel));
