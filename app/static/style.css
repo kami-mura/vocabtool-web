@@ -393,6 +393,11 @@ button.landing-login-btn { border: none; cursor: pointer; }
   box-shadow: 0 18px 40px rgba(0, 122, 255, .38);
 }
 .landing-hero h1 { margin: 0; font-size: 40px; letter-spacing: -.04em; }
+/* 登录用户直接进入学习态：收起营销标题与 Logo，只保留搜索框。 */
+body[data-logged-in="true"] .landing-hero .logo,
+body[data-logged-in="true"] .landing-hero h1 { display: none; }
+body[data-logged-in="true"] .landing-hero { padding: 18px 0 12px; }
+body[data-logged-in="true"] .landing-search { margin-top: 0; }
 .landing-search {
   display: flex;
   align-items: center;
