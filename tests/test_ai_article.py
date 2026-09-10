@@ -1,6 +1,7 @@
 """AI 文章生成功能测试：学习完成门槛、单词范围筛选、高亮与 prompt。"""
 
 import datetime as dt
+import re
 
 import pytest
 
@@ -572,8 +573,8 @@ def test_article_keeps_only_latest_with_naming_rule(client, monkeypatch):
     )
     _first, data = _start_article_for_test(client)
     assert data["corpus_id"] is not None
-    assert data["book_title"].startswith("8.")
-    assert data["book_title"].endswith("-test article")
+    # 标题是「月.日-小写章标题」，按学习日动态生成，不能写死月份。
+    assert re.fullmatch(r"\d{1,2}\.\d{1,2}-test article", data["book_title"])
 
     _second, second_article = _start_article_for_test(client)
     assert second_article["book_title"].endswith("-test article")

@@ -180,59 +180,7 @@
           <button id="today-overview-start" class="primary" type="button">开始今日学习</button>
           <button id="today-overview-add" type="button">制作新卡</button>
           <button id="today-overview-article" type="button">读今日短文</button>
-          <button id="today-overview-poster" type="button">生成打卡海报</button>
           <button id="today-overview-extra" type="button" hidden>继续学习</button>
-        </div>
-      </div>
-    </section>
-
-    <section class="landing-section study-heatmap" id="study-heatmap"{% if not logged_in %} hidden{% endif %}>
-      <div class="study-heatmap-card">
-        <div class="study-heatmap-head">
-          <div class="study-heatmap-title-wrap">
-            <div class="study-heatmap-title-row">
-              <span class="study-heatmap-icon" aria-hidden="true">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                  <line x1="16" y1="2" x2="16" y2="6"></line>
-                  <line x1="8" y1="2" x2="8" y2="6"></line>
-                  <line x1="3" y1="10" x2="21" y2="10"></line>
-                </svg>
-              </span>
-              <h2>学习热力图</h2>
-            </div>
-            <p class="study-heatmap-summary" id="study-heatmap-summary">–</p>
-          </div>
-          <div class="study-heatmap-stats" id="study-heatmap-stats"></div>
-        </div>
-        <div class="study-heatmap-scroll" id="study-heatmap-scroll">
-          <div class="study-heatmap-wrap">
-            <div class="study-heatmap-months" id="study-heatmap-months"></div>
-            <div class="study-heatmap-body">
-              <div class="study-heatmap-weekdays" aria-hidden="true">
-                <span>一</span>
-                <span></span>
-                <span>三</span>
-                <span></span>
-                <span>五</span>
-                <span></span>
-                <span>日</span>
-              </div>
-              <div class="study-heatmap-grid" id="study-heatmap-grid"></div>
-            </div>
-          </div>
-        </div>
-        <div class="study-heatmap-foot">
-          <div class="study-heatmap-legend" id="study-heatmap-legend" aria-hidden="true">
-            <span class="hm-legend-label">少</span>
-            <i class="hm-swatch" data-level="0" title="0 张卡"></i>
-            <i class="hm-swatch lv-1" data-level="1" title="1-4 张卡"></i>
-            <i class="hm-swatch lv-2" data-level="2" title="5-9 张卡"></i>
-            <i class="hm-swatch lv-3" data-level="3" title="10-19 张卡"></i>
-            <i class="hm-swatch lv-4" data-level="4" title="20+ 张卡"></i>
-            <span class="hm-legend-label">多</span>
-          </div>
-          <span class="study-heatmap-hint">点按或悬停格子查看当天明细</span>
         </div>
       </div>
     </section>
@@ -433,7 +381,6 @@
                   <div id="real-needs-list" class="speaking-needs-list"></div>
                 </div>
                 <div id="real-card-ngsl-filter-row" class="ngsl-fields-row">
-                  <label class="check-row"><input id="real-card-exclude-easy" type="checkbox" checked> 过滤 Easy（已掌握）</label>
                   <label class="check-row"><input id="real-card-ngsl-filter" type="checkbox"> 按 NGSL 排名范围筛选</label>
                   <div id="real-card-ngsl-filter-fields" hidden>
                     <label>NGSL 排名 <input id="real-card-rank-from" type="number" min="1" max="31000" value="1"> - <input id="real-card-rank-to" type="number" min="1" max="31000" value="31000"></label>
@@ -534,31 +481,6 @@
       </div>
       <p id="vocabulary-test-status" class="hint" role="status" aria-live="polite"></p>
     </section>
-  </div>
-  <div id="study-poster-modal" class="study-poster-modal" role="dialog" aria-modal="true" aria-labelledby="study-poster-title" hidden>
-    <div class="study-poster-dialog">
-      <div class="study-poster-header">
-        <h3 id="study-poster-title">学习打卡海报</h3>
-        <button id="study-poster-close" class="study-poster-close" type="button" aria-label="关闭">×</button>
-      </div>
-      <div class="study-poster-body">
-        <div class="study-poster-preview-wrap">
-          <canvas id="study-poster-canvas" width="1080" height="1920" hidden></canvas>
-          <img id="study-poster-img" class="study-poster-img" alt="学习打卡海报">
-        </div>
-        <div class="study-poster-sidebar">
-          <div class="study-poster-actions">
-            <button id="study-poster-refresh-quote" class="ghost" type="button">🎲 换一句格言</button>
-            <button id="study-poster-switch-theme" class="ghost" type="button">🎨 切换色彩主题</button>
-            <button id="study-poster-switch-pattern" class="ghost" type="button">🖼️ 切换背景图案</button>
-            <button id="study-poster-download" class="primary" type="button">📥 保存高清海报</button>
-            <button id="study-poster-copy" class="ghost" type="button">📋 复制图片</button>
-          </div>
-          <p id="study-poster-status" class="hint" role="status" aria-live="polite"></p>
-          <p class="hint study-poster-mobile-hint">📱 手机端可长按海报图片直接保存或发送给好友</p>
-        </div>
-      </div>
-    </div>
   </div>
   {% endif %}
   <script src="{{ static_url('theme-sync.js') }}"></script>

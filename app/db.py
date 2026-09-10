@@ -1055,6 +1055,30 @@ def _migrate_saved_word_status() -> None:
             )
 
 
+def _migrate_drop_word_status_columns() -> None:
+    """移除单词三态状态的两个遗留列。
+
+    - `saved_words.status`（easy/mid/hard）：生词库不再保存掌握状态，
+      「是否已制卡」由 cards 表派生（见 api_support._words_with_cards）。
+    - `review_logs.previous_word_status`：撤销评分时用于回写词库状态，
+      状态概念移除后该列恒为空串且无人读取。
+
+    两个列都不参与索引与约束。列不存在时跳过，新库与重复执行都安全。
+    本迁移不改动任何行数据（DROP COLUMN 只重建表结构），不触碰卡片与
+    复习记录的字段值。依赖 SQLite 3.35+（2021-03 起）的 DROP COLUMN。
+    """
+    for table in ("saved_words", "review_logs"):
+        inspector = inspect(engine)
+        if table not in inspector.get_table_names():
+            continue
+        existing = {column["name"] for column in inspector.get_columns(table)}
+        column = "status" if table == "saved_words" else "previous_word_status"
+        if column not in existing:
+            continue
+        with engine.begin() as connection:
+            connection.execute(text(f"ALTER TABLE {table} DROP COLUMN {column}"))
+
+
 def _migrate_saved_words() -> None:
     """把旧 Hard 无卡词迁入生词库，并移除 Easy/Mid/Hard 分类表。"""
     inspector = inspect(engine)
@@ -1211,6 +1235,7 @@ _SCHEMA_MIGRATIONS: list[tuple[str, Callable[[], None]]] = [
     ("028_user_api_credentials_free_quota", _migrate_user_api_credentials_and_free_quota),
     ("029_free_article_quota", _migrate_free_article_quota),
     ("030_clean_card_back_mnemonic", _migrate_clean_card_back_mnemonic),
+    ("031_drop_word_status_columns", _migrate_drop_word_status_columns),
 ]
 
 

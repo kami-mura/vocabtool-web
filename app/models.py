@@ -291,7 +291,10 @@ class CorpusChapter(Base):
 
 
 class SavedWord(Base):
-    """用户词库中的单词：三态 easy/mid/hard（mid=已制卡，自动维护）。"""
+    """生词库中的单词：只有「在库里 / 不在库里」，不保存任何掌握状态。
+
+    「是否已制卡」由 cards 表派生（见 _words_with_cards），不再冗余存储。
+    """
 
     __tablename__ = "saved_words"
     __table_args__ = (
@@ -303,7 +306,6 @@ class SavedWord(Base):
         Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
     )
     word = Column(String(100), index=True, nullable=False)
-    status = Column(String(20), default="hard", nullable=False)  # easy/mid/hard
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
 
@@ -370,7 +372,6 @@ class ReviewLog(Base):
     previous_due_at = Column(DateTime, nullable=True)
     previous_reps = Column(Integer, default=0)
     previous_lapses = Column(Integer, default=0)
-    previous_word_status = Column(String(20), default="")
     session_pending = Column(Boolean, default=False, nullable=False)
     session_correct_streak = Column(Integer, default=0, nullable=False)
     previous_session_pending = Column(Boolean, default=False, nullable=False)

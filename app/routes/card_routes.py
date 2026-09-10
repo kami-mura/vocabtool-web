@@ -34,8 +34,8 @@ from ..api_support import (
     _decode_upload_body,
     _ensure_daily_new_assignments,
     _learning_day,
-    _mark_saved_word_mid,
     _read_limited_body,
+    _record_word_in_library,
     _release_heavy_import_slot,
     _require_storage_space,
     _require_user,
@@ -264,21 +264,6 @@ def _parse_expression_needs(text: str) -> list[str]:
     )
 
 
-def _exclude_easy_targets(
-    db: Session, user_id: int, candidates: list[tuple[str, int | None, int]]
-) -> list[tuple[str, int | None, int]]:
-    easy_words = {
-        str(row[0] or "").strip().casefold()
-        for row in db.query(SavedWord.word).filter(
-            SavedWord.user_id == user_id,
-            SavedWord.status == "easy",
-        )
-    }
-    return [
-        item for item in candidates if str(item[0] or "").strip().casefold() not in easy_words
-    ]
-
-
 @router.post("/card-studio/targets")
 def card_studio_targets(
     body: CardTargetsIn, request: Request, db: Session = Depends(get_db)
@@ -349,14 +334,25 @@ def card_studio_targets(
         ]
         candidates.sort(key=lambda item: item[1] or 999_999)
     elif body.source == "saved":
-        # 只提取生词库中的 hard 词：mid=已制卡、easy=已掌握，都不应重复提取
+        # 生词库里尚未制卡的词；「已制卡」由 cards 表派生，不再是词库的状态。
+        card_words = {
+            str(row[0] or "").split(" [", 1)[0]
+            for row in db.query(Card.word)
+            .filter(Card.user_id == user.id, Card.card_type != "speaking")
+            .distinct()
+            .all()
+        }
         rows = (
             db.query(SavedWord)
-            .filter(SavedWord.user_id == user.id, SavedWord.status == "hard")
+            .filter(SavedWord.user_id == user.id)
             .order_by(SavedWord.updated_at.desc())
             .all()
         )
-        candidates = [(row.word, vocab.rank_of(row.word), 0) for row in rows]
+        candidates = [
+            (row.word, vocab.rank_of(row.word), 0)
+            for row in rows
+            if row.word not in card_words
+        ]
     elif body.source == "expressions":
         # 口语表达需求列表：每行一个中文需求。口语卡的 word 是 need-id、
         # front 才是需求原文，去重时与同类型卡的 front 比对。
@@ -385,8 +381,6 @@ def card_studio_targets(
             if item[1] is not None and body.from_rank <= item[1] <= body.to_rank
         ]
         candidates.sort(key=lambda item: item[1] or 999_999)
-    if body.exclude_easy and body.source != "expressions":
-        candidates = _exclude_easy_targets(db, user.id, candidates)
     if body.randomize:
         random.shuffle(candidates)
     words = [item[0] for item in candidates]
@@ -444,7 +438,6 @@ async def card_studio_targets_file(
     to_rank: int = 31_000,
     count: int = 100,
     include_unknown: bool = True,
-    exclude_easy: bool = True,
     card_type: str = "reading",
     db: Session = Depends(get_db),
 ):
@@ -495,8 +488,6 @@ async def card_studio_targets_file(
     candidates.sort(
         key=lambda item: (item[1] is None, item[1] or 999_999, -item[2])
     )
-    if exclude_easy:
-        candidates = _exclude_easy_targets(db, user.id, candidates)
     candidates = candidates[:count]
     words = [item[0] for item in candidates]
     card_words = _words_with_cards(db, user.id, words)
@@ -883,7 +874,7 @@ def create_cards_from_studio(
             )
             card_words = _words_with_cards(db, user.id, selected)
             for word in card_words:
-                _mark_saved_word_mid(db, user.id, word)
+                _record_word_in_library(db, user.id, word)
             db.commit()
             db_write_seconds = round(time.time() - db_write_started, 1)
             result = _with_limit_notice({
@@ -978,7 +969,7 @@ def create_cards_from_studio(
             if base_word in existing_words:
                 existing_count += 1
                 existing_word_list.append(base_word)
-                _mark_saved_word_mid(db, user.id, base_word)
+                _record_word_in_library(db, user.id, base_word)
                 continue
             content = generated.get(ai_word) or generated.get(base_word)
             if not content or not str(content.get("m") or "").strip():
@@ -1078,7 +1069,7 @@ def create_cards_from_studio(
         created_word_list = [item["word"] for item in prepared_cards]
         for item in prepared_cards:
             db.add(_new_card(item))
-            _mark_saved_word_mid(db, user.id, item["word"])
+            _record_word_in_library(db, user.id, item["word"])
         try:
             db.commit()
         except IntegrityError:
@@ -1107,7 +1098,7 @@ def create_cards_from_studio(
                         continue
                     seen_again.add(item["word"])
                     db.add(_new_card(item))
-                    _mark_saved_word_mid(db, user.id, item["word"])
+                    _record_word_in_library(db, user.id, item["word"])
                     created_word_list.append(item["word"])
                     created_now += 1
             db.commit()
@@ -1489,26 +1480,6 @@ def delete_card(card_id: int, request: Request, db: Session = Depends(get_db)):
     ).delete(synchronize_session=False)
     db.delete(card)
     db.flush()
-    # 删卡后该词已无任何单词卡：mid（已制卡）派生状态失效，恢复为 hard。
-    if card.card_type != "speaking":
-        still_has_card = (
-            db.query(Card.id)
-            .filter(
-                Card.user_id == user.id,
-                Card.word == word,
-                Card.card_type != "speaking",
-            )
-            .first()
-        )
-        if not still_has_card:
-            saved_row = (
-                db.query(SavedWord)
-                .filter(SavedWord.user_id == user.id, SavedWord.word == word)
-                .first()
-            )
-            if saved_row and saved_row.status == "mid":
-                saved_row.status = "hard"
-                saved_row.updated_at = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
     db.commit()
     return {"ok": True, "word": word, "card_type": card.card_type}
 
@@ -1622,44 +1593,8 @@ def delete_cards_batch(
     if not card_ids and not words:
         raise HTTPException(status_code=400, detail="没有可删除的单词")
 
-    # 删卡后该词已无任何单词卡：mid（已制卡）派生状态失效，恢复为 hard。
-    for word in words:
-        if db.query(Card.id).filter(
-            Card.user_id == user.id,
-            Card.word == word,
-            Card.card_type != "speaking",
-        ).first():
-            continue
-        row = (
-            db.query(SavedWord)
-            .filter(SavedWord.user_id == user.id, SavedWord.word == word)
-            .first()
-        )
-        if row and row.status == "mid":
-            row.status = "hard"
-            row.updated_at = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
-    if card_ids:
-        remaining_words = {
-            str(row[0] or "").split(" [", 1)[0]
-            for row in db.query(Card.word)
-            .filter(
-                Card.user_id == user.id,
-                Card.card_type != "speaking",
-            )
-            .all()
-        }
-        for row in (
-            db.query(SavedWord)
-            .filter(
-                SavedWord.user_id == user.id,
-                SavedWord.status == "mid",
-                SavedWord.word.notin_(remaining_words),
-            )
-            .all()
-        ):
-            row.status = "hard"
-            row.updated_at = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
-
+    # 删卡后该词会自动重新出现在生词库里：是否已制卡由 cards 表派生，
+    # 不再需要把状态从 mid 回写成 hard。
     db.commit()
     return {"ok": True, "deleted": deleted, "words": len(words)}
 
@@ -2015,7 +1950,6 @@ def _apply_review_and_build_log(
         previous_due_at=previous_due_at,
         previous_reps=previous_reps,
         previous_lapses=previous_lapses,
-        previous_word_status="",
         session_pending=session_pending,
         session_correct_streak=session_correct_streak,
         previous_session_pending=previous_learning_step > 0,

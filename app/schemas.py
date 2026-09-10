@@ -59,7 +59,6 @@ class CardTargetsIn(BaseModel):
     randomize: bool = False
     include_unknown: bool = False
     ngsl_filter: bool = False
-    exclude_easy: bool = True
     card_type: str = "reading"
 
 
@@ -99,12 +98,6 @@ class SentenceRefreshPreferenceIn(BaseModel):
 
 class WordBatchDeleteIn(BaseModel):
     words: list[str] = Field(default=[], max_length=2000)
-
-
-class WordBatchStatusIn(BaseModel):
-    words: list[str] = Field(default=[], max_length=5000)
-    status: str = Field(pattern="^(easy|mid|hard)$")
-    preview: bool = False
 
 
 class LookupIn(BaseModel):

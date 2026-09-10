@@ -10,12 +10,16 @@ from tests.conftest import register
 def test_word_library_starts_empty_and_old_classification_api_is_removed(client):
     register(client, "rank@example.com")
     library = client.get("/api/words").json()
-    assert library == {"words": [], "count": 0, "query": "", "status": "all"}
+    assert library == {"words": [], "count": 0, "query": ""}
     assert client.post(
         "/api/words/the/status", json={"status": "unknown"}
     ).status_code == 404
     assert client.post(
         "/api/words/import-known", json={"text": "quasar"}
+    ).status_code == 405
+    # 三态标记接口已随状态概念一并移除（路径被 /words/{word} 占用，方法不允许）。
+    assert client.post(
+        "/api/words/batch-status", json={"words": ["quasar"], "status": "easy"}
     ).status_code == 405
 
 
@@ -239,144 +243,55 @@ def test_saved_words_can_be_searched_and_batch_removed(client):
     assert payload == {"ok": True, "deleted": 2}
 
 
-def test_word_three_state_default_hard_and_batch_mark_easy(client):
-    register(client, "three-state@example.com")
-    for word in ("quasar", "nebula", "alpha"):
-        lookup = client.post("/api/lookups", json={"text": word}).json()["lookup"]
-        assert client.post(f"/api/lookups/{lookup['id']}/save").status_code == 200
-    words = client.get("/api/words").json()["words"]
-    statuses = {item["word"]: item["status"] for item in words}
-    assert statuses == {"quasar": "hard", "nebula": "hard", "alpha": "hard"}
-
-    # 批量标记 Easy：已是 hard 的词不降级（优先级 mid > hard > easy）
-    marked = client.post(
-        "/api/words/batch-status",
-        json={"words": ["quasar", "nebula"], "status": "easy"},
-    )
-    assert marked.status_code == 200
-    assert marked.json()["updated"] == 0
-    words = client.get("/api/words").json()["words"]
-    statuses = {item["word"]: item["status"] for item in words}
-    assert statuses["quasar"] == "hard"
-    assert statuses["nebula"] == "hard"
-    assert statuses["alpha"] == "hard"
-
-    # 未入库的新词可以被批量标记为 easy
-    marked = client.post(
-        "/api/words/batch-status",
-        json={"words": ["beta", "gamma"], "status": "easy"},
-    )
-    assert marked.status_code == 200
-    assert marked.json()["updated"] == 2
-    words = client.get("/api/words").json()["words"]
-    statuses = {item["word"]: item["status"] for item in words}
-    assert statuses["beta"] == "easy"
-    assert statuses["gamma"] == "easy"
-    assert statuses["quasar"] == "hard"
-
-    easy = client.get("/api/words", params={"status": "easy"}).json()
-    assert easy["count"] == 2
-    assert {item["word"] for item in easy["words"]} == {"beta", "gamma"}
-    hard = client.get("/api/words", params={"status": "hard"}).json()
-    assert hard["count"] == 3
-    assert {item["word"] for item in hard["words"]} == {"quasar", "nebula", "alpha"}
-    assert client.get("/api/words", params={"status": "nope"}).status_code == 400
-
-
-def test_word_mid_is_derived_from_cards_and_not_manually_settable(client):
-    register(client, "mid-derived@example.com")
+def test_saved_words_have_no_status_field(client):
+    """生词库只记录词本身：响应不再暴露 easy/mid/hard 状态。"""
+    register(client, "no-status@example.com")
     for word in ("quasar", "nebula"):
         lookup = client.post("/api/lookups", json={"text": word}).json()["lookup"]
         assert client.post(f"/api/lookups/{lookup['id']}/save").status_code == 200
-    assert client.post(
-        "/api/words/batch-status",
-        json={"words": ["quasar"], "status": "mid"},
-    ).status_code == 400
-
-    from app.models import Card, User
-    db = SessionLocal()
-    try:
-        user_id = db.query(User.id).filter(User.email == "mid-derived@example.com").one()[0]
-        db.add(
-            Card(
-                user_id=user_id,
-                word="quasar",
-                card_type="general",
-                front="quasar",
-                back="quasar",
-            )
-        )
-        db.commit()
-    finally:
-        db.close()
-
-    words = client.get("/api/words").json()["words"]
-    statuses = {item["word"]: item["status"] for item in words}
-    assert statuses["quasar"] == "mid"
-    assert statuses["nebula"] == "hard"
-    mid = client.get("/api/words", params={"status": "mid"}).json()
-    assert mid["count"] == 1
-    assert mid["words"][0]["word"] == "quasar"
-
-    # 已制卡（mid）词在批量标记 Easy 时保持 mid，不会被降级
-    marked = client.post(
-        "/api/words/batch-status",
-        json={"words": ["quasar"], "status": "easy"},
-    )
-    assert marked.status_code == 200
-    assert marked.json()["updated"] == 0
-    words = client.get("/api/words").json()["words"]
-    statuses = {item["word"]: item["status"] for item in words}
-    assert statuses["quasar"] == "mid"
-
-    # 一个单词只属于一个状态：quasar 是 mid 时不出现在 easy/hard 筛选中
-    easy = client.get("/api/words", params={"status": "easy"}).json()
-    assert "quasar" not in {item["word"] for item in easy["words"]}
-    hard = client.get("/api/words", params={"status": "hard"}).json()
-    assert "quasar" not in {item["word"] for item in hard["words"]}
+    payload = client.get("/api/words").json()
+    assert payload["count"] == 2
+    assert {item["word"] for item in payload["words"]} == {"quasar", "nebula"}
+    for item in payload["words"]:
+        assert "status" not in item
+        assert "mid" not in item
 
 
-def test_batch_mark_easy_count_excludes_already_easy(client):
-    """批量标记 Easy 的个数不包含已 Easy 的词；preview 模式只算不写。"""
-    register(client, "batch-easy-count@example.com")
-    for word in ("alpha", "beta"):
+def test_library_view_is_derived_from_cards(client):
+    """「已制卡」由 cards 表派生：制卡后词离开生词库视图，删卡后自动回来。"""
+    register(client, "library-derived@example.com")
+    for word in ("quasar", "nebula"):
         lookup = client.post("/api/lookups", json={"text": word}).json()["lookup"]
         assert client.post(f"/api/lookups/{lookup['id']}/save").status_code == 200
 
-    # 已入库的新词标记为 easy
-    first = client.post(
-        "/api/words/batch-status",
-        json={"words": ["gamma", "delta"], "status": "easy"},
-    )
-    assert first.json()["updated"] == 2
+    from app.models import User
 
-    # 混合：gamma/delta 已 easy 跳过、alpha/beta 是 hard 不降级、epsilon 新词标记
-    again = client.post(
-        "/api/words/batch-status",
-        json={"words": ["alpha", "gamma", "delta", "epsilon"], "status": "easy"},
-    )
-    body = again.json()
-    assert body["updated"] == 1
-    assert body["skipped_existing"] == 2
-    assert body["skipped_higher"] == 1
+    db = SessionLocal()
+    try:
+        user_id = (
+            db.query(User.id)
+            .filter(User.email == "library-derived@example.com")
+            .one()[0]
+        )
+        card = Card(
+            user_id=user_id,
+            word="quasar",
+            card_type="general",
+            front="quasar",
+            back="quasar",
+        )
+        db.add(card)
+        db.commit()
+        card_id = card.id
+    finally:
+        db.close()
 
-    # preview 不写库：zeta 会被算进 updated，但不会真的入库
-    preview = client.post(
-        "/api/words/batch-status",
-        json={
-            "words": ["gamma", "zeta"],
-            "status": "easy",
-            "preview": True,
-        },
-    )
-    pbody = preview.json()
-    assert pbody["updated"] == 1
-    assert pbody["skipped_existing"] == 1
-    assert pbody["preview"] is True
-    easy = client.get("/api/words", params={"status": "easy"}).json()
-    assert easy["count"] == 3
-    assert {item["word"] for item in easy["words"]} == {
-        "gamma",
-        "delta",
-        "epsilon",
-    }
+    library = client.get("/api/words").json()
+    assert library["count"] == 1
+    assert {item["word"] for item in library["words"]} == {"nebula"}
+
+    # 删卡后该词重新出现；不再需要把状态从 mid 回写成 hard。
+    assert client.delete(f"/api/cards/{card_id}").status_code == 200
+    library = client.get("/api/words").json()
+    assert library["count"] == 2
+    assert {item["word"] for item in library["words"]} == {"quasar", "nebula"}

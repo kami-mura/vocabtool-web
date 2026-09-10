@@ -488,24 +488,21 @@ def _words_with_cards(
     return result
 
 
-def _mark_saved_word_mid(db: Session, user_id: int, word: str) -> int:
-    """制卡成功后把词保留在词库并标记为 mid；卡片和复习记录不受影响。"""
+def _record_word_in_library(db: Session, user_id: int, word: str) -> int:
+    """制卡成功后把词登记进生词库；卡片和复习记录不受影响。
+
+    生词库只记录「用户见过这个词」；是否已制卡由 cards 表派生，
+    因此删卡后该词会自动重新出现在生词库里，无需回写任何状态。
+    """
     row = (
         db.query(SavedWord)
         .filter(SavedWord.user_id == user_id, SavedWord.word == word)
         .first()
     )
     if row:
-        row.status = "mid"
         row.updated_at = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
         return 0
-    db.add(
-        SavedWord(
-            user_id=user_id,
-            word=word,
-            status="mid",
-        )
-    )
+    db.add(SavedWord(user_id=user_id, word=word))
     return 1
 
 
@@ -968,7 +965,7 @@ __all__ = [
     "_review_preference",
     "_sentence_refresh_due",
     "_set_auth_cookie",
-    "_mark_saved_word_mid",
+    "_record_word_in_library",
     "_sum_storage_bytes",
     "_text_bytes",
     "_today_stats",

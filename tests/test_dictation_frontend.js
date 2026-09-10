@@ -38,21 +38,7 @@ assert.ok(source.includes("dictation-user-tag"), "包含用户输入对比tag");
 assert.ok(source.includes("dictation-sentence-wrap"), "包含阅读卡风格例句");
 assert.ok(!source.includes("dictation-sentence-row"), "例句不再单独有框");
 
-// 6. 海报使用 VocabTool 品牌，包含日间文言格言与4项核心打卡数据
-assert.ok(source.includes('ctx.fillText("VocabTool"'), "海报品牌名使用 VocabTool");
-assert.ok(source.includes("VocabTool-打卡海报-"), "海报下载文件名为 VocabTool");
-assert.ok(source.includes("REAL_FAMOUS_QUOTES"), "海报使用真实名人格言库");
-assert.ok(source.includes("getRandomPosterQuote"), "海报随机抽取名言");
-assert.ok(source.includes("学而时习之，不亦说乎？"), "包含孔子论语文言文原句");
-assert.ok(source.includes("温故而知新，可以为师矣。"), "包含温故而知新原文");
-assert.ok(source.includes("splitEnglishIntoLines"), "包含英文自适应折行防溢出引擎");
-assert.ok(source.includes("splitCjkIntoLines"), "包含中文自适应折行防溢出引擎");
-assert.ok(source.includes("drawLogoV"), "包含经典V字品牌Logo");
-assert.ok(source.includes("POSTER_COLOR_THEMES"), "包含多套色彩主题库");
-assert.ok(source.includes("POSTER_PATTERNS"), "包含多套艺术图案库");
-assert.ok(source.includes("study-poster-switch-theme"), "包含单独切换色彩主题按钮");
-assert.ok(source.includes("study-poster-switch-pattern"), "包含单独切换背景图案按钮");
+// 6. 困难按钮支持 previewLabel 动态计算
 assert.ok(source.includes('previewLabel("hard", "现在")'), "困难 按钮支持 previewLabel 动态计算");
-assert.ok(!source.includes("recent112"), "海报不再绘制热力图");
 
 console.log("dictation frontend checks passed");

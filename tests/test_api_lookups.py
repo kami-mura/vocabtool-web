@@ -290,8 +290,8 @@ def test_builtin_ngsl_lookup_skips_deepseek_and_reports_speed(client, monkeypatc
     assert data["lookup"]["card_front"] == "She runs every morning before work."
     assert data["lookup"]["has_card"] is False
     assert data["lookup"]["saved"] is False
-    assert data["lookup"]["easy"] is False
-    assert data["lookup"]["word_status"] is None
+    assert "easy" not in data["lookup"]
+    assert "word_status" not in data["lookup"]
     assert client.get("/api/words", params={"q": "run"}).json()["words"] == []
     history_count = len(client.get("/api/lookups").json()["lookups"])
     saved = client.post(f"/api/lookups/{data['lookup']['id']}/save")
@@ -302,8 +302,8 @@ def test_builtin_ngsl_lookup_skips_deepseek_and_reports_speed(client, monkeypatc
     assert reopened.status_code == 200
     assert reopened.json()["lookup_source"] == "history"
     assert reopened.json()["lookup"]["saved"] is True
-    assert reopened.json()["lookup"]["easy"] is False
-    assert reopened.json()["lookup"]["word_status"] == "hard"
+    assert "word_status" not in reopened.json()["lookup"]
+    assert "easy" not in reopened.json()["lookup"]
     assert len(client.get("/api/lookups").json()["lookups"]) == history_count
 
     # 查词结果不再提供制卡入口（查词只能加入生词库），卡片只能从制卡向导创建。
@@ -316,13 +316,10 @@ def test_builtin_ngsl_lookup_skips_deepseek_and_reports_speed(client, monkeypatc
     reopened = client.post(f"/api/lookups/{data['lookup']['id']}/reopen")
     assert reopened.json()["lookup"]["has_card"] is True
     assert reopened.json()["lookup"]["saved"] is False
-    assert reopened.json()["lookup"]["easy"] is False
-    assert reopened.json()["lookup"]["word_status"] == "mid"
     cannot_save = client.post(f"/api/lookups/{data['lookup']['id']}/save")
     assert cannot_save.status_code == 409
-    # 制卡后词保留在词库并显示为 mid（已制卡）
-    words = client.get("/api/words", params={"q": "run"}).json()["words"]
-    assert words and words[0]["status"] == "mid"
+    # 已制卡由 cards 表派生：该词不再出现在生词库视图里
+    assert client.get("/api/words", params={"q": "run"}).json()["words"] == []
 
     info = client.get("/api/lookups/builtin-info")
     assert info.status_code == 200
@@ -330,31 +327,28 @@ def test_builtin_ngsl_lookup_skips_deepseek_and_reports_speed(client, monkeypatc
     assert "run" in info.json()["sample_terms"]
 
 
-def test_easy_lookup_can_be_added_to_saved_words(client):
-    register(client, "easy-lookup-save@example.com")
-    marked = client.post(
-        "/api/words/batch-status",
-        json={"words": ["run"], "status": "easy"},
-    )
-    assert marked.status_code == 200
-    assert marked.json()["updated"] == 1
-
+def test_saved_lookup_add_is_idempotent_and_has_no_status(client):
+    """查词结果加入生词库：重复保存幂等，且响应不再带 easy/mid/hard 状态。"""
+    register(client, "lookup-save-idempotent@example.com")
     lookup = client.post("/api/lookups", json={"text": "run"}).json()["lookup"]
     assert lookup["has_card"] is False
-    assert lookup["saved"] is True  # Easy 词已在生词库
-    assert lookup["easy"] is True
-    assert lookup["word_status"] == "easy"
+    assert lookup["saved"] is False
+    assert "easy" not in lookup
+    assert "word_status" not in lookup
 
-    saved = client.post(f"/api/lookups/{lookup['id']}/save")
-    assert saved.status_code == 200
-    assert saved.json()["created"] is True
-    assert saved.json()["promoted_from_easy"] is True
+    first = client.post(f"/api/lookups/{lookup['id']}/save")
+    assert first.status_code == 200
+    assert first.json() == {"ok": True, "created": True, "word": "run"}
+
+    second = client.post(f"/api/lookups/{lookup['id']}/save")
+    assert second.status_code == 200
+    assert second.json() == {"ok": True, "created": False, "word": "run"}
 
     reopened = client.post(f"/api/lookups/{lookup['id']}/reopen").json()["lookup"]
     assert reopened["has_card"] is False
     assert reopened["saved"] is True
-    assert reopened["easy"] is False
-    assert reopened["word_status"] == "hard"
+    library = client.get("/api/words", params={"q": "run"}).json()["words"]
+    assert [item["word"] for item in library] == ["run"]
 
 
 def test_successful_deepseek_lookup_is_saved_and_reused_locally(client, monkeypatch):

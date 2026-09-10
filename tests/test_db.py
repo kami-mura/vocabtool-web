@@ -261,11 +261,21 @@ def test_old_sqlite_database_migrates_cleanly(monkeypatch, tmp_path):
         assert "026_anki_exchange" in versions
         assert "028_user_api_credentials_free_quota" in versions
         assert "029_free_article_quota" in versions
+        assert "031_drop_word_status_columns" in versions
         quota_columns = {
             row[1]
             for row in connection.execute("PRAGMA table_info(ai_free_daily_quota)")
         }
         assert "article_count" in quota_columns
+        # 单词三态状态已整体移除：两张表都不应再有状态列。
+        saved_word_columns = {
+            row[1] for row in connection.execute("PRAGMA table_info(saved_words)")
+        }
+        assert "status" not in saved_word_columns
+        review_log_columns = {
+            row[1] for row in connection.execute("PRAGMA table_info(review_logs)")
+        }
+        assert "previous_word_status" not in review_log_columns
     finally:
         connection.close()
 

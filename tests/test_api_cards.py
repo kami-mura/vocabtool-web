@@ -150,10 +150,8 @@ def test_studio_cards_preserve_user_case(client):
     card_words = sorted(item["word"] for item in queue)
     assert card_words == ["March", "march"]
 
-    # 制卡后词保留在词库并显示 mid（已制卡）
-    words = client.get("/api/words", params={"q": "march"}).json()["words"]
-    assert {item["word"] for item in words} == {"March", "march"}
-    assert all(item["status"] == "mid" for item in words)
+    # 已制卡由 cards 表派生：词已制卡，因此不再出现在生词库视图里。
+    assert client.get("/api/words", params={"q": "march"}).json()["words"] == []
     cards = client.get("/api/cards/browse", params={"q": "march"}).json()["cards"]
     assert {item["word"] for item in cards} == {"March", "march"}
 
@@ -357,9 +355,8 @@ def test_phrase_cards_appear_in_learning_cards_not_saved_words(client):
     )
     assert generated.status_code == 200
     assert generated.json()["created"] == 1
-    # 制卡后词保留在词库并显示为 mid（已制卡）
-    words = client.get("/api/words", params={"q": "mull it over"}).json()["words"]
-    assert words and words[0]["status"] == "mid"
+    # 已制卡由 cards 表派生：词仍登记在词库中，但不再出现在生词库视图里
+    assert client.get("/api/words", params={"q": "mull it over"}).json()["words"] == []
     cards = client.get("/api/cards/browse", params={"q": "mull it over"}).json()
     assert any(item["word"] == "mull it over" for item in cards["cards"])
 
@@ -455,18 +452,11 @@ def test_card_studio_pasted_text_and_saved_words_imports_all(client):
     assert len(saved.json()["words"]) == 3
 
 
-def test_card_studio_saved_source_excludes_easy_and_mid_words(client):
-    register(client, "studio-saved-no-easy@example.com")
-    for word in ("run", "set"):
+def test_card_studio_saved_source_excludes_words_with_cards(client):
+    register(client, "studio-saved-no-carded@example.com")
+    for word in ("run", "set", "point"):
         lookup = client.post("/api/lookups", json={"text": word}).json()["lookup"]
         assert client.post(f"/api/lookups/{lookup['id']}/save").status_code == 200
-    # point 通过批量标记面板标为 easy（词不在词库时直接创建 easy 行），
-    # set 制卡后为 mid（已制卡）：两者都不应被提取
-    marked = client.post(
-        "/api/words/batch-status", json={"words": ["point"], "status": "easy"}
-    )
-    assert marked.status_code == 200
-    assert marked.json()["updated"] == 1
     made = client.post(
         "/api/card-studio/cards",
         json={"words": ["set"], "card_type": "general"},
@@ -476,40 +466,29 @@ def test_card_studio_saved_source_excludes_easy_and_mid_words(client):
 
     saved = client.post(
         "/api/card-studio/targets",
-        json={"source": "saved", "count": 1, "card_type": "general"},
+        json={"source": "saved", "count": 10, "card_type": "general"},
     )
     assert saved.status_code == 200
     words = [item["word"] for item in saved.json()["words"]]
-    assert "point" not in words
+    # 只排除已制卡的词；不再有 easy/mid 状态参与筛选。
     assert "set" not in words
-    assert words == ["run"]
+    assert set(words) == {"run", "point"}
 
 
-def test_card_studio_targets_exclude_easy_by_default(client):
-    register(client, "studio-default-exclude-easy@example.com")
-    marked = client.post(
-        "/api/words/batch-status", json={"words": ["point"], "status": "easy"}
-    )
-    assert marked.status_code == 200
-
-    default_filtered = client.post(
-        "/api/card-studio/targets",
-        json={"source": "wordlist", "text": "point\nrun", "count": 10},
-    )
-    assert default_filtered.status_code == 200
-    assert [item["word"] for item in default_filtered.json()["words"]] == ["run"]
-
-    included = client.post(
+def test_card_studio_targets_ignore_legacy_exclude_easy_flag(client):
+    """Easy 过滤已随状态概念移除：旧前端仍可能携带 exclude_easy，服务端忽略它。"""
+    register(client, "studio-legacy-exclude-easy@example.com")
+    response = client.post(
         "/api/card-studio/targets",
         json={
             "source": "wordlist",
             "text": "point\nrun",
             "count": 10,
-            "exclude_easy": False,
+            "exclude_easy": True,
         },
     )
-    assert included.status_code == 200
-    assert [item["word"] for item in included.json()["words"]] == ["point", "run"]
+    assert response.status_code == 200
+    assert [item["word"] for item in response.json()["words"]] == ["point", "run"]
 
 
 def test_card_studio_wordlist_and_saved_sources_support_ngsl_filter(client):
@@ -1182,7 +1161,7 @@ def test_card_studio_batches_uncached_words_without_per_word_lookup(client, monk
     assert storage_checks[0] > 0
 
 
-def test_creating_card_marks_saved_word_mid_and_preserves_review_evidence(client):
+def test_creating_card_moves_word_out_of_library_and_preserves_review_evidence(client):
     register(client, "saved-to-card@example.com")
     lookup = client.post("/api/lookups", json={"text": "run"}).json()["lookup"]
     assert client.post(f"/api/lookups/{lookup['id']}/save").status_code == 200
@@ -1193,9 +1172,8 @@ def test_creating_card_marks_saved_word_mid_and_preserves_review_evidence(client
     )
     assert made.status_code == 200
     assert made.json()["created"] == 1
-    # 制卡后词保留在词库并标记为 mid
-    words = client.get("/api/words", params={"q": "run"}).json()["words"]
-    assert words and words[0]["status"] == "mid"
+    # 已制卡由 cards 表派生：该词离开生词库视图
+    assert client.get("/api/words", params={"q": "run"}).json()["words"] == []
     card = client.get("/api/cards").json()["new"][0]
     reviewed = client.post(
         f"/api/cards/{card['id']}/review",
@@ -1214,7 +1192,7 @@ def test_creating_card_marks_saved_word_mid_and_preserves_review_evidence(client
     finally:
         db.close()
 
-def test_delete_single_card_keeps_word_as_mid_until_last_card_gone(client):
+def test_delete_single_card_returns_word_to_library_after_last_card_gone(client):
     register(client, "delete-card@example.com")
     client.post(
         "/api/card-studio/cards",
@@ -1229,19 +1207,18 @@ def test_delete_single_card_keeps_word_as_mid_until_last_card_gone(client):
 
     first = client.delete(f"/api/cards/{cards[0]['id']}")
     assert first.status_code == 200
-    # 仍有另一张卡：仍算 mid
-    words = client.get("/api/words", params={"q": "run"}).json()["words"]
-    assert words and words[0]["status"] == "mid"
+    # 仍有另一张卡：词仍不算回到生词库
+    assert client.get("/api/words", params={"q": "run"}).json()["words"] == []
 
     second = client.delete(f"/api/cards/{cards[1]['id']}")
     assert second.status_code == 200
     assert client.get("/api/cards/browse", params={"q": "run"}).json()["total"] == 0
-    # 最后一张卡删除后：mid 失效，恢复为 hard
+    # 最后一张卡删除后：词自动回到生词库，不再需要状态回写
     words = client.get("/api/words", params={"q": "run"}).json()["words"]
-    assert words and words[0]["status"] == "hard"
+    assert [item["word"] for item in words] == ["run"]
 
 
-def test_batch_delete_learning_cards_downgrades_mid_to_hard(client):
+def test_batch_delete_learning_cards_returns_words_to_library(client):
     register(client, "batch-delete-mid@example.com")
     for word in ("run", "set", "point"):
         made = client.post(
@@ -1263,11 +1240,9 @@ def test_batch_delete_learning_cards_downgrades_mid_to_hard(client):
     assert all(card["word"] != "set" for card in set_cards)
     point_cards = client.get("/api/cards/browse", params={"q": "point"}).json()["cards"]
     assert any(card["word"] == "point" for card in point_cards)
-    words = client.get("/api/words").json()["words"]
-    statuses = {item["word"]: item["status"] for item in words}
-    assert statuses["run"] == "hard"
-    assert statuses["set"] == "hard"
-    assert statuses["point"] == "mid"
+    # 删卡的两个词回到生词库；仍持有卡片的 point 不在其中。
+    library = {item["word"] for item in client.get("/api/words").json()["words"]}
+    assert library == {"run", "set"}
 
 
 def test_batch_delete_cards_by_card_ids(client):
@@ -1322,7 +1297,7 @@ def test_batch_delete_matches_anki_label_suffix(client):
     assert client.get("/api/words", params={"q": "run"}).json()["words"] == []
 
 
-def test_batch_delete_card_downgrades_mid_to_hard(client):
+def test_batch_delete_card_returns_word_to_library(client):
     register(client, "batch-delete-card@example.com")
     client.post(
         "/api/card-studio/cards",
@@ -1332,7 +1307,7 @@ def test_batch_delete_card_downgrades_mid_to_hard(client):
     assert result.status_code == 200
     assert result.json()["deleted"] == 1
     words = client.get("/api/words", params={"q": "run"}).json()["words"]
-    assert words and words[0]["status"] == "hard"
+    assert [item["word"] for item in words] == ["run"]
 
 
 def test_card_batch_delete_does_not_remove_saved_word_without_card(client):

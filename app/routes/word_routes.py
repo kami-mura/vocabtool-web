@@ -15,7 +15,6 @@ from ..api_support import (
     WordEntry,
     _require_user,
     _vocabulary_profile,
-    _words_with_cards,
     ai_mod,
     check_request_rate,
     dt,
@@ -28,12 +27,10 @@ from ..schemas import (
     VocabularyProfileIn,
     VocabularyTestSubmitIn,
     WordBatchDeleteIn,
-    WordBatchStatusIn,
 )
 
 router = APIRouter()
 
-ALLOWED_WORD_STATUSES = {"easy", "mid", "hard"}
 VOCABULARY_TEST_LEVELS = tuple(range(1_000, 21_001, 1_000))
 VOCABULARY_TEST_BASE_LEVEL = 5_000
 VOCABULARY_TEST_WINDOW = 100
@@ -52,42 +49,33 @@ def list_words(
     request: Request,
     db: Session = Depends(get_db),
     q: str = "",
-    status: str = "all",
     limit: int = 120,
 ):
+    """生词库列表：本人加入的、尚未制卡的词。
+
+    「是否已制卡」由 cards 表派生（制卡后词暂离生词库，删卡后自动回来），
+    词库本身不保存任何掌握状态。
+    """
     user = _require_user(db, request)
     query = q.strip()
     query_lower = query.lower()
     limit = min(max(1, limit), 2000)
-    if status != "all" and status not in ALLOWED_WORD_STATUSES:
-        raise HTTPException(status_code=400, detail="无效状态")
 
-    saved_rows = db.query(SavedWord).filter(SavedWord.user_id == user.id).all()
-    saved_dict = {row.word: row for row in saved_rows}
-    all_card_words = {
+    card_words = {
         str(row[0] or "").split(" [", 1)[0]
         for row in db.query(Card.word)
         .filter(Card.user_id == user.id, Card.card_type != "speaking")
         .distinct()
         .all()
     }
-    all_words = set(saved_dict) | all_card_words
+    all_words = {
+        str(row[0] or "")
+        for row in db.query(SavedWord.word)
+        .filter(SavedWord.user_id == user.id)
+        .all()
+    } - card_words
     if query_lower:
         all_words = {word for word in all_words if query_lower in word.lower()}
-
-    # 兼容 status 筛选
-    if status == "mid":
-        all_words = all_words & all_card_words
-    elif status == "easy":
-        all_words = {
-            w for w in all_words
-            if w not in all_card_words and saved_dict.get(w) and saved_dict[w].status == "easy"
-        }
-    elif status == "hard":
-        all_words = {
-            w for w in all_words
-            if w not in all_card_words and (not saved_dict.get(w) or saved_dict[w].status != "easy")
-        }
 
     count = len(all_words)
     ordered = sorted(
@@ -105,16 +93,9 @@ def list_words(
     result = []
     for word in ordered:
         entry = entries.get(word)
-        is_mid = word in all_card_words
-        explicit = saved_dict.get(word)
-        effective = (
-            "mid" if is_mid else (explicit.status if explicit else "hard")
-        )
         result.append(
             {
                 "word": word,
-                "status": effective,
-                "mid": is_mid,
                 "rank": vocab.rank_of(word),
                 "pos": entry.pos if entry else "",
                 "en_def": entry.en_def if entry else "",
@@ -125,7 +106,6 @@ def list_words(
         "words": result,
         "count": count,
         "query": query,
-        "status": status,
     }
 
 
@@ -167,78 +147,6 @@ def delete_words_batch(
     ).delete(synchronize_session=False)
     db.commit()
     return {"ok": True, "deleted": deleted}
-
-
-@router.post("/words/batch-status")
-def update_words_batch_status(
-    body: WordBatchStatusIn, request: Request, db: Session = Depends(get_db)
-):
-    """批量标记词库单词状态；mid 为制卡派生状态，不接受手动标记。
-
-    优先级：mid > hard > easy。批量标记不会降级更高优先级的词：
-    已制卡（mid）与显式 hard 的词保持原状（计入 skipped_higher）；
-    已处于目标状态的词（如已 Easy）跳过不重复标记（计入 skipped_existing）。
-    preview=true 时不写库，只返回本次会实际更新的个数，用于前端先展示准确数字。
-    """
-    user = _require_user(db, request)
-    status = body.status.strip().lower()
-    if status not in ALLOWED_WORD_STATUSES:
-        raise HTTPException(status_code=400, detail="无效状态")
-    if status == "mid":
-        raise HTTPException(status_code=400, detail="mid 由制卡自动维护，不能手动标记")
-    normalized = sorted(
-        {
-            vocab.user_word_identity(word.strip())
-            for word in body.words
-            if word.strip()
-        }
-    )
-    if not normalized:
-        raise HTTPException(status_code=400, detail="没有可更新的单词")
-    now = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
-    priority = {"mid": 3, "hard": 2, "easy": 1}
-    target_priority = priority[status]
-    card_words = _words_with_cards(db, user.id, normalized)
-    existing = {
-        row.word: row
-        for row in db.query(SavedWord)
-        .filter(
-            SavedWord.user_id == user.id,
-            SavedWord.word.in_(normalized),
-        )
-        .all()
-    }
-    updated = 0
-    skipped_existing = 0
-    skipped_higher = 0
-    for word in normalized:
-        if word in card_words:
-            skipped_higher += 1  # 已制卡（mid）：最高优先级，不覆盖
-            continue
-        row = existing.get(word)
-        current_priority = priority.get(row.status, 0) if row else 0
-        if current_priority > target_priority:
-            skipped_higher += 1  # 更高优先级（如 hard 标记 easy 时）不降级
-            continue
-        if row and row.status == status:
-            skipped_existing += 1  # 已在目标状态（如已 Easy），跳过不重复标记
-            continue
-        if row:
-            row.status = status
-            row.updated_at = now
-        else:
-            db.add(SavedWord(user_id=user.id, word=word, status=status))
-        updated += 1
-    if not body.preview:
-        db.commit()
-    return {
-        "ok": True,
-        "updated": updated,
-        "skipped_existing": skipped_existing,
-        "skipped_higher": skipped_higher,
-        "preview": body.preview,
-        "status": status,
-    }
 
 
 def _profile_dict(profile: VocabularyProfile) -> dict:
