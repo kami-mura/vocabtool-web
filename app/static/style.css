@@ -3888,3 +3888,16 @@ select:focus-visible {
     transition: background-color .3s ease;
   }
 }
+
+/* ---------- 内联 SVG 图标 ---------- */
+.nav-ico { display: inline-flex; align-items: center; justify-content: center; }
+.nav-ico svg { display: block; width: 18px; height: 18px; }
+.account-menu-summary .nav-ico svg { width: 16px; height: 16px; }
+.mobile-nav-ic { display: inline-flex; align-items: center; justify-content: center; }
+.mobile-nav-ic svg { display: block; width: 20px; height: 20px; }
+.theme-ico { display: inline-flex; align-items: center; justify-content: center; vertical-align: -3px; }
+.theme-ico svg { display: block; width: 16px; height: 16px; }
+.auth-theme-toggle .theme-ico svg { width: 20px; height: 20px; }
+.theme-ico-sun { display: none; }
+[data-theme="dark"] .theme-ico-sun { display: inline-flex; }
+[data-theme="dark"] .theme-ico-moon { display: none; }

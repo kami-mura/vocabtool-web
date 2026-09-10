@@ -1306,7 +1306,7 @@
       title = "从第一张卡片开始";
       sub = "查一个想学的词，AI 会帮你做成学习卡片";
     } else if (canExtra) {
-      title = "今天的学习完成啦 🎉";
+      title = "今天的学习完成啦";
       sub = "可以再做一点新卡，或者读一篇 AI 短文";
     } else if (remaining > 0) {
       title = "今天还有 " + remaining + " 张卡片";

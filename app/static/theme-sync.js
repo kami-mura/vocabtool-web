@@ -21,9 +21,7 @@
     const meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute("content", dark ? "#0f1420" : "#007AFF");
     const accountLabel = document.getElementById("account-theme-toggle-label");
-    if (accountLabel) accountLabel.textContent = dark ? "☀ 日间模式" : "☾ 夜间模式";
-    const authToggle = document.getElementById("auth-theme-toggle");
-    if (authToggle) authToggle.textContent = dark ? "☀" : "☾";
+    if (accountLabel) accountLabel.textContent = dark ? "日间模式" : "夜间模式";
   }
 
   function sync() {
