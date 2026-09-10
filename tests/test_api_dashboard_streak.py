@@ -3,7 +3,7 @@
 import datetime as dt
 
 from app.db import SessionLocal
-from app.models import Card, ReviewLog, User
+from app.models import ReviewLog, User
 from tests.conftest import register
 
 
@@ -97,30 +97,6 @@ def test_streak_alive_when_today_not_studied_yet(client):
     user_id = _user_id("streak-alive@example.com")
     _set_review_dates(user_id, 2, 1)
     assert _streak(client) == 2
-
-
-def test_dashboard_due_today_excludes_buried_cards(client):
-    register(client, "buried-dashboard@example.com")
-    client.post(
-        "/api/card-studio/cards",
-        json={"words": ["run"], "card_type": "general"},
-    )
-    db = SessionLocal()
-    try:
-        user_id = _user_id("buried-dashboard@example.com")
-        row = db.query(Card).filter(Card.user_id == user_id).one()
-        row.state = "review"
-        row.due_at = dt.datetime.now(dt.timezone.utc).replace(
-            tzinfo=None
-        ) - dt.timedelta(days=1)
-        row.buried = True
-        db.commit()
-    finally:
-        db.close()
-    data = client.get("/api/dashboard").json()
-    assert data["due_today"] == 0
-
-
 def test_dashboard_again_pending_counts_learning_cards(client):
     register(client, "again-dashboard@example.com")
     client.post(

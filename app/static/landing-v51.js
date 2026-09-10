@@ -799,7 +799,6 @@
     }
   }
   let realUndoStatusTimer = null;
-  const realReviewAgainCounts = new Map();
 
   function celebrateBalloons() {
     if (
@@ -1152,13 +1151,7 @@
     const backInner = '<div class="card-answer">' + renderMarkdown(sanitizeCardBack(card.back), target) +
       (card.card_type === "cloze" ? ' <button class="demo-audio reading-word-audio" data-real-audio="' + escapeHtml(target) + '" type="button">▶</button>' : "") +
       "</div>";
-    const showBury = (realReviewAgainCounts.get(card.id) || 0) >= 3;
     const backHtml = backInner +
-      (showBury
-        ? '<div class="real-card-actions">' +
-          '<button class="small" data-real-bury="' + card.id + '" type="button">不想学</button>' +
-          "</div>"
-        : "") +
       '<div class="demo-rating">' +
       '<button class="rating again" data-real-rating="again" data-real-card="' + card.id + '" type="button"><b>重来</b><small>现在</small></button>' +
       '<button class="rating hard" data-real-rating="hard" data-real-card="' + card.id + '" type="button"><b>困难</b><small>' + escapeHtml(previewLabel("hard", "现在")) + "</small></button>" +
@@ -1643,9 +1636,6 @@
     realReviewInFlight += 1;
     realReviewQueueVersion += 1;
     try {
-      if (rating === "again") {
-        realReviewAgainCounts.set(card.id, (realReviewAgainCounts.get(card.id) || 0) + 1);
-      }
       // 先乐观更新本地队列，点击立即换卡，不等待网络。
       if (!holdCard) {
         if (willRelearn) {
@@ -1770,26 +1760,6 @@
         warmUpRealAudio();
       }
       flushReviewRefreshIfIdle();
-    }
-  }
-
-  async function buryRealCard(button) {
-    const id = Number(button.dataset.realBury);
-    const index = realReviewQueue.findIndex((card) => card.id === id);
-    if (index < 0) return;
-    try {
-      const res = await fetch("/api/cards/" + id + "/bury", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.detail || "操作失败");
-      realReviewQueueVersion += 1;
-      realReviewQueue.splice(index, 1);
-      renderRealReview();
-    } catch (err) {
-      const status = document.getElementById("real-undo-status");
-      if (status) status.textContent = "操作失败：" + err.message;
     }
   }
 
@@ -2010,11 +1980,6 @@
   const realReviewCards = document.getElementById("real-review-cards");
   if (realReviewCards) {
     realReviewCards.addEventListener("click", (e) => {
-      const buryButton = e.target.closest("[data-real-bury]");
-      if (buryButton) {
-        buryRealCard(buryButton);
-        return;
-      }
       const ratingButton = e.target.closest("[data-real-rating]");
       if (ratingButton) {
         rateRealReviewCard(ratingButton);
@@ -2608,17 +2573,13 @@
           (realBrowserSelection.has(card.id) ? " checked" : "") +
           ' aria-label="选择 ' + escapeHtml(card.word) + '"></label>' +
           '<details class="browser-card"><summary>' +
-          "<strong>" + escapeHtml(card.word) +
-          (card.buried ? ' <span class="browser-buried">不想学</span>' : "") + "</strong>" +
-          "<span>" + escapeHtml(card.deck || card.card_type) + " · " +
+          "<strong>" + escapeHtml(card.word) + "</strong>" +
+          "<span>" + escapeHtml(card.card_type) + " · " +
           (card.ngsl_rank ? "NGSL #" + Number(card.ngsl_rank) : "不在 NGSL 词表") + " · " +
           (card.next_review_date ? "待复习 " + card.next_review_date : "新卡") + "</span></summary>" +
           '<div class="browser-card-content"><div><b>正面</b><p>' + front + "</p></div>" +
           '<div><b>背面</b><p>' + back + "</p></div>" +
           '<div class="browser-card-actions">' +
-          (card.buried
-            ? '<button class="small" data-real-unbury="' + card.id + '" type="button">恢复这张卡</button>'
-            : '<button class="small" data-real-bury="' + card.id + '" type="button">不想学</button>') +
           (card.card_type === "reading"
             ? '<button class="small" data-real-refresh-sentence="' + card.id + '" type="button">换句</button>'
             : "") +
@@ -2828,38 +2789,6 @@
   const realBrowserResults = document.getElementById("real-browser-results");
   if (realBrowserResults) {
     realBrowserResults.addEventListener("click", async (e) => {
-      const bury = e.target.closest("[data-real-bury]");
-      if (bury) {
-        try {
-          const res = await fetch("/api/cards/" + bury.dataset.realBury + "/bury", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-          });
-          const data = await res.json().catch(() => ({}));
-          if (!res.ok) throw new Error(data.detail || "操作失败");
-          loadRealBrowser();
-          requestReviewRefresh();
-        } catch (err) {
-          realBrowserResults.innerHTML = '<div class="empty-state">' + escapeHtml(err.message) + "</div>";
-        }
-        return;
-      }
-      const unbury = e.target.closest("[data-real-unbury]");
-      if (unbury) {
-        try {
-          const res = await fetch("/api/cards/" + unbury.dataset.realUnbury + "/unbury", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-          });
-          const data = await res.json().catch(() => ({}));
-          if (!res.ok) throw new Error(data.detail || "操作失败");
-          loadRealBrowser();
-          requestReviewRefresh();
-        } catch (err) {
-          realBrowserResults.innerHTML = '<div class="empty-state">' + escapeHtml(err.message) + "</div>";
-        }
-        return;
-      }
       const refreshSentence = e.target.closest("[data-real-refresh-sentence]");
       if (refreshSentence) {
         try {

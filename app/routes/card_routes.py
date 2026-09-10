@@ -970,9 +970,7 @@ def browse_cards(
     offset = max(0, offset)
     query = db.query(Card).filter(Card.user_id == user.id)
     if state != "all":
-        if state == "buried":
-            query = query.filter(Card.buried.is_(True))
-        elif state in {"new", "scheduled"}:
+        if state in {"new", "scheduled"}:
             query = query.filter(
                 Card.due_at.is_(None) if state == "new" else Card.due_at.is_not(None)
             )
@@ -1059,38 +1057,6 @@ def _scoped_action_key(user_id: int, action_id: str) -> str:
     return hashlib.sha256(f"{user_id}:{action_id}".encode()).hexdigest()
 
 
-@router.post("/cards/{card_id}/bury")
-def bury_card(card_id: int, request: Request, db: Session = Depends(get_db)):
-    """掩埋卡片：今天起不再进入学习队列；可在卡片浏览器里恢复。"""
-    user = _require_user(db, request)
-    card = (
-        db.query(Card)
-        .filter(Card.id == card_id, Card.user_id == user.id)
-        .first()
-    )
-    if not card:
-        raise HTTPException(status_code=404, detail="卡片不存在")
-    card.buried = True
-    db.commit()
-    return {"ok": True, "card": _card_dict(card)}
-
-
-@router.post("/cards/{card_id}/unbury")
-def unbury_card(card_id: int, request: Request, db: Session = Depends(get_db)):
-    """恢复被掩埋的卡片，重新进入学习队列。"""
-    user = _require_user(db, request)
-    card = (
-        db.query(Card)
-        .filter(Card.id == card_id, Card.user_id == user.id)
-        .first()
-    )
-    if not card:
-        raise HTTPException(status_code=404, detail="卡片不存在")
-    card.buried = False
-    db.commit()
-    return {"ok": True, "card": _card_dict(card)}
-
-
 @router.delete("/cards/{card_id}")
 def delete_card(card_id: int, request: Request, db: Session = Depends(get_db)):
     """删除单张学习卡片及其复习记录。"""
@@ -1117,28 +1083,6 @@ def delete_card(card_id: int, request: Request, db: Session = Depends(get_db)):
     db.flush()
     db.commit()
     return {"ok": True, "word": word, "card_type": card.card_type}
-
-
-@router.post("/cards/unbury-batch")
-def unbury_cards_batch(
-    body: CardsBatchDeleteIn, request: Request, db: Session = Depends(get_db)
-):
-    """批量恢复“不想学”的卡片，重新进入学习队列。"""
-    user = _require_user(db, request)
-    card_ids = sorted(set(body.card_ids))
-    restored = 0
-    if card_ids:
-        restored = (
-            db.query(Card)
-            .filter(
-                Card.user_id == user.id,
-                Card.id.in_(card_ids),
-                Card.buried.is_(True),
-            )
-            .update({"buried": False}, synchronize_session=False)
-        )
-        db.commit()
-    return {"ok": True, "restored": int(restored)}
 
 
 @router.post("/cards/delete-batch")

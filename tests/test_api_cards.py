@@ -872,41 +872,6 @@ def test_refresh_highlights_legacy_reading_fronts_and_bolds_word_only_cards(clie
     cards = {item["word"]: item for item in browsed["cards"]}
     assert "**runs**" in cards["run"]["front"]
     assert cards["quasar"]["front"] == "**quasar**"
-
-
-def test_bury_card_excludes_from_queue_and_can_unbury(client):
-    """掩埋的卡不进入学习队列与每日分配；可在浏览器恢复。"""
-    register(client, "bury@example.com")
-    client.put("/api/cards/settings", json={"new_cards_per_day": 0})
-    created = client.post(
-        "/api/card-studio/cards",
-        json={"words": ["run"], "card_type": "reading"},
-    )
-    assert created.status_code == 200
-    card_id = client.get("/api/cards/browse", params={"q": "run"}).json()["cards"][0]["id"]
-
-    buried = client.post(f"/api/cards/{card_id}/bury")
-    assert buried.status_code == 200
-    assert buried.json()["card"]["buried"] is True
-
-    queue = client.get("/api/cards", params={"card_type": "reading", "extra_new": 5}).json()
-    assert queue["queue"] == []
-    assert queue["extra_available"] == 0
-
-    browsed = client.get("/api/cards/browse", params={"state": "buried"}).json()
-    assert [item["id"] for item in browsed["cards"]] == [card_id]
-
-    unburied = client.post(f"/api/cards/{card_id}/unbury")
-    assert unburied.status_code == 200
-    assert unburied.json()["card"]["buried"] is False
-
-    queue2 = client.get("/api/cards", params={"card_type": "reading", "extra_new": 5}).json()
-    assert len(queue2["queue"]) == 1
-
-    missing = client.post("/api/cards/999999/bury")
-    assert missing.status_code == 404
-
-
 def test_cloze_and_reading_fronts_use_word_not_hint(client, monkeypatch):
     """带括号注解的词（taxi (verb)）制卡时，正面必须挖空/高亮单词本身，
     注解只用于选义，不能留在句子匹配里导致挖空失败。"""

@@ -782,7 +782,6 @@ def _card_dict(
         "front": card.front,
         "back": cleaned_back,
         "context": card.context or "",
-        "buried": bool(card.buried),
         "revision": int(card.revision or 0),
         "state": "new" if card.due_at is None else "scheduled",
         "is_learning": str(getattr(card, "state", "") or "") == "learning",
