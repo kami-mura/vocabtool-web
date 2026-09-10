@@ -3014,8 +3014,8 @@ button.ghost.small {
 
   /* 查词页去掉大 Logo，减少首屏占高 */
   .landing-hero .logo { display: none; }
-  /* body 前缀提升优先级：皮肤（style-liquid.css 等）后加载会覆盖移动端内边距，
-     导致搜索/词源/问答结果栏比设计窄一截。 */
+  /* body 前缀提升优先级：历史皮肤覆盖层曾在此后加载并覆盖移动端内边距，
+     导致搜索/词源/问答结果栏比设计窄一截。保留更高优先级写法以防回归。 */
   body .landing-main { padding: 16px 14px calc(92px + env(safe-area-inset-bottom)); }
   /* 手机端：顶栏禁用背景模糊与进入动画——二者都会让内部 fixed 弹层
      以顶栏为定位基准，导致账户菜单渲染到屏幕外 */
@@ -3747,8 +3747,8 @@ svg {
 }
 
 /* 首页标语：窄屏自动缩字号，保持单行。
-   body 前缀提升优先级：皮肤样式表（style-liquid.css 等）后加载且同级选择器
-   会覆盖这里，导致 40px 固定字号把“查单词、记词汇，读文章”挤出屏幕。 */
+   body 前缀提升优先级：历史上皮肤样式表在同级选择器上覆盖过这里，
+   导致 40px 固定字号把“查单词、记词汇，读文章”挤出屏幕。 */
 @media (max-width: 820px) {
   body .landing-hero h1 {
     font-size: clamp(17px, 5vw, 30px);
@@ -3892,4 +3892,586 @@ svg {
 .topbar .landing-brand {
   display: inline-flex;
   align-items: center;
+}
+
+
+/* ============================================================
+   布局与组件适配层（原 style-glass.css）
+   ============================================================ */
+
+/* ============================================================
+   玻璃拟态 Glassmorphism —— 当前功能布局适配层
+   视觉沿用 style.css 的 Modern UI Refresh，不覆盖原有风格
+   ============================================================ */
+
+/* ---------- 记忆/文章/管理区桌面网格 ---------- */
+.landing-section {
+  margin-top: 36px;
+}
+
+.manage-panels {
+  border-top: 0;
+  padding-top: 0;
+}
+.manage-panels.is-open {
+  border-top: 1px solid var(--line);
+  padding-top: 20px;
+}
+.manage-panel[hidden] { display: none; }
+.manage-panel .library-body,
+.manage-panel .add-card-body {
+  max-width: none;
+}
+
+/* ---------- 记忆区：4 个卡位常驻 ---------- */
+.real-review-toolbar {
+  justify-content: flex-start;
+  margin-bottom: 12px;
+}
+#real-review .home-review-cards .demo-card,
+#guest-demo-cards .demo-cards .demo-card {
+  height: clamp(360px, 64vh, 460px);
+}
+.review-placeholder .demo-card-face {
+  border-style: dashed;
+  border-color: var(--line);
+  background: transparent;
+  box-shadow: none;
+}
+
+/* ---------- 文章区：完整展示，页面随正文自然滚动 ---------- */
+#real-article-panel {
+  display: flex;
+  flex-direction: column;
+}
+#real-article-body-wrap {
+  display: flex;
+  flex-direction: column;
+}
+.real-article-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 20px;
+  color: var(--muted);
+  text-align: center;
+}
+.real-article-placeholder p {
+  margin: 0;
+}
+.real-article-placeholder p:first-child {
+  color: var(--text);
+  font-weight: 700;
+}
+.real-article-placeholder[hidden] { display: none; }
+#real-article-result {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------- 游客文章区：完整展示 ---------- */
+#guest-demo-article {
+  display: flex;
+  flex-direction: column;
+}
+#guest-article-body {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------- 桌面版式：上下单栏，卡片一行 4 个 ---------- */
+@media (min-width: 900px) {
+  .landing-main {
+    display: block;
+    max-width: 1080px;
+  }
+  .landing-section {
+    margin-top: 48px;
+  }
+  .landing-hero {
+    margin-bottom: 0;
+  }
+  #guest-demo-cards,
+  #real-review {
+    grid-area: auto;
+    padding-right: 0;
+    border-right: 0;
+  }
+  #guest-demo-article,
+  #real-article-panel {
+    grid-area: auto;
+    padding-left: 0;
+  }
+  .manage-area {
+    grid-area: auto;
+  }
+  #real-review .home-review-cards,
+  #guest-demo-cards .demo-cards {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    max-width: none;
+  }
+  #real-card-browser .card-browser-filters {
+    grid-template-columns: minmax(180px, 1fr) auto auto;
+  }
+}
+
+/* ============================================================
+   卡片外观：默认与基础皮肤统一（参考白纸大卡）
+   ============================================================ */
+#real-review .home-review-cards {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  gap: 20px;
+  max-width: 100%;
+  margin: 26px 0 0;
+}
+#real-review .home-review-cards .demo-card {
+  width: 100%;
+  max-width: 100%;
+  height: clamp(360px, 64vh, 460px);
+}
+#real-review .home-review-cards .demo-card-face.front,
+#real-review .home-review-cards .demo-card-face.back {
+  background: var(--panel);
+}
+#real-review .home-review-cards .demo-front-text {
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+#real-review .home-review-cards .general-card .demo-front-text {
+  font-size: 28px;
+  font-weight: 750;
+}
+#real-review .home-review-cards .card-answer,
+#real-review .home-review-cards .card-answer p,
+#real-review .home-review-cards .card-answer li,
+#real-review .home-review-cards .card-answer strong,
+#real-review .home-review-cards .card-answer em,
+#real-review .home-review-cards .card-answer code {
+  font-size: 22px;
+  line-height: 1.7;
+  color: var(--text);
+}
+#real-review .home-review-cards .demo-rating .rating {
+  padding: 10px 16px;
+}
+#real-review .home-review-cards .demo-rating .rating b {
+  font-size: 16px;
+}
+#real-review .home-review-cards .demo-rating .rating small {
+  font-size: 12px;
+}
+#real-review .home-review-cards .demo-card-face.front {
+  padding: 16px 16px 84px;
+}
+#real-review .home-review-cards .demo-audio,
+#real-review .home-review-cards .reading-word-row .demo-audio,
+#real-review .home-review-cards .reading-word-audio,
+#real-review .home-review-cards .reading-sentence-audio,
+#guest-demo-cards .demo-audio {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  margin: 0 0 0 8px;
+  padding: 3px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  min-height: 28px;
+  height: 28px;
+  border-radius: 999px;
+  color: var(--text);
+}
+#real-review .home-review-cards .demo-flip {
+  font-size: 16px;
+  min-height: 48px;
+  padding: 12px 26px;
+}
+/* 正面目标词：强调色高亮 */
+#real-review .home-review-cards .demo-card-face.front .target-word,
+#real-review .home-review-cards .demo-card-face.front mark,
+#guest-demo-cards .demo-card-face.front mark,
+#guest-demo-cards .demo-card-face mark {
+  background: linear-gradient(transparent 58%, var(--card-hl) 58%, var(--card-hl) 94%, transparent 94%);
+  color: var(--accent);
+  padding: 0 2px;
+  border-radius: 0;
+  font-weight: 600;
+}
+/* 演示区：四张示例卡 */
+#guest-demo-cards .demo-cards {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  max-width: 1080px;
+  margin: 0 auto;
+}
+#guest-demo-cards .demo-cards .demo-card {
+  height: clamp(360px, 64vh, 460px);
+}
+/* 演示卡：白纸面 + 更清晰的字号 */
+#guest-demo-cards .demo-card-face.front,
+#guest-demo-cards .demo-card-face.back {
+  background: var(--panel);
+}
+#guest-demo-cards .demo-front-text {
+  font-size: 20px;
+  font-weight: 600;
+}
+#guest-demo-cards .general-card .demo-front-text { font-size: 28px; }
+#guest-demo-cards .demo-back-word {
+  font-size: 18px;
+}
+#guest-demo-cards .demo-card-face.back p {
+  font-size: 15px;
+  color: var(--text);
+  line-height: 1.6;
+}
+
+@media (max-width: 820px) {
+  #guest-demo-cards .demo-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+}
+
+@media (max-width: 600px) {
+  #guest-demo-cards .demo-cards .demo-card {
+    height: min(300px, 52vh);
+  }
+  #guest-demo-cards .demo-front-text {
+    font-size: 16px;
+  }
+  #guest-demo-cards .demo-rating {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
+  }
+  #guest-demo-cards .demo-rating .rating {
+    min-height: 34px;
+    padding: 4px 2px;
+  }
+  #guest-demo-cards .demo-rating .rating b {
+    font-size: 12px;
+  }
+  #guest-demo-cards .demo-rating .rating small {
+    font-size: 9px;
+  }
+}
+/* 卡片静止：关闭 3D 跟随鼠标抖动 */
+html.js-ui-polish .demo-card.ui-tilt {
+  transform: none !important;
+  will-change: auto;
+}
+
+/* ============================================================
+   查词结果：默认与基础皮肤同一结构，主题色不同
+   ============================================================ */
+body .landing-search-result {
+  background: var(--panel);
+  border: 2px solid var(--lookup-border);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  color: var(--text);
+}
+body .landing-search-result .lookup-head {
+  text-align: center;
+  margin-bottom: 12px;
+}
+body .landing-search-result .lookup-word {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.4;
+  margin-bottom: 8px;
+  color: var(--accent);
+}
+body .landing-search-result .lookup-word mark.word-highlight,
+body .floating-lookup .lookup-word mark.word-highlight {
+  font-size: 24px;
+  font-weight: 700;
+  padding: 0 4px;
+  background: linear-gradient(transparent 58%, var(--card-hl) 58%, var(--card-hl) 94%, transparent 94%);
+}
+body .landing-search-result .search-rank,
+body .floating-lookup .search-rank {
+  display: inline-flex;
+}
+body .landing-search-result .lookup-explanation,
+body .landing-search-result .qa-rich,
+body .floating-lookup .lookup-explanation,
+body .floating-lookup .qa-rich {
+  text-align: left;
+}
+body .floating-lookup .qa-answer-box,
+body .floating-lookup .lookup-answer.card,
+body .floating-lookup .reader-lookup-loading {
+  background: var(--panel);
+  border: 2px solid var(--lookup-border);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  color: var(--text);
+}
+body .floating-lookup .lookup-answer.card {
+  text-align: left;
+  max-height: 76vh;
+  overflow-y: auto;
+}
+body .floating-lookup .lookup-head {
+  text-align: center;
+  margin-bottom: 12px;
+}
+body .floating-lookup .lookup-word {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.4;
+  margin-bottom: 8px;
+  color: var(--accent);
+}
+body .floating-lookup .lookup-actions {
+  display: flex;
+  justify-content: center;
+}
+
+
+/* ============================================================
+   现代简约覆盖层（原 style-liquid.css）
+   ============================================================ */
+
+/* ============================================================
+   默认风格：现代简约（苹果交互 + Notion 排版）
+   只改视觉，不改变任何功能逻辑
+   ============================================================ */
+
+/* ---------- 背景：纯净浅底，去掉光斑与极光 ---------- */
+.landing-main::before,
+.landing-main::after,
+body::before,
+body::after {
+  display: none !important;
+}
+:root:not([data-theme="dark"]) body {
+  background: var(--bg);
+}
+[data-theme="dark"] body {
+  background: var(--bg);
+}
+
+/* ---------- 文本：Notion 风格排版 ---------- */
+body {
+  font-family: ui-sans-serif, -apple-system, "PingFang SC", "Helvetica Neue",
+    "Noto Sans SC", system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.65;
+  letter-spacing: -.01em;
+}
+h1, h2, h3 {
+  letter-spacing: -.02em;
+}
+h2 { font-size: 22px; font-weight: 750; }
+h3 { font-size: 17px; font-weight: 700; }
+.landing-hero h1 {
+  font-size: 40px;
+  font-weight: 800;
+  letter-spacing: -.03em;
+}
+/* 正文阅读体验：更宽行距 + 阅读宽度 */
+.lookup-answer p,
+.demo-article,
+.ai-article-body {
+  line-height: 1.75;
+}
+.demo-article,
+.ai-article-body {
+  max-width: 66ch;
+}
+
+/* ---------- 面板：白底 + 细边框；阴影只表达真实层级 ---------- */
+/* 普通正文面板：只用边框表达边界，不加多余阴影 */
+.card-browser,
+.manage-panel,
+.real-extra-panel,
+.auth-card,
+.demo-card-face,
+.demo-article,
+.home-review-empty {
+  background: #ffffff;
+  border-color: #e7eaf0;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+/* 悬浮内容（下拉结果、浮层、菜单、提示）：阴影表达真实浮起 */
+.landing-search-result,
+.lookup-answer,
+.account-menu-panel,
+.review-manage-menu,
+.toast {
+  background: #ffffff;
+  border-color: #e7eaf0;
+  box-shadow:
+    0 2px 6px rgba(16, 24, 40, .06),
+    0 12px 32px rgba(16, 24, 40, .12);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* ---------- 间距：以 8px 为基的常用尺度 ---------- */
+.landing-main {
+  padding: 48px 24px 80px;
+}
+.landing-section {
+  margin-top: 48px;
+}
+.landing-search {
+  gap: 8px;
+}
+.card-browser-results {
+  gap: 8px;
+}
+
+/* ---------- 输入控件：白底 + 苹果式焦点环 ---------- */
+input,
+textarea,
+select {
+  background: #ffffff;
+  border-color: #d9dfe8;
+}
+input:focus,
+textarea:focus,
+select:focus,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+  border-color: rgba(10, 112, 238, .5);
+  box-shadow: 0 0 0 4px rgba(10, 112, 238, .16);
+}
+
+/* ---------- 按钮：纯色主按钮 + 苹果弹簧反馈 ---------- */
+@media (prefers-reduced-motion: no-preference) {
+  button {
+    transition:
+      transform .18s cubic-bezier(.34, 1.56, .64, 1),
+      background-color .2s ease,
+      border-color .2s ease,
+      box-shadow .2s ease,
+      color .2s ease;
+  }
+  button:active:not(:disabled) {
+    transform: scale(.97);
+  }
+}
+
+/* 卡片音频播放与翻转按钮：不用蓝色，保持中性文字色 */
+.demo-audio,
+.demo-flip {
+  color: var(--text);
+}
+
+/* logo：与全局同色（iOS 蓝渐变），弱化白色高光 */
+:root:not([data-theme="dark"]) .logo::after,
+:root:not([data-theme="dark"]) .topbar-logo::after {
+  background: linear-gradient(180deg, rgba(255, 255, 255, .14), rgba(255, 255, 255, 0) 52%);
+}
+
+/* ---------- 夜间模式：深色实底 ---------- */
+[data-theme="dark"] .topbar,
+[data-theme="dark"] .landing-search-input,
+[data-theme="dark"] .landing-search-result,
+[data-theme="dark"] .lookup-answer,
+[data-theme="dark"] .demo-card-face,
+[data-theme="dark"] .demo-article,
+[data-theme="dark"] .card-browser,
+[data-theme="dark"] .manage-panel,
+[data-theme="dark"] .account-menu-panel,
+[data-theme="dark"] .account-api-modal-card,
+[data-theme="dark"] .real-extra-panel,
+[data-theme="dark"] .review-manage-menu,
+[data-theme="dark"] .home-review-empty,
+[data-theme="dark"] .auth-card,
+[data-theme="dark"] .toast {
+  background: #1a2130;
+  border-color: #2c3850;
+  box-shadow: none;
+}
+[data-theme="dark"] .landing-search-result,
+[data-theme="dark"] .lookup-answer,
+[data-theme="dark"] .account-menu-panel,
+[data-theme="dark"] .review-manage-menu,
+[data-theme="dark"] .toast {
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, .3),
+    0 12px 32px rgba(0, 0, 0, .45);
+}
+[data-theme="dark"] input,
+[data-theme="dark"] textarea,
+[data-theme="dark"] select {
+  background: #1a2130;
+  border-color: #2c3850;
+}
+[data-theme="dark"] input:focus,
+[data-theme="dark"] textarea:focus,
+[data-theme="dark"] select:focus {
+  border-color: rgba(64, 156, 255, .6);
+  box-shadow: 0 0 0 4px rgba(64, 156, 255, .2);
+}
+
+
+/* ============================================================
+   精移动效层（原 style-motion.css）
+   ============================================================ */
+
+/* ============================================================
+   精移动效层（所有皮肤共用，最后加载）
+   卡片 hover 抬升辉光 / 搜索聚焦呼吸 / 词条微浮动。
+   只加动效不改布局；prefers-reduced-motion 时全部关闭。
+   ============================================================ */
+
+@media (prefers-reduced-motion: no-preference) {
+  .demo-card {
+    transition: transform .35s var(--ease), box-shadow .35s var(--ease);
+  }
+  .demo-card:hover {
+    transform: translateY(-6px);
+  }
+  .demo-card:hover .demo-card-face {
+    box-shadow: var(--shadow-lg);
+  }
+
+  .word-result {
+    transition: transform .25s var(--ease), box-shadow .25s var(--ease);
+  }
+  .word-result:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .landing-search:focus-within {
+    animation: motion-search-glow 2.6s ease-in-out infinite;
+  }
+  @keyframes motion-search-glow {
+    0%, 100% {
+      box-shadow: 0 0 0 3px rgba(0, 122, 255, .12), var(--shadow);
+    }
+    50% {
+      box-shadow: 0 0 0 5px rgba(0, 122, 255, .20), var(--shadow);
+    }
+  }
+
+  .demo-flip {
+    transition: transform .25s var(--ease), box-shadow .25s var(--ease);
+  }
+  .demo-flip:hover {
+    transform: translateY(-2px);
+  }
+
+  /* 文章内标记词：轻微呼吸高亮 */
+  .demo-article mark,
+  .ai-article-body mark {
+    transition: background-color .3s ease;
+  }
 }

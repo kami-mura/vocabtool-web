@@ -127,10 +127,7 @@ const styleSource = fs.readFileSync(
   path.join(__dirname, "..", "app", "static", "style.css"),
   "utf8"
 );
-const glassStyleSource = fs.readFileSync(
-  path.join(__dirname, "..", "app", "static", "style-glass.css"),
-  "utf8"
-);
+const glassStyleSource = styleSource;
 const qaRichRule = styleSource.match(/\.qa-rich\s*\{[^}]*\}/);
 assert.ok(qaRichRule, "存在查询问答结果 .qa-rich 样式");
 assert.match(
