@@ -3,7 +3,7 @@ import os
 import sqlite3
 import time
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 
 import app.db as db_mod
 
@@ -278,6 +278,80 @@ def test_old_sqlite_database_migrates_cleanly(monkeypatch, tmp_path):
         assert "previous_word_status" not in review_log_columns
     finally:
         connection.close()
+
+
+def test_word_status_migration_drops_easy_rows_without_touching_others(
+    monkeypatch, tmp_path
+):
+    """迁移 031 必须删掉 easy 行，否则 6855 个已掌握的词会涌进生词库。
+
+    同时校验 hard/mid 行保留、两个遗留列被删除，且重复执行幂等。
+    """
+    from app import models  # noqa: F401  # 注册表结构
+
+    path = str(tmp_path / "status.db")
+    engine = create_engine(f"sqlite:///{path}")
+    # 先用当前模型建表（已是新结构），再手工补回旧列以模拟历史库。
+    db_mod.Base.metadata.create_all(bind=engine)
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "ALTER TABLE saved_words ADD COLUMN status "
+                "VARCHAR(20) NOT NULL DEFAULT 'hard'"
+            )
+        )
+        connection.execute(
+            text(
+                "ALTER TABLE review_logs ADD COLUMN previous_word_status "
+                "VARCHAR(20) NOT NULL DEFAULT ''"
+            )
+        )
+        connection.execute(
+            text(
+                "INSERT INTO users (id, email, password_hash, salt) "
+                "VALUES (1, 'a@example.com', 'x', 'y')"
+            )
+        )
+        for word, status in (
+            ("knownword", "easy"),
+            ("freshword", "hard"),
+            ("cardedword", "mid"),
+        ):
+            connection.execute(
+                text(
+                    "INSERT INTO saved_words (user_id, word, status) "
+                    "VALUES (1, :word, :status)"
+                ),
+                {"word": word, "status": status},
+            )
+
+    monkeypatch.setattr(db_mod, "engine", engine)
+    db_mod.init_db()
+
+    def _snapshot():
+        connection = sqlite3.connect(path)
+        try:
+            return (
+                {row[1] for row in connection.execute("PRAGMA table_info(saved_words)")},
+                {
+                    row[1]
+                    for row in connection.execute("PRAGMA table_info(review_logs)")
+                },
+                {row[0] for row in connection.execute("SELECT word FROM saved_words")},
+            )
+        finally:
+            connection.close()
+
+    saved_columns, review_columns, words = _snapshot()
+    assert "status" not in saved_columns
+    assert "previous_word_status" not in review_columns
+    # easy 行被删除；hard 与 mid 行原样保留。
+    assert words == {"freshword", "cardedword"}
+
+    # 幂等：再跑一次不报错，数据不变。
+    db_mod.init_db()
+    _saved_columns, _review_columns, words_again = _snapshot()
+    assert words_again == {"freshword", "cardedword"}
 
 
 def test_prune_temp_uploads_removes_stale_files(monkeypatch, tmp_path):

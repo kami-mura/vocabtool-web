@@ -1056,27 +1056,39 @@ def _migrate_saved_word_status() -> None:
 
 
 def _migrate_drop_word_status_columns() -> None:
-    """移除单词三态状态的两个遗留列。
+    """移除单词三态状态：先删掉 easy 行，再删掉两个遗留列。
 
-    - `saved_words.status`（easy/mid/hard）：生词库不再保存掌握状态，
-      「是否已制卡」由 cards 表派生（见 api_support._words_with_cards）。
+    - `saved_words` 中 `status = 'easy'` 的整行删除。这些词是用户显式标记为
+      「已掌握」的，本来就不属于生词库；迁移前的可见集合恰好就是
+      `status <> 'easy'` 且尚无词卡的词，因此删除后生词库条数完全不变
+      （保留它们反而会让 6855 个已掌握的词涌进生词库）。
+    - `saved_words.status`：「是否已制卡」改由 cards 表派生
+      （见 api_support._words_with_cards），词库不再保存掌握状态。
     - `review_logs.previous_word_status`：撤销评分时用于回写词库状态，
       状态概念移除后该列恒为空串且无人读取。
 
-    两个列都不参与索引与约束。列不存在时跳过，新库与重复执行都安全。
-    本迁移不改动任何行数据（DROP COLUMN 只重建表结构），不触碰卡片与
-    复习记录的字段值。依赖 SQLite 3.35+（2021-03 起）的 DROP COLUMN。
+    两个表各自在一个事务内完成（DELETE 与 DROP COLUMN 同事务，失败整体
+    回滚），不改动 cards 与 review_logs 的行数据。列不存在时跳过，新库与
+    重复执行都安全。依赖 SQLite 3.35+（2021-03 起）的 DROP COLUMN。
     """
-    for table in ("saved_words", "review_logs"):
-        inspector = inspect(engine)
-        if table not in inspector.get_table_names():
-            continue
-        existing = {column["name"] for column in inspector.get_columns(table)}
-        column = "status" if table == "saved_words" else "previous_word_status"
-        if column not in existing:
-            continue
-        with engine.begin() as connection:
-            connection.execute(text(f"ALTER TABLE {table} DROP COLUMN {column}"))
+    inspector = inspect(engine)
+    if "saved_words" in inspector.get_table_names():
+        columns = {column["name"] for column in inspector.get_columns("saved_words")}
+        if "status" in columns:
+            with engine.begin() as connection:
+                connection.execute(
+                    text("DELETE FROM saved_words WHERE status = 'easy'")
+                )
+                connection.execute(text("ALTER TABLE saved_words DROP COLUMN status"))
+
+    inspector = inspect(engine)
+    if "review_logs" in inspector.get_table_names():
+        columns = {column["name"] for column in inspector.get_columns("review_logs")}
+        if "previous_word_status" in columns:
+            with engine.begin() as connection:
+                connection.execute(
+                    text("ALTER TABLE review_logs DROP COLUMN previous_word_status")
+                )
 
 
 def _migrate_saved_words() -> None:
