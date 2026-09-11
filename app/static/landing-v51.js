@@ -2624,13 +2624,18 @@
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.detail || "额度加载失败");
       if (data.uses_own_key) {
-        note.textContent = "卡片正面与释义由 AI 生成。当前使用自己的 Key，不受网站免费额度限制。";
+        note.textContent =
+          "卡片正面与释义由 AI 生成。当前使用自己的 Key，不受网站免费额度限制；单次最多生成 " +
+          (data.max_cards_per_run || 1000) + " 张。";
       } else if (data.remaining == null) {
-        note.textContent = "卡片正面与释义由 AI 生成。当前网站免费制卡额度未设上限。";
+        note.textContent =
+          "卡片正面与释义由 AI 生成。当前网站免费制卡额度未设上限；单次最多生成 " +
+          (data.max_cards_per_run || 1000) + " 张。";
       } else {
         note.textContent =
           "卡片正面与释义由 AI 生成。今天还可免费制作 " + data.remaining +
-          " 张（每日 " + data.limit + " 张）；超过时只制作前 " + data.remaining + " 张。";
+          " 张（每日 " + data.limit + " 张，单次最多 " +
+          (data.max_cards_per_run || 1000) + " 张）；超过时只制作前 " + data.remaining + " 张。";
       }
     } catch (err) {
       note.textContent = "卡片正面与释义由 AI 生成。暂时无法读取今日剩余额度。";
@@ -2950,7 +2955,11 @@
     const progressFill = document.getElementById("real-card-progress-fill");
     const progressText = document.getElementById("real-card-progress-text");
     let progressTimer = null;
+    let progressWatchdog = null;
     let generationStartedWall = 0;
+    let lastProgressAt = 0;
+    let lastProgressSnapshot = "";
+    const NO_PROGRESS_TIMEOUT_MS = 10 * 60 * 1000;
 
     function setCardProgress(completed, total, detail) {
       if (!progressWrap || !progressFill || !progressText) return;
@@ -2958,8 +2967,8 @@
       const percent = total > 0 ? Math.min(100, Math.round((completed / total) * 100)) : 0;
       progressFill.style.width = percent + "%";
       progressText.textContent = detail
-        ? "已生成 " + completed + " / " + total + " 张（" + detail + "）"
-        : "已生成 " + completed + " / " + total + " 张";
+        ? "已完成 " + completed + " / " + total + " 张（" + detail + "）"
+        : "已完成 " + completed + " / " + total + " 张";
     }
 
     async function pollCardProgress() {
@@ -2976,14 +2985,20 @@
           if (p.finished_wall && Number(p.finished_wall) < generationStartedWall) {
             return;
           }
-          finishCardGeneration(p.result || {}, Number((p.result || {}).total) || 0);
+          finishCardGeneration(
+            p.result || {},
+            Number((p.result || {}).processed) || 0
+          );
           return;
         }
-        setCardProgress(
-          Number(p.completed) || 0,
-          Number(p.total) || 0,
-          p.detail || ""
-        );
+        const completed = Number(p.completed) || 0;
+        const total = Number(p.total) || 0;
+        const snapshot = completed + "/" + total;
+        if (snapshot !== lastProgressSnapshot) {
+          lastProgressSnapshot = snapshot;
+          lastProgressAt = Date.now();
+        }
+        setCardProgress(completed, total, p.detail || "");
       } catch (_) { /* 轮询失败不打断生成 */ }
     }
 
@@ -2992,17 +3007,35 @@
         clearInterval(progressTimer);
         progressTimer = null;
       }
+      if (progressWatchdog) {
+        clearInterval(progressWatchdog);
+        progressWatchdog = null;
+      }
       realCardGenerate.disabled = false;
+    }
+
+    // 观望模式：请求被代理切断后继续轮询；只有长时间没有新进度才放弃，
+    // 不再使用固定总时长（大批量生成可能持续几十分钟）。
+    function startProgressWatchdog() {
+      if (progressWatchdog) return;
+      progressWatchdog = setInterval(() => {
+        if (!progressTimer) return;
+        if (Date.now() - lastProgressAt < NO_PROGRESS_TIMEOUT_MS) return;
+        stopCardProgressPoll();
+        const status = document.getElementById("real-card-status");
+        if (status) status.textContent = "长时间没有新进度，请稍后刷新查看";
+      }, 30 * 1000);
     }
 
     async function finishCardGeneration(result, totalWords) {
       stopCardProgressPoll();
       const resultEl = document.getElementById("real-card-result");
+      const failed = result.failed || [];
+      const doneCount = (result.created || 0) + (result.existing || 0) + failed.length;
       if (resultEl) {
         let html =
           "已生成 " + (result.created || 0) +
           " 张，已有 " + (result.existing || 0) + " 张重复。";
-        const failed = result.failed || [];
         if (failed.length) {
           html +=
             '<div class="card-generate-failed"><b>失败 ' + failed.length + " 个：</b><ul>" +
@@ -3014,7 +3047,11 @@
         }
         resultEl.innerHTML = '<div class="empty-state">' + html + "</div>";
       }
-      setCardProgress(result.created || 0, result.processed || totalWords || 0, "完成");
+      setCardProgress(
+        doneCount,
+        result.processed || doneCount || totalWords || 0,
+        "完成"
+      );
       const status = document.getElementById("real-card-status");
       if (status) {
         status.textContent = result.limit_notice || (result.error ? "部分失败：" + result.error : "");
@@ -3040,30 +3077,33 @@
       if (status) status.textContent = "正在生成…";
       setCardProgress(0, words.length, "排队中");
       generationStartedWall = Math.floor(Date.now() / 1000);
+      lastProgressAt = Date.now();
+      lastProgressSnapshot = "0/" + words.length;
       progressTimer = setInterval(pollCardProgress, 1500);
-      let watchTimeout = null;
+      let res;
       try {
-        const res = await fetch("/api/card-studio/cards", {
+        res = await fetch("/api/card-studio/cards", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ words, card_type: realCardType }),
         });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.detail || data.error || "生成失败，请稍后重试");
-        await finishCardGeneration(data, words.length);
       } catch (err) {
-        // 请求可能被代理/隧道切断（大批量生成超过 ~100 秒），
-        // 但生成仍在后台继续：进入观望模式，靠轮询进度拿最终结果，
-        // 避免进度条卡死、刷新后才发现卡片已生成。
+        // 只有网络/代理切断才进入观望模式：生成可能仍在后台继续。
         if (status) status.textContent = "连接中断，生成仍在后台进行…";
-        pollCardProgress();
-        watchTimeout = setTimeout(() => {
-          if (progressTimer) {
-            stopCardProgressPoll();
-            if (status) status.textContent = "仍未收到完成结果，请稍后刷新查看";
-          }
-        }, 6 * 60 * 1000);
+        startProgressWatchdog();
+        return;
       }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        // 服务端明确拒绝（额度用完/超出上限/校验失败）：显示真实原因并停止轮询。
+        stopCardProgressPoll();
+        setCardProgress(0, words.length, "失败");
+        if (status) {
+          status.textContent = data.detail || data.error || "生成失败，请稍后重试";
+        }
+        return;
+      }
+      await finishCardGeneration(data, words.length);
     };
   }
 

@@ -125,6 +125,7 @@ uvicorn app.main:app --reload --port 8000
 | `NEW_CARDS_PER_DAY` | 默认每日新卡数量 |
 | `DEFAULT_KNOWN_RANK` | 默认已认识的 NGSL 排名范围 |
 | `AI_FREE_DAILY_QUERY_LIMIT`、`AI_FREE_DAILY_CARD_LIMIT` | 平台 Key 的用户每日免费查询/制卡额度 |
+| `MAX_CARDS_PER_RUN`、`AI_CARD_GENERATION_DEADLINE_SECONDS` | 单次制卡上限与单次任务墙钟上限 |
 | `AI_DAILY_REQUEST_LIMIT`、`GUEST_AI_DAILY_LIMIT` | AI 内部请求和游客日调用限额 |
 | `MAX_UPLOAD_BYTES`、`USER_STORAGE_QUOTA_BYTES` | 单文件和单用户存储限制 |
 | `ALLOWED_HOSTS`、`COOKIE_SECURE` | 生产域名和安全 Cookie 配置 |

@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-from . import config
-
 
 class RegisterIn(BaseModel):
     email: str = Field(min_length=3, max_length=255)
@@ -55,7 +53,7 @@ class CardTargetsIn(BaseModel):
     text: str = Field(default="", max_length=1_000_000)
     from_rank: int = Field(default=3001, ge=1, le=100_000)
     to_rank: int = Field(default=5000, ge=1, le=100_000)
-    count: int = Field(default=100, ge=1, le=5000)
+    count: int = Field(default=100, ge=1, le=10_000)
     randomize: bool = False
     include_unknown: bool = False
     ngsl_filter: bool = False
@@ -63,7 +61,9 @@ class CardTargetsIn(BaseModel):
 
 
 class CardStudioCreateIn(BaseModel):
-    words: list[str] = Field(min_length=1, max_length=config.MAX_CARDS_PER_RUN)
+    # 提交上限覆盖内置词表/NGSL 全量提取（最大 31K）；实际单次生成量由
+    # 路由按 MAX_CARDS_PER_RUN 与免费额度截断，并返回 limit_notice 说明。
+    words: list[str] = Field(min_length=1, max_length=31_000)
     card_type: str = "reading"
     corpus_id: int | None = None
 

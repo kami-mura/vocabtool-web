@@ -96,16 +96,20 @@ USER_STORAGE_QUOTA_BYTES = min(
     50 * 1024 * 1024,
     _env_int("USER_STORAGE_QUOTA_BYTES", 50 * 1024 * 1024),
 )
-MAX_CARDS_PER_RUN = min(500, _env_int("MAX_CARDS_PER_RUN", 500))
+MAX_CARDS_PER_RUN = max(1, _env_int("MAX_CARDS_PER_RUN", 1000))
 AI_USAGE_RETENTION_DAYS = max(
     30, _env_int("AI_USAGE_RETENTION_DAYS", 180)
+)
+# 单次制卡任务的墙钟上限：1000 词按每批 10 词约需 20-30 分钟，默认给足。
+AI_CARD_GENERATION_DEADLINE_SECONDS = max(
+    300.0, _env_float("AI_CARD_GENERATION_DEADLINE_SECONDS", 1800.0)
 )
 # 每位用户每日 AI 请求上限（按站点时区自然日计数）；0 表示不限制。
 # 默认 3000：查词 100 次、制卡 2000 张（约 200-400 次批量请求）都不会触发。
 AI_DAILY_REQUEST_LIMIT = max(0, _env_int("AI_DAILY_REQUEST_LIMIT", 3000))
 # 平台 Key 的免费用量按业务动作分别限制；用户自带 Key 不消耗这些额度。
 AI_FREE_DAILY_QUERY_LIMIT = max(0, _env_int("AI_FREE_DAILY_QUERY_LIMIT", 50))
-AI_FREE_DAILY_CARD_LIMIT = max(0, _env_int("AI_FREE_DAILY_CARD_LIMIT", 50))
+AI_FREE_DAILY_CARD_LIMIT = max(0, _env_int("AI_FREE_DAILY_CARD_LIMIT", 200))
 AI_FREE_DAILY_ARTICLE_LIMIT = max(0, _env_int("AI_FREE_DAILY_ARTICLE_LIMIT", 1))
 
 # 全站未登录用户每日 AI 查词总量上限；0 表示不限制。

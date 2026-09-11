@@ -408,7 +408,7 @@ async def card_studio_targets_file(
     user = _require_user(db, request)
     if not 1 <= from_rank <= to_rank <= 100_000:
         raise HTTPException(status_code=400, detail="NGSL 排名范围不正确")
-    count = min(5000, max(1, count))
+    count = min(10_000, max(1, count))
     if not check_request_rate(
         db,
         action="targets-file",
@@ -516,10 +516,18 @@ def list_wordlists(request: Request, db: Session = Depends(get_db)):
 @router.get("/card-studio/quota")
 def get_card_studio_quota(request: Request, db: Session = Depends(get_db)):
     user = _require_user(db, request)
+    max_run = config.MAX_CARDS_PER_RUN
     if _user_ai_credential(db, user):
-        return {"uses_own_key": True, "limit": None, "used": 0, "remaining": None}
+        return {
+            "uses_own_key": True,
+            "limit": None,
+            "used": 0,
+            "remaining": None,
+            "max_cards_per_run": max_run,
+        }
     return {
         "uses_own_key": False,
+        "max_cards_per_run": max_run,
         **ai_mod.free_ai_quota_status(db, user.id, "card"),
     }
 
@@ -549,13 +557,6 @@ def create_cards_from_studio(
                 f"本次只制作前 {remaining} 张。"
             )
 
-    def _with_limit_notice(result: dict) -> dict:
-        result["submitted"] = submitted_count
-        result["processed"] = len(input_words)
-        if limit_notice:
-            result["limit_notice"] = limit_notice
-        return result
-
     if not check_request_rate(
         db,
         action="card-studio-cards",
@@ -569,6 +570,20 @@ def create_cards_from_studio(
     words = _parse_card_target_list("\n".join(input_words))[: config.MAX_CARDS_PER_RUN]
     if not words:
         raise HTTPException(status_code=400, detail="没有可用于制卡的词条")
+    if len(words) < len(input_words) and not limit_notice:
+        # 自带 Key（或免费额度足够）时仍受单次上限约束：明确告知截断范围。
+        limit_notice = (
+            f"单次最多生成 {config.MAX_CARDS_PER_RUN} 张，"
+            f"本次只处理前 {config.MAX_CARDS_PER_RUN} 个词。"
+        )
+
+    def _with_limit_notice(result: dict) -> dict:
+        result["submitted"] = submitted_count
+        result["processed"] = len(words)
+        if limit_notice:
+            result["limit_notice"] = limit_notice
+        return result
+
     try:
         if body.corpus_id:
             db_write_started = time.time()
@@ -621,6 +636,7 @@ def create_cards_from_studio(
                     "failed": result["failed"],
                     "error": "",
                     "limit_notice": result.get("limit_notice", ""),
+                    "processed": result["processed"],
                     "total": result["created"] + result["existing"] + len(result["failed"]),
                 },
             )
@@ -845,6 +861,7 @@ def create_cards_from_studio(
                 "failed": result["failed"],
                 "error": result["error"],
                 "limit_notice": result.get("limit_notice", ""),
+                "processed": result["processed"],
                 "total": result["created"] + result["existing"] + len(result["failed"]),
             },
         )

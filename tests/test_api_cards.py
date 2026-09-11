@@ -205,6 +205,30 @@ def test_own_api_key_is_not_truncated_by_free_card_limit(client, monkeypatch):
     assert "limit_notice" not in data
 
 
+def test_own_api_key_run_is_capped_at_max_cards_per_run(client, monkeypatch):
+    """自带 Key 单次提交超过 MAX_CARDS_PER_RUN 时按上限截断，并明确提示。"""
+    from app import config
+
+    monkeypatch.setattr(
+        "app.routes.card_routes._user_ai_credential", lambda _db, _user: object()
+    )
+    register(client, "own-key-run-cap@example.com")
+    over = config.MAX_CARDS_PER_RUN + 5
+    words = [f"runword{index}" for index in range(over)]
+
+    response = client.post(
+        "/api/card-studio/cards",
+        json={"card_type": "general", "words": words},
+    )
+
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert data["submitted"] == over
+    assert data["processed"] == config.MAX_CARDS_PER_RUN
+    assert data["created"] == config.MAX_CARDS_PER_RUN
+    assert str(config.MAX_CARDS_PER_RUN) in data["limit_notice"]
+
+
 def test_free_card_generation_uses_today_remaining_quota(client, monkeypatch):
     from app import ai, config
     from app.models import User
@@ -225,6 +249,7 @@ def test_free_card_generation_uses_today_remaining_quota(client, monkeypatch):
         "limit": 50,
         "used": 20,
         "remaining": 30,
+        "max_cards_per_run": config.MAX_CARDS_PER_RUN,
     }
 
     words = [f"remainingword{index}" for index in range(36)]
@@ -620,18 +645,23 @@ def test_card_studio_ngsl_targets_respect_range_and_order(client):
     assert ranks[0] >= 500 and ranks[-1] <= 1000
 
 
-def test_card_studio_accepts_at_most_five_hundred_input_words(client):
-    register(client, "studio-five-hundred@example.com")
+def test_card_studio_accepts_over_five_hundred_input_words(client):
+    """提交上限覆盖全量词表提取；实际生成量按单次上限截断并提示。"""
+    register(client, "studio-run-cap@example.com")
     accepted = client.post(
         "/api/card-studio/cards",
         json={"words": ["run"] * 500, "card_type": "general"},
     )
     assert accepted.status_code == 200, accepted.text
-    rejected = client.post(
+    truncated = client.post(
         "/api/card-studio/cards",
-        json={"words": ["run"] * 501, "card_type": "general"},
+        json={"words": [f"bulk{index}" for index in range(1001)], "card_type": "general"},
     )
-    assert rejected.status_code == 422
+    assert truncated.status_code == 200, truncated.text
+    data = truncated.json()
+    assert data["submitted"] == 1001
+    assert data["processed"] == 1000
+    assert "单次最多生成 1000 张" in data["limit_notice"]
 
 
 def test_ai_reading_card_is_a_sentence_and_repairs_legacy_front(client, monkeypatch):
