@@ -19,7 +19,8 @@
 
 日常学习任务统一使用 `deepseek-flash`。这些任务主要要求格式稳定和低延迟，
 不需要深度推理，因此默认 `thinking=disabled`。只有用户显式要求深度分析时才开启
-思考；短文生成固定使用思考模式 `max`，优先保证一篇长文覆盖全部目标词。
+思考；短文生成本身按快速模式运行（每 12 个目标词一篇），仅在显式要求
+更高质量时才开启思考。
 
 | 功能/入口 | 后端函数 | 温度 | 思考 | 强度 | 建议输出上限 | 建议超时/重试 |
 | --- | --- | ---: | --- | --- | ---: | --- |
@@ -31,7 +32,7 @@
 | 英语问答 `/api/lookups/question` | `answer_question` | 0.3 | 关闭 | 无 | 2048 | 45 秒；复杂问题可另设显式思考入口 |
 | 主题词表 `/api/words/topic` | `generate_topic_word_list` | 0.3–0.4 | 关闭 | 无 | 1024 | 30 秒；重试 1 次 |
 | 优先词筛选 `/api/words/priority-select` | `select_priority_words` | 0.1–0.2 | 关闭 | 无 | 2048 | 45 秒；模型失败时已有确定性顺序补足 |
-| AI 短文 `/api/cards/article` | `generate_article` | 思考模式不传温度；修复 0.1 | 固定开启 | `max` | 65536 | 首次 120 秒；最多 2 次，第二次快速修复 |
+| AI 短文 `/api/cards/article` | `generate_article` | 0.4；修复 0.1 | 默认关闭 | 显式开启时取 `AI_ARTICLE_REASONING_EFFORT` | 4096（快速）/ 8192（思考） | 快速 60 秒、思考 120 秒；最多 2 次，第二次快速修复 |
 
 DeepSeek V4 的思考模式不使用 `temperature`。开启思考时只发送
 `reasoning_effort=low/high/max`；快速模式不发送强度参数。`max` 只适合真正需要
@@ -60,10 +61,12 @@ client.chat.completions.create(
 
 ## 三、AI 短文的最终调用流程
 
-1. 浏览器提交生成请求后立即得到“已开始生成”的响应；后端固定发送
-   `thinking=enabled` 与 `reasoning_effort=max`。
-2. 当天全部目标词只生成一篇文章，长度约为目标词数 × 10。
-3. 后台任务生成这一篇文章；页面显示状态，浏览器连接中断也不会中止生成。
+1. 浏览器提交生成请求后立即得到“已开始生成”的响应；后端默认发送
+   `thinking=disabled` 快速生成，仅显式要求时才发送 `thinking=enabled`
+   与 `reasoning_effort`。
+2. 当天全部目标词按每 12 个一篇拆分（`AI_ARTICLE_TARGET_LIMIT`），
+   逐篇生成；响应体标明共几篇。
+3. 后台任务逐篇生成这些文章；页面显示状态，浏览器连接中断也不会中止生成。
 4. 只有 JSON 异常、漏词或瞬时网络错误时才进行一次快速修复（温度 0.1）。
 5. 生成失败时任务状态返回真实原因；旧文章保留，未完成的新文章不入库。
 6. 日志只记录目标词数量、调用次数、模式和耗时，不记录 API Key 或文章正文。

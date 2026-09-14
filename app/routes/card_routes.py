@@ -483,8 +483,9 @@ async def card_studio_targets_file(
 async def card_studio_progress(request: Request):
     """轮询当前用户的 AI 制卡进度（已制成 X / N 张卡）。
 
-    制卡是同步长任务，会占住默认线程池 worker 最长 300 秒；本路由若也走
-    默认线程池，40 个并发制卡即可把轮询饿死（前端进度条假死）。因此鉴权
+    制卡是同步长任务，会占住默认线程池 worker 最长
+    AI_CARD_GENERATION_DEADLINE_SECONDS（默认 1800 秒）；本路由若也走
+    默认线程池，少量并发制卡即可把轮询饿死（前端进度条假死）。因此鉴权
     与读数都放到独立小容量执行器里，不与制卡竞争默认线程池。
     """
     def _auth_and_read_progress() -> dict:
@@ -2022,6 +2023,10 @@ def generate_study_article(
     if not _start_article_generation(user.id, len(word_groups)):
         raise HTTPException(status_code=409, detail="今日短文正在生成，请稍候")
     if not user_credential:
+        # 免费短文额度按「次」计 1 个单位，但后台任务会按每 12 个目标词
+        # 分篇生成，目标词多时这一次可能对应几十次 AI 调用（成本高于其它
+        # 额度项，故 AI_FREE_DAILY_ARTICLE_LIMIT 默认为 1）。额度在任务
+        # 开始前扣除，后台失败不退还——如需更严的成本控制请调低该值。
         quota_error = ai_mod.free_ai_quota_reserve(
             db, user.id, "article", need=1
         )

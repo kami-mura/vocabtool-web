@@ -12,7 +12,7 @@ services:
       - --proxy-headers
       - --forwarded-allow-ips=127.0.0.1,172.16.0.0/12
     environment:
-      NEW_CARDS_PER_DAY: ${NEW_CARDS_PER_DAY:-20}
+      NEW_CARDS_PER_DAY: ${NEW_CARDS_PER_DAY:-10}
       DEFAULT_KNOWN_RANK: ${DEFAULT_KNOWN_RANK:-3000}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}

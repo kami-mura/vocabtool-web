@@ -69,8 +69,12 @@ def test_home_page_has_guest_search_demo_and_login_link(client):
     assert 'id="real-review" hidden' in page.text
     assert "游客每人可体验" not in page.text
     assert 'action="/login"' not in page.text
-    assert page.text.count('class="demo-card"') == 3
+    # 3 张示例卡：通用卡带 general-card class，另两张是阅读卡与 Cloze 卡。
+    assert page.text.count('class="demo-card"') == 2
     assert 'class="demo-card general-card"' in page.text
+    # 口语卡型已随卡片类型收敛移除，落地页不得再宣传做不出来的卡型。
+    assert "口语卡" not in page.text
+    assert "通用、阅读与 Cloze 卡" in page.text
     assert "onclick=" not in page.text
     assert "data-audio=" in page.text
     assert "data-demo-rating=" in page.text

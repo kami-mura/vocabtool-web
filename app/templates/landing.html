@@ -121,13 +121,12 @@
     <section class="landing-section" id="guest-demo-cards"{% if logged_in %} hidden{% endif %}>
       <div class="landing-section-head">
         <h2>体验学习卡片</h2>
-        <p>通用、阅读、Cloze 与口语卡，点击翻面体验</p>
+        <p>通用、阅读与 Cloze 卡，点击翻面体验</p>
       </div>
       {% set demo_cards = [
         {"type": "通用卡", "front": "<mark class='word-highlight'>pond</mark>", "answer": "pond /pɒnd/", "meaning": "n. 池塘", "sentence": "The children fed the ducks by the pond after school.", "audio": "pond", "audio_back": "The children fed the ducks by the pond after school.", "front_audio": true},
         {"type": "阅读卡", "front": "The old <mark class='word-highlight'>fisherman</mark> checked his net before sunrise.", "answer": "fisherman", "meaning": "n. 渔夫；钓鱼的人", "sentence": "", "audio": "The old fisherman checked his net before sunrise.", "front_audio": true},
-        {"type": "Cloze 卡", "front": "She spoke in a <mark class='word-highlight'>______</mark> voice so the baby would not wake.", "answer": "gentle /ˈdʒentl/", "meaning": "adj. 轻柔的；温和的", "sentence": "", "audio": "She spoke in a gentle voice so the baby would not wake.", "front_audio": false},
-        {"type": "口语卡", "front": "如何称赞对方说话很有感染力？", "answer": "Your words are truly eloquent.", "meaning": "称赞对方表达生动、有感染力", "sentence": "", "audio": "Your words are truly eloquent.", "front_audio": false}
+        {"type": "Cloze 卡", "front": "She spoke in a <mark class='word-highlight'>______</mark> voice so the baby would not wake.", "answer": "gentle /ˈdʒentl/", "meaning": "adj. 轻柔的；温和的", "sentence": "", "audio": "She spoke in a gentle voice so the baby would not wake.", "front_audio": false}
       ] %}
       <div class="demo-cards">
         {% for card in demo_cards %}

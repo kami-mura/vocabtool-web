@@ -19,7 +19,6 @@ ruff check app tests
 python -m compileall -q app tests
 node --check app/static/landing-v51.js
 node --check app/static/auth.js
-node --check app/static/skin.js
 node --check app/static/ui-polish.js
 ```
 
