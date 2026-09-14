@@ -69,6 +69,16 @@ def request_registration_code(
 
 @router.post("/register")
 def register(body: RegisterIn, request: Request, db: Session = Depends(get_db)):
+    # 注册关闭邮箱验证时本端点会直接做 PBKDF2 哈希并写库，必须限流；
+    # 阈值与 /register/request-code 一致，正常注册不会触发。
+    if not check_request_rate(
+        db,
+        action="register",
+        identity=_anonymous_request_identity(request),
+        limit=100,
+        window_minutes=60,
+    ):
+        raise HTTPException(status_code=429, detail="注册请求过多，请稍后再试")
     if config.EMAIL_VERIFICATION_REQUIRED:
         if len(body.code.strip()) != 6 or not body.code.strip().isdigit():
             raise HTTPException(status_code=400, detail="请输入 6 位邮箱验证码")

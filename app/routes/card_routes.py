@@ -567,11 +567,13 @@ def create_cards_from_studio(
         raise HTTPException(status_code=429, detail="制卡请求过多，请稍后再试")
     if body.card_type not in GENERATABLE_CARD_TYPES:
         raise HTTPException(status_code=400, detail="无效卡片类型")
-    words = _parse_card_target_list("\n".join(input_words))[: config.MAX_CARDS_PER_RUN]
+    parsed_words = _parse_card_target_list("\n".join(input_words))
+    words = parsed_words[: config.MAX_CARDS_PER_RUN]
     if not words:
         raise HTTPException(status_code=400, detail="没有可用于制卡的词条")
-    if len(words) < len(input_words) and not limit_notice:
-        # 自带 Key（或免费额度足够）时仍受单次上限约束：明确告知截断范围。
+    if len(parsed_words) > config.MAX_CARDS_PER_RUN and not limit_notice:
+        # 仅在真的被单次上限截断时提示；提交重复词或无效行会被解析阶段
+        # 去重/过滤，那属于另外的情况，不能报成「被 1000 上限截断」。
         limit_notice = (
             f"单次最多生成 {config.MAX_CARDS_PER_RUN} 张，"
             f"本次只处理前 {config.MAX_CARDS_PER_RUN} 个词。"

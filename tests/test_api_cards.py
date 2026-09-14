@@ -1382,3 +1382,19 @@ def test_clean_card_back_mnemonic_residue(client):
     finally:
         db.close()
 
+
+
+def test_card_studio_duplicate_words_do_not_report_cap_truncation(client):
+    """重复词在解析阶段被去重，不能报成「被单次 1000 上限截断」。"""
+    register(client, "dup-words-notice@example.com")
+    response = client.post(
+        "/api/card-studio/cards",
+        json={
+            "words": ["run", "run", "market", "market", "run"],
+            "card_type": "general",
+        },
+    )
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert data["processed"] == 2
+    assert "limit_notice" not in data

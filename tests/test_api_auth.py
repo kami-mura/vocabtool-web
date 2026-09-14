@@ -983,3 +983,33 @@ def test_startup_pruning_removes_expired_sessions_and_stale_review_requests():
         assert db.get(ReviewRequest, "stale-review-action") is None
     finally:
         db.close()
+
+
+def test_register_is_rate_limited(client, monkeypatch):
+    """注册端点必须限流：关闭邮箱验证时会直接做 PBKDF2 哈希并写库。"""
+    from app.routes import auth_routes
+
+    monkeypatch.setattr(
+        auth_routes, "check_request_rate", lambda *_args, **_kwargs: False
+    )
+    response = client.post(
+        "/api/register",
+        json={"email": "rate-limited-register@example.com", "password": "password123"},
+    )
+    assert response.status_code == 429
+    assert "注册请求过多" in response.json()["detail"]
+
+
+def test_register_proceeds_when_rate_limit_allows(client, monkeypatch):
+    """限流放行时注册行为保持不变（本次只新增限流，不改注册流程）。"""
+    from app.routes import auth_routes
+
+    monkeypatch.setattr(
+        auth_routes, "check_request_rate", lambda *_args, **_kwargs: True
+    )
+    response = client.post(
+        "/api/register",
+        json={"email": "allowed-register@example.com", "password": "password123"},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["email"] == "allowed-register@example.com"

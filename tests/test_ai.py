@@ -888,3 +888,197 @@ def test_priority_select_maps_ai_output_back_to_input(monkeypatch):
     assert error is None
     assert set(result["selected"]) == {"apple", "banana"}
     assert result["remaining"] == ["cherry"]
+
+
+def test_free_ai_quota_refund_restores_and_clamps(monkeypatch):
+    from app.db import SessionLocal
+    from app.models import AiFreeDailyQuota, User
+
+    monkeypatch.setattr(config, "AI_FREE_DAILY_CARD_LIMIT", 3)
+    db = SessionLocal()
+    try:
+        user = User(email="refund-card@example.com", password_hash="x", salt="y")
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+        assert ai.free_ai_quota_reserve(db, user.id, "card", need=3) is None
+        assert ai.free_ai_quota_status(db, user.id, "card")["used"] == 3
+        ai.free_ai_quota_refund(db, user.id, "card", need=2)
+        assert ai.free_ai_quota_status(db, user.id, "card")["used"] == 1
+        # 退还永远不会把计数减到 0 以下（并发下额度已被他人用掉时不动）
+        ai.free_ai_quota_refund(db, user.id, "card", need=5)
+        assert ai.free_ai_quota_status(db, user.id, "card")["used"] == 1
+        row = db.query(AiFreeDailyQuota).filter_by(user_id=user.id).one()
+        assert row.card_count == 1
+        # 只影响指定类型，不误伤同一天的其他额度
+        assert row.query_count == 0
+        assert row.article_count == 0
+    finally:
+        db.close()
+
+
+def test_unbillable_failure_classification():
+    class APIConnectionError(Exception):
+        pass
+
+    class APITimeoutError(Exception):
+        pass
+
+    class _StatusError(Exception):
+        def __init__(self, status_code):
+            super().__init__(str(status_code))
+            self.status_code = status_code
+
+    # 请求根本没发出去：并发槽满、连接错误/超时、非 429 的 4xx
+    assert ai._is_unbillable_failure(ai._AiBusyError("busy")) is True
+    assert ai._is_unbillable_failure(APIConnectionError("x")) is True
+    assert ai._is_unbillable_failure(APITimeoutError("x")) is True
+    assert ai._is_unbillable_failure(_StatusError(401)) is True
+    assert ai._is_unbillable_failure(_StatusError(400)) is True
+    assert ai._is_unbillable_failure(_StatusError(402)) is True
+    # 429 与 5xx 视为请求已到达上游，按既有语义照常计费
+    assert ai._is_unbillable_failure(_StatusError(429)) is False
+    assert ai._is_unbillable_failure(_StatusError(500)) is False
+    assert ai._is_unbillable_failure(ValueError("boom")) is False
+
+
+def test_explain_lookup_refunds_logged_in_free_quota_when_busy(monkeypatch):
+    from app.db import SessionLocal
+    from app.models import User
+
+    monkeypatch.setattr(config, "AI_FREE_DAILY_QUERY_LIMIT", 5)
+    monkeypatch.setattr(config, "AI_DAILY_REQUEST_LIMIT", 0)
+    monkeypatch.setattr(ai, "ai_enabled", lambda: True)
+    monkeypatch.setattr(ai, "_new_ai_client", lambda: object())
+    monkeypatch.setattr(ai.time, "sleep", lambda _seconds: None)
+
+    def busy_chat(_client, **kwargs):
+        raise ai._AiBusyError("AI 请求繁忙，请稍后重试")
+
+    monkeypatch.setattr(ai, "_chat_completion", busy_chat)
+    db = SessionLocal()
+    try:
+        user = User(email="busy-lookup@example.com", password_hash="x", salt="y")
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+        result, error, charged = ai.explain_lookup(db, user.id, "quasar", "word")
+        assert result is None
+        # 提示必须指向「服务器忙」，而不是让用户去查 Key / 余额
+        assert "繁忙" in error
+        assert charged is False
+        assert ai.free_ai_quota_status(db, user.id, "query")["used"] == 0
+    finally:
+        db.close()
+
+
+def test_explain_lookup_does_not_refund_on_rate_limit(monkeypatch):
+    """429 表示请求已到达上游，按既有语义不退款。"""
+    from app.db import SessionLocal
+    from app.models import User
+
+    class RateLimitError(Exception):
+        status_code = 429
+
+    monkeypatch.setattr(config, "AI_FREE_DAILY_QUERY_LIMIT", 5)
+    monkeypatch.setattr(config, "AI_DAILY_REQUEST_LIMIT", 0)
+    monkeypatch.setattr(ai, "ai_enabled", lambda: True)
+    monkeypatch.setattr(ai, "_new_ai_client", lambda: object())
+    monkeypatch.setattr(ai.time, "sleep", lambda _seconds: None)
+    monkeypatch.setattr(
+        ai, "_chat_completion", lambda _client, **kwargs: (_ for _ in ()).throw(RateLimitError("429"))
+    )
+    db = SessionLocal()
+    try:
+        user = User(email="rate-limit@example.com", password_hash="x", salt="y")
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+        result, error, charged = ai.explain_lookup(db, user.id, "quasar", "word")
+        assert result is None
+        assert charged is True
+        assert ai.free_ai_quota_status(db, user.id, "query")["used"] == 1
+    finally:
+        db.close()
+
+
+def test_explain_lookup_retries_transient_connection_error(monkeypatch):
+    from app.db import SessionLocal
+    from app.models import User
+
+    class APIConnectionError(Exception):
+        pass
+
+    monkeypatch.setattr(config, "AI_FREE_DAILY_QUERY_LIMIT", 0)
+    monkeypatch.setattr(config, "AI_DAILY_REQUEST_LIMIT", 0)
+    monkeypatch.setattr(ai, "ai_enabled", lambda: True)
+    monkeypatch.setattr(ai, "_new_ai_client", lambda: object())
+    monkeypatch.setattr(ai.time, "sleep", lambda _seconds: None)
+
+    calls = {"count": 0}
+
+    def flaky_chat(_client, **kwargs):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            raise APIConnectionError("temporary")
+        return _fake_chat_response(
+            "environment /ɪnˈvaɪrənmənt/\n1. 环境 | The surroundings\n"
+            "• The environment needs our protection.\n环境需要我们的保护。"
+        )
+
+    monkeypatch.setattr(ai, "_chat_completion", flaky_chat)
+    db = SessionLocal()
+    try:
+        user = User(email="retry-lookup@example.com", password_hash="x", salt="y")
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+        result, error, _charged = ai.explain_lookup(
+            db, user.id, "environment", "word"
+        )
+        # 连接错误属于可重试类别：一次抖动不再直接判失败
+        assert calls["count"] == 2
+        assert error is None
+        assert result is not None
+    finally:
+        db.close()
+
+
+def test_card_generation_busy_requeues_without_burning_attempts(monkeypatch):
+    from app.db import SessionLocal
+    from app.models import User
+
+    monkeypatch.setattr(config, "AI_FREE_DAILY_CARD_LIMIT", 5)
+    monkeypatch.setattr(config, "AI_DAILY_REQUEST_LIMIT", 0)
+    monkeypatch.setattr(ai, "ai_enabled", lambda: True)
+    monkeypatch.setattr(ai, "_new_ai_client", lambda: object())
+    monkeypatch.setattr(ai.time, "sleep", lambda _seconds: None)
+    # 全忙时会一直排队：把墙钟预算压到极短，避免测试等默认的 1800 秒
+    monkeypatch.setattr(ai, "_AI_CARD_GENERATION_DEADLINE_SECONDS", 0.05)
+
+    def busy_chat(_client, **kwargs):
+        raise ai._AiBusyError("AI 请求繁忙，请稍后重试")
+
+    monkeypatch.setattr(ai, "_chat_completion", busy_chat)
+    db = SessionLocal()
+    try:
+        user = User(email="busy-cards@example.com", password_hash="x", salt="y")
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+        results, errors, _count, _timings = ai._generate_card_content_locked(
+            user.id, ["alpha", "beta", "gamma"], "general"
+        )
+        assert results == {}
+        # 关键：不能报成「AI 请求多次失败」——那是把服务器自身限流
+        # 说成了模型或用户的问题，并会静默丢弃整批词。
+        assert all("多次失败" not in message for message in errors.values())
+        # 请求从未发出，预扣的免费制卡额度必须退回
+        assert ai.free_ai_quota_status(db, user.id, "card")["used"] == 0
+    finally:
+        db.close()

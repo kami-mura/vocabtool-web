@@ -34,6 +34,8 @@ AI_DEFINITION_FRONT_BATCH_SIZE = 5
 # 模型返回不合格时只做有限次修复；确定性校验会阻止坏卡入库。
 AI_CARD_MAX_ATTEMPTS = 2
 AI_CARD_NETWORK_RETRIES = 2
+# 本机并发槽满时，整批退回队尾前的等待时间；避免空转抢槽。
+AI_CARD_BUSY_RETRY_SECONDS = 1.0
 AI_CARD_TEMPERATURE = 0.3
 AI_REQUEST_TIMEOUT_SECONDS = 120.0
 # 结构化输出任务按业务规模设置上限；不要让简短查词继承全局 8192。
@@ -50,6 +52,15 @@ _AI_CARD_GENERATION_DEADLINE_SECONDS = config.AI_CARD_GENERATION_DEADLINE_SECOND
 # 同一用户同时只允许一个制卡任务，避免并发提交占满线程池与 AI 配额。
 _AI_CARD_PER_USER_CONCURRENCY = 1
 _AI_REQUEST_SLOTS = threading.BoundedSemaphore(4)
+
+
+class _AiBusyError(RuntimeError):
+    """本机 AI 并发槽已满：请求根本没发出去。
+
+    与真实网络/上游错误区分开，才能做到「不计入用户的重试预算」。
+    """
+
+
 _AI_QUOTA_EXCEEDED = "今日 AI 调用次数已达上限，请明天再试或联系管理员"
 _FREE_QUERY_QUOTA_EXCEEDED = (
     "今日免费 AI 查询额度已用完，请明天再试或配置自己的 API Key"
@@ -227,6 +238,9 @@ def _safe_api_error(exc: Exception, action: str, user_api_key=None) -> str:
         return f"{model} 请求参数或模型不可用，请检查模型配置"
     if error_name in {"APIConnectionError", "APITimeoutError"}:
         return f"本机暂时无法连接 {model}，请检查网络后重试"
+    if isinstance(exc, _AiBusyError):
+        # 本机并发槽已满，与模型无关，不要给出「检查 Key/余额」类误导提示。
+        return "AI 请求繁忙，请稍后重试"
     if isinstance(exc, json.JSONDecodeError):
         return f"{model} 返回格式异常，请重新查询"
     return f"{model} 查询暂时失败，请稍后重试"
@@ -444,7 +458,7 @@ def _chat_completion(
         kwargs["reasoning_effort"] = reasoning_effort
     kwargs.setdefault("max_tokens", 8192)
     if not _AI_REQUEST_SLOTS.acquire(blocking=False):
-        raise RuntimeError("AI 请求繁忙，请稍后重试")
+        raise _AiBusyError("AI 请求繁忙，请稍后重试")
     try:
         response = client.chat.completions.create(**kwargs)
         usage = getattr(response, "usage", None)
@@ -1109,6 +1123,67 @@ def free_ai_quota_status(
     return {"limit": limit, "used": used, "remaining": max(0, limit - used)}
 
 
+def free_ai_quota_refund(
+    db: Session, user_id: int, quota_type: str, need: int = 1
+) -> None:
+    """退还平台 Key 的登录用户免费额度（用户无责失败时调用）。
+
+    与 `guest_ai_quota_refund` 对称：只在「请求根本没发出去」时使用，
+    计数不会减到 0 以下（并发下若已被其他请求用掉则不退还）。
+    """
+    if quota_type not in {"query", "card", "article"}:
+        raise ValueError("unsupported free AI quota type")
+    need = max(1, int(need))
+    columns = {
+        "query": AiFreeDailyQuota.query_count,
+        "card": AiFreeDailyQuota.card_count,
+        "article": AiFreeDailyQuota.article_count,
+    }
+    column = columns[quota_type]
+    now = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
+    db.execute(
+        update(AiFreeDailyQuota)
+        .where(
+            AiFreeDailyQuota.user_id == user_id,
+            AiFreeDailyQuota.day == _quota_day(),
+            column >= need,
+        )
+        .values({column.key: column - need, "updated_at": now})
+    )
+    db.commit()
+
+
+def _is_unbillable_failure(exc: Exception) -> bool:
+    """失败是否属于「请求未真正生效」——这类失败不该扣用户免费额度。
+
+    算：并发槽满、连接错误/超时、非 429 的 4xx（认证/参数/余额类永久错误）。
+    不算：429 与 5xx —— 请求已到达上游，按既有语义照常计费。
+    """
+    if isinstance(exc, _AiBusyError):
+        return True
+    if type(exc).__name__ in {"APIConnectionError", "APITimeoutError"}:
+        return True
+    status = getattr(exc, "status_code", None)
+    return isinstance(status, int) and 400 <= status < 500 and status != 429
+
+
+def _refund_unbillable_free_quota(
+    db: Session, user_id: int | None, quota_type: str, exc: Exception | None
+) -> bool:
+    """按「该不该由用户买单」退还平台 Key 免费额度，返回是否已退还。
+
+    游客沿用原有行为（任何失败都退，计的是全站共享额度）；
+    登录用户只在请求未真正生效时退（见 `_is_unbillable_failure`）。
+    """
+    if user_id is None:
+        guest_ai_quota_refund(db)
+        return True
+    if exc is None or not _is_unbillable_failure(exc):
+        return False
+    free_ai_quota_refund(db, user_id, quota_type)
+    return True
+
+
 def guest_ai_quota_reserve(db: Session, need: int = 1) -> str | None:
     """全站游客每日 AI 查词总量原子预占（跨进程安全，按站点时区自然日）。"""
     limit = int(config.GUEST_AI_DAILY_LIMIT or 0)
@@ -1212,9 +1287,27 @@ def _generate_card_content_locked(
                 _empty_timings(),
             )
 
+    def _refund_unbilled_card_quota(unbilled: int) -> None:
+        """退还「已预扣额度、但请求从未发出」的制卡免费额度。
+
+        只处理平台 Key 用户（自带 Key 不消耗免费额度）；只退从未真正
+        发起过请求的词，避免用超时/反复失败来套取额度。
+        """
+        if user_api_key or not reserve_card_quota or unbilled <= 0:
+            return
+        quota_db = SessionLocal()
+        try:
+            free_ai_quota_refund(quota_db, user_id, "card", need=unbilled)
+        except Exception:
+            logger.warning("card free quota refund failed", exc_info=True)
+        finally:
+            quota_db.close()
+
     try:
         client = _new_ai_client(user_api_key) if user_api_key else _new_ai_client()
     except Exception as exc:
+        # 客户端都建不起来，这批词一个请求都没发出去，额度全额退还。
+        _refund_unbilled_card_quota(len(unique_words))
         error = _safe_api_error(exc, "card client", user_api_key)
         return {}, {word: error for word in unique_words}, 0, _empty_timings()
 
@@ -1229,7 +1322,9 @@ def _generate_card_content_locked(
     # 口语卡同样只做有限次修复；无限重试会放大 Flash 的格式抖动和延迟。
     max_attempts = AI_CARD_MAX_ATTEMPTS
 
-    def generate_one_batch(batch: list[str]) -> tuple[str, str, int, float]:
+    def generate_one_batch(
+        batch: list[str],
+    ) -> tuple[str, str, int, float, bool]:
         started = time.time()
         content = ""
         request_error = ""
@@ -1271,6 +1366,7 @@ def _generate_card_content_locked(
                     return _call_ai_card_batch(client, batch, card_template)
                 raise
 
+        ai_busy = False
         for network_attempt in range(AI_CARD_NETWORK_RETRIES):
             attempts += 1
             try:
@@ -1281,13 +1377,22 @@ def _generate_card_content_locked(
                     )
                 request_error = ""
                 break
+            except _AiBusyError as exc:
+                # 请求没发出去：不计入本批的请求次数与网络重试，
+                # 由外层队列重新排入队尾（不消耗该词的尝试预算）。
+                attempts -= 1
+                ai_busy = True
+                request_error = _safe_api_error(
+                    exc, "card generation", user_api_key
+                )
+                break
             except Exception as exc:
                 request_error = _safe_api_error(
                     exc, "card generation", user_api_key
                 )
                 if network_attempt < AI_CARD_NETWORK_RETRIES - 1:
                     time.sleep(1 + network_attempt)
-        return content, request_error, attempts, time.time() - started
+        return content, request_error, attempts, time.time() - started, ai_busy
 
     # 串行队列：每轮只取队头 10 个词、发一个请求；成功的计入结果，
     # 失败的（网络错误或格式不合格）放回队尾，直到队列清空全部制成。
@@ -1330,9 +1435,23 @@ def _generate_card_content_locked(
                 _report_round()
                 break
 
-            content, request_error, attempts, elapsed = generate_one_batch(batch)
+            content, request_error, attempts, elapsed, ai_busy = generate_one_batch(
+                batch
+            )
             request_count += attempts
             timings["ai_wait_seconds"] += elapsed
+            if ai_busy:
+                # 本机槽位满：整批原样放回队尾，并退回上面预扣的尝试次数。
+                # 否则「服务器自己忙」会把这批词判成「AI 请求多次失败」并静默丢弃。
+                for word in batch:
+                    key = _card_word_key(word)
+                    attempts_by_key[key] = max(
+                        0, attempts_by_key.get(key, 0) - 1
+                    )
+                pending.extend(batch)
+                time.sleep(AI_CARD_BUSY_RETRY_SECONDS)
+                _report_round()
+                continue
             if request_error:
                 # 整批失败：放回队尾，直到达到单词尝试上限。
                 for word in batch:
@@ -1367,6 +1486,14 @@ def _generate_card_content_locked(
         # 写入最终结果，前端轮询到 done 后停止；条目 120 秒 TTL 自动清理。
 
     timings["ai_wait_seconds"] = round(float(timings["ai_wait_seconds"]), 1)
+    # 排队期间撞上墙钟超时、或全程只遇到「本机槽位满」的词，请求从未发出，
+    # 预扣的免费额度应退还（否则服务器自己忙要用户买单）。
+    unbilled = sum(
+        1
+        for word in unique_words
+        if attempts_by_key.get(_card_word_key(word), 0) == 0
+    )
+    _refund_unbilled_card_quota(unbilled)
     return results, errors, request_count, timings
 
 
@@ -1528,6 +1655,7 @@ def explain_lookup(
     try:
         client = _new_ai_client(user_api_key) if user_api_key else _new_ai_client()
         last_error = f"{_active_model(user_api_key)} 查询暂时失败，请稍后重试"
+        last_exc: Exception | None = None
         for attempt in range(AI_CARD_NETWORK_RETRIES):
             try:
                 response = _chat_completion(
@@ -1602,6 +1730,7 @@ def explain_lookup(
                 return result, None, charged
             except Exception as exc:
                 db.rollback()
+                last_exc = exc
                 status = getattr(exc, "status_code", None)
                 if (
                     not user_api_key
@@ -1658,20 +1787,29 @@ def explain_lookup(
                         logger.warning("deepseek fallback also failed: %s", type(fb_exc).__name__)
 
                 last_error = _safe_api_error(exc, "lookup", user_api_key)
-                if status != 503 or attempt >= AI_CARD_NETWORK_RETRIES - 1:
-                    if user_id is None and reserve_quota:
-                        guest_ai_quota_refund(db)
+                # 与短文路径一致的分类：连接错误/超时没有 status_code，
+                # 只认 503 会让一次瞬时抖动直接失败。认证/参数类不重试。
+                retryable = status in {500, 502, 503, 504} or type(exc).__name__ in {
+                    "APIConnectionError",
+                    "APITimeoutError",
+                }
+                if not retryable or attempt >= AI_CARD_NETWORK_RETRIES - 1:
+                    if reserve_quota and _refund_unbillable_free_quota(
+                        db, user_id, "query", exc
+                    ):
                         charged = False
                     return None, last_error, charged
                 time.sleep(1 + attempt)
-        if user_id is None and reserve_quota:
-            guest_ai_quota_refund(db)
+        if reserve_quota and _refund_unbillable_free_quota(
+            db, user_id, "query", last_exc
+        ):
             charged = False
         return None, last_error, charged
     except Exception as exc:
         db.rollback()
-        if user_id is None and reserve_quota:
-            guest_ai_quota_refund(db)
+        if reserve_quota and _refund_unbillable_free_quota(
+            db, user_id, "query", exc
+        ):
             charged = False
         return None, _safe_api_error(exc, "lookup", user_api_key), charged
 
