@@ -463,3 +463,165 @@ def test_card_due_nullable_fk_failure_rolls_back(monkeypatch, tmp_path):
         assert "009_card_due_nullable" not in versions
     finally:
         connection.close()
+
+
+def _downgrade_cards_to_pre_027(path):
+    """把已建好的 cards 表改造成迁移 027 之前的结构（含 uq_user_word_type）。
+
+    迁移 027 的重建分支只在旧库存在该约束时才执行；测试 fixture 不带这个
+    约束，等于这条会 DROP TABLE cards 的迁移从来没在 CI 里跑过。
+    """
+    connection = sqlite3.connect(path)
+    try:
+        rows = list(connection.execute("PRAGMA table_info(cards)"))
+        column_names = [row[1] for row in rows]
+        defs = []
+        for _cid, name, coltype, notnull, default, pk in rows:
+            piece = f'"{name}" {coltype or "TEXT"}'
+            if notnull:
+                piece += " NOT NULL"
+            if default is not None:
+                piece += f" DEFAULT {default}"
+            if pk:
+                piece += " PRIMARY KEY"
+            defs.append(piece)
+        defs.append("CONSTRAINT uq_user_word_type UNIQUE (user_id, word, card_type)")
+        defs.append(
+            "CONSTRAINT uq_cards_user_anki_guid UNIQUE (user_id, anki_guid)"
+        )
+        defs.append(
+            "FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE"
+        )
+        insert_columns = ",".join(f'"{name}"' for name in column_names)
+        connection.executescript(
+            "CREATE TABLE cards_legacy (\n"
+            + ",\n".join(defs)
+            + "\n);\n"
+            + f"INSERT INTO cards_legacy ({insert_columns}) "
+            + f"SELECT {insert_columns} FROM cards;\n"
+            + "DROP TABLE cards;\n"
+            + "ALTER TABLE cards_legacy RENAME TO cards;\n"
+            + "CREATE INDEX ix_cards_test_user_word ON cards (user_id, word);\n"
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+
+def test_anki_multi_template_migration_rebuilds_cards_table(monkeypatch, tmp_path):
+    """迁移 027 会 DROP TABLE cards 后重建，必须验证行数、外键与约束语义。
+
+    用带 uq_user_word_type 的真实旧库 fixture 触发重建分支（否则该分支在
+    CI 里永远不执行），并校验：行数与内容保留、具名索引恢复、非 anki 卡的
+    唯一性继续生效、anki 卡可以同词多张、重复执行幂等。
+    """
+    from app import models  # noqa: F401  # 注册表结构
+
+    path = str(tmp_path / "anki027.db")
+    engine = create_engine(f"sqlite:///{path}")
+    db_mod.Base.metadata.create_all(bind=engine)
+    connection = sqlite3.connect(path)
+    try:
+        connection.execute(
+            "INSERT INTO users (id, email, password_hash, salt) "
+            "VALUES (1, 'anki027@example.com', 'x', 'y')"
+        )
+        connection.execute(
+            "INSERT INTO cards (id, user_id, word, card_type, front, back, "
+            "learning_step, session_reduce_day, session_reduce_used) "
+            "VALUES (1, 1, 'harbor', 'general', 'harbor', '港口', 0, '', 0)"
+        )
+        connection.execute(
+            "INSERT INTO cards (id, user_id, word, card_type, front, back, anki_guid, "
+            "learning_step, session_reduce_day, session_reduce_used) "
+            "VALUES (2, 1, 'lantern', 'anki', 'lantern', '灯笼', 'guid-basic', 0, '', 0)"
+        )
+        connection.commit()
+    finally:
+        connection.close()
+    _downgrade_cards_to_pre_027(path)
+
+    monkeypatch.setattr(db_mod, "engine", engine)
+    db_mod.init_db()
+
+    def _inspect():
+        inspector_connection = sqlite3.connect(path)
+        try:
+            uniques = {
+                row[1]
+                for row in inspector_connection.execute("PRAGMA index_list(cards)")
+                if row[2] == 1
+            }
+            indexes = {
+                row[1] for row in inspector_connection.execute("PRAGMA index_list(cards)")
+            }
+            rows = sorted(
+                inspector_connection.execute(
+                    "SELECT id, word, card_type, anki_guid FROM cards ORDER BY id"
+                ).fetchall()
+            )
+            violations = inspector_connection.execute(
+                "PRAGMA foreign_key_check"
+            ).fetchall()
+            return uniques, indexes, rows, violations
+        finally:
+            inspector_connection.close()
+
+    _uniques, indexes, rows, violations = _inspect()
+    # 行数与内容一字不差地保留（重建是 DROP + 复制，最怕静默丢行）
+    assert rows == [
+        (1, "harbor", "general", None),
+        (2, "lantern", "anki", "guid-basic"),
+    ]
+    assert violations == []
+    # 具名索引被原样恢复
+    assert "ix_cards_test_user_word" in indexes
+
+    connection = sqlite3.connect(path)
+    try:
+        indexes_after = {
+            row[1] for row in connection.execute("PRAGMA index_list(cards)")
+        }
+        assert "uq_cards_word_type_non_anki" in indexes_after, (
+            "重建后必须补上非 anki 卡的部分唯一索引"
+        )
+        # 直接证明重建分支真的跑了：旧约束必须消失
+        assert not any(
+            "uq_user_word_type" in str(row[1])
+            for row in connection.execute("PRAGMA index_list(cards)")
+        ), "uq_user_word_type 必须已被重建移除"
+        # 非 anki 卡的同 (user, word, type) 重复仍被拒绝
+        connection.execute(
+            "INSERT INTO cards (id, user_id, word, card_type, front, back, "
+            "learning_step, session_reduce_day, session_reduce_used) "
+            "VALUES (10, 1, 'harbor', 'general', 'harbor', '港口', 0, '', 0)"
+        )
+        duplicate_rejected = False
+    except sqlite3.IntegrityError:
+        duplicate_rejected = True
+    finally:
+        connection.rollback()
+        connection.close()
+    assert duplicate_rejected, "非 anki 卡的同词同类型去重规则必须保持"
+
+    connection = sqlite3.connect(path)
+    try:
+        # anki 卡：同一 note 的多模板允许同 (user, word, 'anki')，guid 天然区分
+        connection.execute(
+            "INSERT INTO cards (id, user_id, word, card_type, front, back, anki_guid, "
+            "learning_step, session_reduce_day, session_reduce_used) "
+            "VALUES (3, 1, 'lantern', 'anki', 'lantern', '灯笼', 'guid-reverse', 0, '', 0)"
+        )
+        connection.commit()
+        anki_count = connection.execute(
+            "SELECT COUNT(*) FROM cards WHERE card_type = 'anki' AND word = 'lantern'"
+        ).fetchone()[0]
+    finally:
+        connection.close()
+    assert anki_count == 2, "一个 note 的多模板卡必须能同时存在"
+
+    # 幂等：再跑一次不报错、不丢行
+    db_mod.init_db()
+    _uniques, _indexes, rows_again, violations_again = _inspect()
+    assert violations_again == []
+    assert [row[0] for row in rows_again] == [1, 2, 3]
