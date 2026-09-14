@@ -328,6 +328,9 @@
   const floatingLookupBody = document.getElementById("floating-lookup-body");
   let floatingQuery = "";
   let floatingCloseTimer = null;
+  // 查询序号守卫：连续双击不同内容时，慢响应不得覆盖后发出的查询结果
+  // （同 realReviewQueueVersion 的既有模式）。
+  let floatingLookupVersion = 0;
 
   function closeFloatingLookup() {
     floatingQuery = "";
@@ -352,6 +355,7 @@
     clearTimeout(floatingCloseTimer);
     if (floatingQuery === text) return;
     floatingQuery = text;
+    const floatingVersion = ++floatingLookupVersion;
     floatingLookup.hidden = false;
     floatingLookup.setAttribute("aria-busy", "true");
     floatingLookupBody.innerHTML =
@@ -401,16 +405,21 @@
         html = '<div class="qa-rich">' + renderRichText(data.answer || "") + "</div>" +
           (data.lookup ? lookupCardActionHtml(data.lookup) : "");
       }
+      if (floatingVersion !== floatingLookupVersion) return;
       floatingLookupBody.innerHTML =
         '<div class="lookup-answer card">' + html +
         '<div class="lookup-actions" style="margin-top:12px">' +
         '<button class="small" data-close-floating-lookup type="button">关闭</button></div></div>';
     } catch (err) {
+      // 已有更新的查询在进行：丢弃这次失败，别用它盖掉后发的结果。
+      if (floatingVersion !== floatingLookupVersion) return;
       floatingQuery = "";
       floatingLookupBody.innerHTML =
         '<div class="lookup-explanation muted">' + escapeHtml(err.message) + "</div>";
     } finally {
-      floatingLookup.setAttribute("aria-busy", "false");
+      if (floatingVersion === floatingLookupVersion) {
+        floatingLookup.setAttribute("aria-busy", "false");
+      }
     }
   }
 
@@ -639,6 +648,11 @@
   let realReviewCelebrated = false;
   let realReviewRemainingTotal = 0;
   let realReviewRemaining = {};
+  // 服务端会按上限截断队列（到期 1000 / 重复 500），此时本地队列长度小于
+  // 真实剩余数。记下「加载时刻的服务端真实剩余」与「本地实际取到的数量」，
+  // 重算时把差额加回来，避免剩余数被越算越小、提前判定「今天的学习完成」。
+  let realReviewServerRemaining = null;
+  let realReviewLoadedCounts = null;
   let realReviewCanExtraNew = false;
   let realReviewTotalCards = 0;
   let realReviewLoaded = false;
@@ -1148,16 +1162,39 @@
     }
   }
 
-  function recalcRealReviewRemaining() {
+  function realReviewKindCounts(queue) {
     const byKind = { new: 0, due: 0, again: 0 };
-    realReviewQueue.forEach((item) => {
+    (queue || []).forEach((item) => {
       const kind = item.queue_kind === "new"
         ? "new"
         : item.queue_kind === "again" ? "again" : "due";
       byKind[kind] += 1;
     });
+    return byKind;
+  }
+
+  // 未被本次加载取到的剩余量（服务端真实剩余 − 本地已取到）。
+  function realReviewQueueSurplus() {
+    const surplus = { new: 0, due: 0, again: 0 };
+    if (!realReviewServerRemaining || !realReviewLoadedCounts) return surplus;
+    Object.keys(surplus).forEach((kind) => {
+      surplus[kind] = Math.max(
+        0,
+        Number(realReviewServerRemaining[kind] || 0) -
+          Number(realReviewLoadedCounts[kind] || 0)
+      );
+    });
+    return surplus;
+  }
+
+  function recalcRealReviewRemaining() {
+    const byKind = realReviewKindCounts(realReviewQueue);
+    const surplus = realReviewQueueSurplus();
+    Object.keys(byKind).forEach((kind) => {
+      byKind[kind] += surplus[kind];
+    });
     realReviewRemaining = byKind;
-    realReviewRemainingTotal = realReviewQueue.length;
+    realReviewRemainingTotal = byKind.new + byKind.due + byKind.again;
   }
 
   function updateRemainingBadge() {
@@ -1236,6 +1273,8 @@
       realReviewCelebrated = false;
       const remaining = data.remaining_counts || {};
       realReviewRemaining = remaining;
+      realReviewServerRemaining = remaining;
+      realReviewLoadedCounts = realReviewKindCounts(realReviewQueue);
       realReviewCanUndo = Boolean(data.can_undo);
       realReviewRemainingTotal =
         Number(remaining.due || 0) +
@@ -1888,6 +1927,8 @@
         realReviewTotalCards = Number(data.total_cards) || realReviewTotalCards;
         const remaining = data.remaining_counts || {};
         realReviewRemaining = remaining;
+        realReviewServerRemaining = remaining;
+        realReviewLoadedCounts = realReviewKindCounts(realReviewQueue);
         realReviewRemainingTotal =
           Number(remaining.due || 0) +
           Number(remaining.new || 0) +
