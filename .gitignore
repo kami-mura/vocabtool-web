@@ -3,6 +3,8 @@ __pycache__/
 .venv/
 venv/
 .env
+.env.*
+!.env.example
 data/*
 !data/ngsl_sfi_31k.csv
 !data/sample_article.txt
@@ -17,6 +19,8 @@ backups/
 # 内部实施计划与过程文档，不随仓库公开
 docs/superpowers/
 docs/稳定性与数据安全审查报告*.md
+# 审查整改清单含未修复弱点的精确位置，等同攻击路线图，不随公开仓库发布
+docs/审查整改清单.md
 
 # 本地工具记忆文件
 .workbuddy/

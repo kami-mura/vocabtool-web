@@ -482,13 +482,6 @@ def extract_epub_chapters(
         return chapters
 
 
-def extract_epub(data: bytes, max_uncompressed_bytes: int = _ARCHIVE_UNCOMPRESSED_LIMIT) -> str:
-    chapters = extract_epub_chapters(
-        data, max_chapter_bytes=max_uncompressed_bytes
-    )
-    return "\n\n".join(chapter["text"] for chapter in chapters).strip()
-
-
 _CHAPTER_ROMAN = r"[ivxlcdm]{2,}"
 _CHAPTER_ROMAN_ANY = r"[ivxlcdm]+"
 _CH_NUM = r"[一二三四五六七八九十百千万零\d]+"

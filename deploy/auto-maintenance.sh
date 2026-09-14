@@ -62,6 +62,7 @@ notify() {
     rclone_config="/etc/vocabflow/rclone.conf"
   elif [[ -f "${project_dir}/.rclone.conf" ]]; then
     rclone_config="${project_dir}/.rclone.conf"
+    echo "R2_WARN（使用应用目录内的 rclone 凭据，建议迁移到 /etc/vocabflow/rclone.conf）"
   fi
 
   # 本地备份失败时跳过 R2 同步与远端清理：不能让滚动删除把
@@ -79,7 +80,12 @@ notify() {
       notify "VocabTool R2 同步失败" "r2-backup.sh 失败，请检查 ${project_dir}/backups/maintenance.log。"
     fi
   else
-    echo "R2_SKIP（未配置 rclone 配置文件）"
+    # 异地备份是灾难恢复链条的一环，缺失不能报告成「一切正常」：
+    # 显式失败并告警，避免长期无人察觉（本地备份与服务器可能是同一地点）。
+    echo "R2_SKIP（未配置 rclone 配置文件，异地备份未运行）"
+    overall_fail=1
+    notify "VocabTool 异地备份未运行" \
+      "未找到 rclone 配置文件，异地(R2)备份没有执行。请在服务器运行 sudo deploy/r2-setup.sh 配置。"
   fi
 
   if curl -fsS --connect-timeout 3 --max-time 5 http://127.0.0.1:8000/healthz >/dev/null 2>&1; then

@@ -19,16 +19,13 @@
   const REVEAL_SELECTOR = [
     ".card",
     ".landing-section",
-    ".stat",
     ".word-result",
     ".browser-card",
     ".empty-state",
     ".demo-article",
     ".demo-words",
-    ".page-heading",
     ".home-review",
     ".auth-card",
-    ".ai-article-result",
     ".landing-search-result",
   ].join(",");
 
@@ -48,7 +45,7 @@
 
   function setRevealDelay(el) {
     const group = el.parentElement;
-    if (!group || !group.matches(".demo-cards, .stat-grid, .word-results")) {
+    if (!group || !group.matches(".demo-cards, .word-results")) {
       return;
     }
     const index = Array.prototype.indexOf.call(group.children, el);

@@ -10,9 +10,23 @@ project_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 subject="${1:-VocabTool 故障通知}"
 message="${2:-}"
 
+# 告警发不出去时不能完全无声：否则告警通道整体失效也无人察觉。
+# 仍然 exit 0（不能影响看门狗本身的判断与重启逻辑），但留下审计痕迹。
+skip() {
+  local reason="$1"
+  local stamp
+  stamp="$(date '+%Y-%m-%d %H:%M:%S')"
+  echo "${stamp} 告警未发送：${reason}（subject=${subject}）" >&2
+  local log_dir="${project_dir}/backups"
+  if [[ -d "${log_dir}" && -w "${log_dir}" ]]; then
+    echo "${stamp} 告警未发送：${reason}（subject=${subject}）" >>"${log_dir}/alert.log"
+  fi
+  exit 0
+}
+
 alert_config="${VOCABFLOW_ALERT_ENV:-/etc/vocabflow-alert.env}"
 if [[ ! -f "${alert_config}" ]]; then
-  exit 0
+  skip "缺少告警配置 ${alert_config}"
 fi
 
 set -a
@@ -22,7 +36,7 @@ set +a
 
 alert_to="${ALERT_TO:-}"
 if [[ -z "${alert_to}" ]]; then
-  exit 0
+  skip "告警配置未设置 ALERT_TO"
 fi
 
 ALERT_TO="${alert_to}" SUBJECT="${subject}" MESSAGE="${message}" \
@@ -38,6 +52,10 @@ alert_to = os.environ.get("ALERT_TO", "")
 subject = os.environ.get("SUBJECT", "VocabTool 故障通知")
 message = os.environ.get("MESSAGE", "")
 if not api_key or not email_from or "@" not in alert_to:
+    print(
+        "告警未发送：RESEND_API_KEY / EMAIL_FROM / ALERT_TO 配置不完整",
+        file=sys.stderr,
+    )
     sys.exit(0)
 
 payload = {
@@ -59,7 +77,9 @@ request = urllib.request.Request(
 try:
     with urllib.request.urlopen(request, timeout=15) as response:
         response.read()
-except Exception:
-    # 通知失败不能影响看门狗本身的判断与重启逻辑。
+except Exception as exc:
+    # 通知失败不能影响看门狗本身的判断与重启逻辑，但要留下痕迹，
+    # 否则告警通道静默失效时无人知道。
+    print(f"告警发送失败：{type(exc).__name__}: {exc}", file=sys.stderr)
     sys.exit(0)
 PY

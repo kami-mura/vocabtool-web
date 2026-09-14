@@ -4,7 +4,9 @@
 set -euo pipefail
 
 project_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-config="${RCLONE_CONFIG:-${project_dir}/.rclone.conf}"
+# 凭据默认放在 /etc（root-only）：放在应用目录时，应用用户被攻破即可读到
+# 能删除全部异地备份的 R2 密钥。需要 sudo：sudo ./deploy/r2-setup.sh
+config="${RCLONE_CONFIG:-/etc/vocabflow/rclone.conf}"
 remote="${R2_REMOTE_NAME:-vocabflow-r2}"
 bucket="${R2_BUCKET:-vocabflow-backups}"
 
@@ -42,7 +44,14 @@ if [[ -z "${secret_access_key}" ]]; then
   exit 1
 fi
 
-mkdir -p "$(dirname "${config}")"
+if ! mkdir -p "$(dirname "${config}")" 2>/dev/null; then
+  echo "无法创建 $(dirname "${config}")，请用 sudo 运行本脚本（凭据应放在 root-only 目录）。" >&2
+  exit 1
+fi
+if [[ ! -w "$(dirname "${config}")" ]]; then
+  echo "$(dirname "${config}") 不可写，请用 sudo 运行本脚本。" >&2
+  exit 1
+fi
 
 RCLONE_CONFIG="${config}" "${rclone_bin}" config create \
   "${remote}" s3 \

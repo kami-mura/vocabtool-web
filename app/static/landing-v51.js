@@ -658,7 +658,6 @@
   let realReviewLoaded = false;
   let realTodayStats = null;
   let todayDashboardData = null;
-  let todayOverviewTimer = null;
   let realReviewHistory = [];
   let realReviewLastRatingAt = 0;
   let realReviewCanUndo = false;

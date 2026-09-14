@@ -4,22 +4,6 @@
 
 ## 一、直接进入仓库的内容
 
-### JSZip
-
-- 文件：`app/static/vendor/jszip.min.js`
-- 版本：3.10.1
-- 版权：Copyright (c) 2009-2016 Stuart Knightley
-- 许可：MIT 或 GPLv3（双许可，本项目按 MIT 使用）
-- 项目主页：<http://stuartk.com/jszip>
-- 内部依赖 pako 为 MIT 许可。
-
-### fflate
-
-- 文件：`app/static/vendor/fflate.min.js`
-- 版权：Copyright (c) 101arrowz（Arjun Barrett）
-- 许可：MIT
-- 项目主页：<https://github.com/101arrowz/fflate>
-
 ### NGSL 词频表
 
 - 文件：`data/ngsl_sfi_31k.csv`

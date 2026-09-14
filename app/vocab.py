@@ -116,22 +116,6 @@ def tokenize(text: str) -> list[str]:
     return _TOKEN_RE.findall(text.lower())
 
 
-def tokenize_with_spans(text: str):
-    """返回 [{token, norm, start, end}]，token 为原文小写形式。"""
-    spans = []
-    for m in _TOKEN_RE.finditer(text):
-        token = m.group(0).lower()
-        spans.append(
-            {
-                "token": token,
-                "norm": normalize_word(token),
-                "start": m.start(),
-                "end": m.end(),
-            }
-        )
-    return spans
-
-
 @lru_cache(maxsize=200_000)
 def normalize_word(token: str) -> str:
     """取词形还原后的词头：running/ran -> run；查不到词库时保留原词。"""
@@ -210,16 +194,6 @@ def suggest_correction(word: str) -> str | None:
         if len(candidate) != len(w) or difflib.SequenceMatcher(None, w, candidate).ratio() < 0.75:
             return None
     return candidate
-
-
-def is_valid_word(word: str) -> bool:
-    """判断一个词是否符合处理条件：长度 2–25、无连续重复字符、含元音（移植自 Streamlit）。"""
-    value = str(word or "").lower().strip()
-    if len(value) < 2 or len(value) > 25:
-        return False
-    if re.search(r"(.)\1{2,}", value):
-        return False
-    return re.search(r"[aeiouy]", value)
 
 
 def analyze(text: str, normalize: bool = True) -> dict[str, int]:

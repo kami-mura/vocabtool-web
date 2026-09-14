@@ -49,8 +49,8 @@ AI_ARTICLE_FAST_MAX_TOKENS = 4096
 AI_ARTICLE_THINKING_MAX_TOKENS = 8192
 # 单次制卡任务的总墙钟上限：超时后停止发起新请求，已成功的卡照常返回。
 _AI_CARD_GENERATION_DEADLINE_SECONDS = config.AI_CARD_GENERATION_DEADLINE_SECONDS
-# 同一用户同时只允许一个制卡任务，避免并发提交占满线程池与 AI 配额。
-_AI_CARD_PER_USER_CONCURRENCY = 1
+# 同一用户同时只允许一个制卡任务（由 _AI_CARD_LOCKS 实现），避免并发
+# 提交占满线程池与 AI 配额。
 _AI_REQUEST_SLOTS = threading.BoundedSemaphore(4)
 
 
@@ -918,11 +918,6 @@ def mark_card_generation_done(user_id: int, result: dict) -> None:
         entry["finished_at"] = time.monotonic()
         entry["finished_wall"] = time.time()
         entry["result"] = result
-
-
-def clear_card_generation_progress(user_id: int) -> None:
-    with _GENERATION_PROGRESS_GUARD:
-        _GENERATION_PROGRESS.pop(user_id, None)
 
 
 def _acquire_card_generation_slot(user_id: int) -> bool:

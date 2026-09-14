@@ -19,6 +19,9 @@ if [[ -z "${rclone_config}" ]]; then
     rclone_config="/etc/vocabflow/rclone.conf"
   else
     rclone_config="${project_dir}/.rclone.conf"
+    # 回退路径不是错误（兼容旧部署），但凭据在应用目录里等于扩大了泄露面，
+    # 每次命中都留下告警，便于按 P2-15 迁到 /etc 后确认已不再走这里。
+    echo "警告：使用应用目录内的 rclone 凭据 ${rclone_config}；建议迁移到 /etc/vocabflow/rclone.conf（root:600）。" >&2
   fi
 fi
 
