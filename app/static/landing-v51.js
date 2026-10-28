@@ -1039,6 +1039,10 @@
     const backInner = '<div class="card-answer">' + renderMarkdown(sanitizeCardBack(card.back), target) +
       (card.card_type === "cloze" ? ' <button class="demo-audio reading-word-audio" data-real-audio="' + escapeHtml(target) + '" type="button">▶</button>' : "") +
       "</div>";
+    const exampleLabel = Number(card.example_count) > 1
+      ? '<small class="muted">今日例句 ' + Number(card.example_number) + '/' + Number(card.example_count) + ' · 学习日轮换</small>'
+      : "";
+    frontHtml += exampleLabel;
     const backHtml = backInner +
       '<div class="demo-rating">' +
       '<button class="rating again" data-real-rating="again" data-real-card="' + card.id + '" type="button"><b>重来</b><small>现在</small></button>' +
@@ -1076,7 +1080,8 @@
       String(card.id) + "|" + String(card.queue_kind || "") + "|" +
       (card.is_learning ? "L" : "R") + "|" +
       (card.session_repeat ? "S" : "") +
-      (Number(card.session_correct_streak) || 0)
+      (Number(card.session_correct_streak) || 0) + "|" +
+      (Number(card.example_number) || 0)
     );
   }
 
@@ -1527,6 +1532,11 @@
       return;
     }
     const card = realReviewQueue[index];
+    if (reviewExampleExpired(card)) {
+      stopRealAudio();
+      await loadRealReview(true, id);
+      return;
+    }
     // “重来”在任何状态下都会立即回队；学习/新卡点“困难”也会回队
     // （FSRS 学习步骤为 0 秒，与 docs/调度算法说明.md 一致）。
     // 如果这是最后一张，不能乐观移除后又被服务器“顶回来”造成闪动，
@@ -1575,6 +1585,7 @@
           session_repeat: Boolean(card.session_repeat),
           action_id: newActionId(),
           expected_revision: Number(card.revision) || 0,
+          expected_example_day: card.example_learning_day || "",
         }],
       };
       const data = await submitReviewWithRetry(payload);
@@ -1871,9 +1882,28 @@
     }
   });
 
+  function reviewExampleExpired(card) {
+    return Boolean(card && card.example_valid_until &&
+      Date.now() >= Date.parse(card.example_valid_until));
+  }
+
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && realReviewInFlight === 0 &&
+        realReviewQueue.some(reviewExampleExpired)) {
+      stopRealAudio();
+      loadRealReview(true);
+    }
+  });
+
   const realReviewCards = document.getElementById("real-review-cards");
   if (realReviewCards) {
     realReviewCards.addEventListener("click", (e) => {
+      if (realReviewQueue.some(reviewExampleExpired)) {
+        e.stopPropagation();
+        stopRealAudio();
+        loadRealReview(true);
+        return;
+      }
       const ratingButton = e.target.closest("[data-real-rating]");
       if (ratingButton) {
         rateRealReviewCard(ratingButton);

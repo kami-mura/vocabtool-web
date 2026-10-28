@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import math
 import threading
@@ -715,6 +716,14 @@ def create_cards_from_studio(
                 failed.append(f"{raw_word}：{ai_errors.get(ai_word) or '没有可用释义'}")
                 continue
             meaning = str(content.get("m") or "").strip()
+            examples = content.get("examples")
+            if examples is not None and not ai_mod._valid_card_examples(content, ai_word, body.card_type):
+                failed.append(f"{raw_word}：AI 没有返回 3 个不同的有效例句")
+                continue
+            examples_json = (
+                json.dumps([card_builder.complete_sentence(s) for s in examples], ensure_ascii=False)
+                if examples and body.card_type != "general" else None
+            )
             display_word, _ = ai_mod._split_card_entry(raw_word)
             if body.card_type == "general":
                 front = display_word
@@ -722,7 +731,7 @@ def create_cards_from_studio(
                 context = ""
             else:
                 sentence = card_builder.complete_sentence(
-                    str(content.get("e") or "").strip()
+                    examples[0] if examples else str(content.get("e") or "").strip()
                 )
                 if not sentence:
                     # 例句卡正面必须是完整句子；AI 没返回例句就不建卡，避免空正面。
@@ -751,6 +760,7 @@ def create_cards_from_studio(
                     "front": front,
                     "back": back,
                     "context": context,
+                    "examples_json": examples_json,
                 }
             )
     
@@ -777,6 +787,7 @@ def create_cards_from_studio(
                 + _utf8_size(item["front"])
                 + _utf8_size(item["back"])
                 + _utf8_size(item["context"])
+                + _utf8_size(item["examples_json"])
                 for item in prepared_cards
             ),
         )
@@ -789,6 +800,7 @@ def create_cards_from_studio(
                 front=item["front"],
                 back=item["back"],
                 context=item["context"],
+                examples_json=item["examples_json"],
                 state="new",
                 due_at=None,
                 reps=0,
@@ -1448,6 +1460,7 @@ def _apply_review_and_build_log(
     previous_lapses = card.lapses
     previous_learning_step = int(card.learning_step or 0)
     previous_fsrs_state = card.fsrs_state
+    card_builder.mark_example_studied(card, _learning_day(now)[0])
     card, fsrs_log_json = srs.apply_rating_with_log(card, rating, now=now)
     session_pending = card.state == "learning"
     session_correct_streak = 0
@@ -1568,6 +1581,8 @@ def review_card(
     now = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
     if card.due_at and card.due_at > now:
         raise HTTPException(status_code=409, detail="这张卡片尚未到期，不能提前复习")
+    if card.examples_json and body.expected_example_day and body.expected_example_day != _learning_day(now)[0]:
+        raise HTTPException(status_code=409, detail="已进入新的学习日，请刷新今日例句后评分")
     review_log, card_payload = _apply_review_and_build_log(db, user, card, rating, now)
     if review_request:
         db.flush()
@@ -1668,6 +1683,8 @@ def review_cards_batch(
                     raise HTTPException(
                         status_code=409, detail="这张卡片尚未到期，不能提前复习"
                     )
+                if card.examples_json and item.expected_example_day and item.expected_example_day != _learning_day(now)[0]:
+                    raise HTTPException(status_code=409, detail="已进入新的学习日，请刷新今日例句后评分")
                 review_log, card_payload = _apply_review_and_build_log(
                     db, user, card, rating, now
                 )

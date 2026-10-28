@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 
 from sqlalchemy import func, or_
@@ -66,6 +67,32 @@ def _complete_sentence(sentence: str) -> str:
 
 def complete_sentence(sentence: str) -> str:
     return _complete_sentence(sentence)
+
+
+def example_selection(card: Card, day: str) -> tuple[list[str], int]:
+    """下一次学习使用的例句；读取/预览不推进轮换，漏学天数不影响序号。"""
+    if card.card_type not in {"reading", "cloze"} or not card.examples_json:
+        return [], 0
+    try:
+        examples = json.loads(card.examples_json)
+    except (TypeError, ValueError):
+        return [], 0
+    if not isinstance(examples, list) or not 1 <= len(examples) <= 3 or not all(
+        isinstance(sentence, str) and sentence.strip() for sentence in examples
+    ):
+        return [], 0
+    index = int(card.example_index or 0)
+    if card.example_day and day > card.example_day:
+        index += 1
+    return examples, index % len(examples)
+
+
+def mark_example_studied(card: Card, day: str) -> None:
+    """随成功评分一起提交；同日重复/撤销不会切句，失败事务不会推进。"""
+    examples, index = example_selection(card, day)
+    if examples and (not card.example_day or day > card.example_day):
+        card.example_day = day
+        card.example_index = index
 
 
 def is_complete_sentence(sentence: str, word: str) -> bool:

@@ -321,6 +321,10 @@ class Card(Base):
     front = Column(Text, nullable=False)
     back = Column(Text, nullable=False)
     context = Column(Text, default="")
+    # 新例句卡的固定语境集合；旧卡保持 NULL，继续使用原 front/back/context。
+    examples_json = Column(Text, nullable=True)
+    example_day = Column(String(10), nullable=False, default="", server_default="")
+    example_index = Column(Integer, nullable=False, default=0, server_default="0")
     state = Column(String(20), default="new")  # new / learning / review
     interval_days = Column(Float, default=0.0)
     ease = Column(Float, default=2.5)

@@ -1217,6 +1217,20 @@ def _configure_sqlite_journal() -> None:
         connection.exec_driver_sql("PRAGMA journal_mode=WAL")
 
 
+def _migrate_card_examples() -> None:
+    """仅加列，不生成或覆盖旧卡内容；部分成功后重试仍安全。"""
+    existing = {column["name"] for column in inspect(engine).get_columns("cards")}
+    additions = {
+        "examples_json": "TEXT",
+        "example_day": "VARCHAR(10) NOT NULL DEFAULT ''",
+        "example_index": "INTEGER NOT NULL DEFAULT 0",
+    }
+    with engine.begin() as connection:
+        for name, definition in additions.items():
+            if name not in existing:
+                connection.execute(text(f"ALTER TABLE cards ADD COLUMN {name} {definition}"))
+
+
 # 一次性 schema 变更按版本顺序登记；新增迁移只往列表末尾追加。
 _SCHEMA_MIGRATIONS: list[tuple[str, Callable[[], None]]] = [
     ("002_card_learning_step", _migrate_card_learning_step),
@@ -1248,6 +1262,7 @@ _SCHEMA_MIGRATIONS: list[tuple[str, Callable[[], None]]] = [
     ("029_free_article_quota", _migrate_free_article_quota),
     ("030_clean_card_back_mnemonic", _migrate_clean_card_back_mnemonic),
     ("031_drop_word_status_columns", _migrate_drop_word_status_columns),
+    ("032_card_examples", _migrate_card_examples),
 ]
 
 

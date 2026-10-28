@@ -625,3 +625,46 @@ def test_anki_multi_template_migration_rebuilds_cards_table(monkeypatch, tmp_pat
     _uniques, _indexes, rows_again, violations_again = _inspect()
     assert violations_again == []
     assert [row[0] for row in rows_again] == [1, 2, 3]
+
+
+def test_card_examples_migration_retries_after_partial_failure_and_preserves_data(monkeypatch, tmp_path):
+    import pytest
+    from sqlalchemy import event
+
+    path = str(tmp_path / "examples.db")
+    _create_old_schema(path)
+    engine = create_engine(f"sqlite:///{path}")
+    monkeypatch.setattr(db_mod, "engine", engine)
+    migrations = db_mod._SCHEMA_MIGRATIONS
+    monkeypatch.setattr(db_mod, "_SCHEMA_MIGRATIONS", migrations[:-1])
+    db_mod.init_db()
+    with engine.connect() as connection:
+        before = connection.execute(text("SELECT * FROM cards")).fetchall()
+        columns = list(connection.execute(text("SELECT * FROM cards")).keys())
+        logs = connection.execute(text("SELECT * FROM review_logs")).fetchall()
+    monkeypatch.setattr(db_mod, "_SCHEMA_MIGRATIONS", migrations)
+
+    def fail_second_column(conn, cursor, statement, parameters, context, executemany):
+        if statement.startswith("ALTER TABLE cards ADD COLUMN example_day"):
+            raise RuntimeError("simulated migration interruption")
+
+    event.listen(engine, "before_cursor_execute", fail_second_column)
+    with pytest.raises(RuntimeError, match="simulated migration interruption"):
+        db_mod.init_db()
+    event.remove(engine, "before_cursor_execute", fail_second_column)
+    with engine.connect() as connection:
+        assert not connection.execute(text(
+            "SELECT 1 FROM schema_migrations WHERE version = '032_card_examples'"
+        )).first()
+    db_mod.init_db()
+    db_mod.init_db()
+    db_mod._migrate_card_examples()
+    with engine.begin() as connection:
+        assert connection.execute(text("SELECT " + ",".join(columns) + " FROM cards")).fetchall() == before
+        assert connection.execute(text("SELECT * FROM review_logs")).fetchall() == logs
+        assert connection.execute(text("SELECT examples_json, example_day, example_index FROM cards")).one() == (None, "", 0)
+        connection.execute(text("UPDATE cards SET examples_json = '[\"one\",\"two\",\"three\"]', example_day = '2026-10-01', example_index = 2"))
+    db_mod._migrate_card_examples()
+    with engine.connect() as connection:
+        assert connection.execute(text("SELECT examples_json, example_day, example_index FROM cards")).one() == ('["one","two","three"]', "2026-10-01", 2)
+    engine.dispose()

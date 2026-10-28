@@ -238,6 +238,7 @@ def _user_storage_bytes(db: Session, user_id: int) -> int:
         Card.front,
         Card.back,
         Card.context,
+        Card.examples_json,
         filters=[(Card.user_id, user_id)],
     )
     total += _sum_storage_bytes(
@@ -775,13 +776,29 @@ def _card_dict(
         if card.back
         else ""
     )
+    day, _, day_end = _learning_day(now)
+    examples, example_index = card_builder.example_selection(card, day)
+    front, context = card.front, card.context or ""
+    if examples:
+        context = examples[example_index]
+        front = card_builder.sentence_front(context, card.word, cloze=card.card_type == "cloze")
+        if card.card_type == "cloze":
+            # 新卡背面的首段是基准句，余下内容是固定释义。
+            meaning = cleaned_back.partition("\n\n")[2]
+            cleaned_back = f"{card_builder.sentence_front(context, card.word)}\n\n{meaning}"
     return {
         "id": card.id,
         "word": card.word,
         "card_type": card.card_type,
-        "front": card.front,
+        "front": front,
         "back": cleaned_back,
-        "context": card.context or "",
+        "context": context,
+        "example_number": example_index + 1 if context else 0,
+        "example_count": len(examples) or (1 if context else 0),
+        "example_learning_day": day if examples else "",
+        "example_valid_until": (
+            day_end.replace(tzinfo=dt.timezone.utc).isoformat() if examples else None
+        ),
         "revision": int(card.revision or 0),
         "state": "new" if card.due_at is None else "scheduled",
         "is_learning": str(getattr(card, "state", "") or "") == "learning",

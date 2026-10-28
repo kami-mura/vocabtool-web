@@ -10,6 +10,21 @@ from app.ai import (
 )
 
 
+def _three_example_response(words, invalid_words=()):
+    return json.dumps({"items": [
+        {
+            "id": f"I{index:02d}", "pos": "adj.",
+            "en_def": "a test meaning", "zh_def": "" if word in invalid_words else "测试释义",
+            "examples": [
+                f"Readers remember {word} from the book.",
+                f"She writes {word} on the board.",
+                f"They discuss {word} during class.",
+            ],
+        }
+        for index, word in enumerate(words, start=1)
+    ]})
+
+
 def test_lookup_prompt_requests_multiple_common_senses():
     assert "Give 2-3 core high-frequency meanings" in _STREAMLIT_SIMPLE_LOOKUP_PROMPT
     assert "genuinely single-sense" in _STREAMLIT_SIMPLE_LOOKUP_PROMPT
@@ -234,7 +249,7 @@ def test_old_streamlit_prompt_builders_and_batch_sizes():
     _system_cloze, user_cloze = ai._build_definition_front_prompts("taxi (verb)")
     assert '"items"' in user_word and '"meaning"' in user_word
     assert '"pos"' in user_reading and '"en_def"' in user_reading
-    assert '"example"' in user_cloze and "clearly preferred answer" in user_cloze
+    assert '"examples"' in user_cloze and "clearly preferred answer" in user_cloze
     assert _card_generation_batch_size("cloze") == 5
     assert _card_generation_batch_size("reading") == 10
     assert _card_generation_batch_size("general") == 10
@@ -243,13 +258,8 @@ def test_old_streamlit_prompt_builders_and_batch_sizes():
 def test_batch_card_generation_requeues_only_incomplete_words(monkeypatch):
     calls = []
     responses = [
-        """```text
-gross ||| ||| adj. | very unpleasant | 令人恶心的 ||| The gross smell forced everyone to leave the kitchen. ||| |||
-healthy ||| ||| ||| Daily walks help older adults stay healthy and independent. ||| |||
-```""",
-        """```text
-healthy ||| ||| adj. | in good health | 健康的 ||| Daily walks help older adults stay healthy and independent. ||| |||
-```""",
+        _three_example_response(["gross", "healthy"], invalid_words=["healthy"]),
+        _three_example_response(["healthy"]),
     ]
 
     class FakeDb:
@@ -296,9 +306,7 @@ def test_batch_card_generation_retries_transient_network_error(monkeypatch):
         calls.append(list(words))
         if len(calls) == 1:
             raise TimeoutError("temporary")
-        return """```text
-healthy ||| ||| adj. | in good health | 健康的 ||| Daily walks help older adults stay healthy and independent. ||| |||
-```"""
+        return _three_example_response(words)
 
     monkeypatch.setattr(ai, "_call_ai_card_batch", fake_call)
     results, errors, request_count, timings = ai.generate_card_content_in_batches(
@@ -326,12 +334,7 @@ def test_card_generation_runs_ten_ten_word_batches_sequentially(monkeypatch):
 
     def fake_call(_client, batch, _card_template):
         calls.append(list(batch))
-        rows = [
-            f"{word} ||| ||| n. | a test target | 测试目标 ||| "
-            f"Readers remember {word} through one clear example sentence. ||| |||"
-            for word in batch
-        ]
-        return "```text\n" + "\n".join(rows) + "\n```"
+        return _three_example_response(batch)
 
     monkeypatch.setattr(ai, "_call_ai_card_batch", fake_call)
     results, errors, request_count, timings = ai.generate_card_content_in_batches(
@@ -564,12 +567,7 @@ def test_card_generation_reserves_card_count_and_own_key_bypasses_it(monkeypatch
     monkeypatch.setattr(ai, "_new_ai_client", lambda *_args: object())
 
     def fake_cards(_client, words, _template, _user_api_key=None):
-        rows = [
-            f"{word} ||| ||| n. | test meaning | 测试释义 ||| "
-            f"Readers remember {word} through this clear example sentence. ||| |||"
-            for word in words
-        ]
-        return "```text\n" + "\n".join(rows) + "\n```"
+        return _three_example_response(words)
 
     monkeypatch.setattr(ai, "_call_ai_card_batch", fake_cards)
     db = SessionLocal()

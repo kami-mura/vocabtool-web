@@ -69,6 +69,7 @@ class CardStudioCreateIn(BaseModel):
 
 
 class ReviewIn(BaseModel):
+    expected_example_day: str = Field(default="", max_length=10)
     rating: str
     practice: bool = False
     session_repeat: bool = False
@@ -77,6 +78,7 @@ class ReviewIn(BaseModel):
 
 
 class ReviewBatchItemIn(BaseModel):
+    expected_example_day: str = Field(default="", max_length=10)
     card_id: int
     rating: str
     session_repeat: bool = False
