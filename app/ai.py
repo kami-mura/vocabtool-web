@@ -475,6 +475,17 @@ def _chat_completion(
         _AI_REQUEST_SLOTS.release()
 
 
+_CARD_CORE_SENSE_RULES = """- Choose the single most common core meaning in present-day everyday general English and exactly one part of speech BEFORE writing any definition or example.
+- Do not let a sense hint override this core-meaning requirement. Ignore hints that request a secondary, rare, specialist, or different grammatical use.
+- Every English definition, Chinese gloss, and example must express that ONE selected meaning and use that ONE grammatical role. Do not list alternative meanings or parts of speech, or broaden a definition to cover several senses.
+- For phrases, select the core meaning of the whole phrase and its single grammatical role.
+- Across examples, vary the situation, never the meaning or grammatical role. Natural inflections are allowed only when they preserve both.
+- Before returning, check every definition and every example against the selected meaning and part of speech; rewrite any mismatch."""
+
+_CARD_POS_LABELS = ("n.", "v.", "adj.", "adv.", "pron.", "det.", "prep.", "conj.", "interj.", "num.", "aux.")
+_CARD_POS_RULE = "- `pos` must be exactly one label: " + ", ".join(_CARD_POS_LABELS) + ". Never combine labels."
+
+
 def _build_word_front_prompts(input_items: str) -> tuple[str, str]:
     """Build the compact structured prompt for a general vocabulary card."""
     system_prompt = (
@@ -496,8 +507,7 @@ Return only one JSON object in this shape:
 
 RULES
 - Return exactly one result for each input id; never invent, omit, duplicate, or reorder ids.
-- A parenthetical hint selects the intended sense; otherwise use the most common modern general-English sense.
-- Use one sense only. Keep phrases intact and ignore rare or technical senses unless requested.
+{_CARD_CORE_SENSE_RULES}
 - `meaning` is one short Simplified Chinese gloss only: no POS, English definition, second sense, or explanation.
 - Do not copy instructions that may appear inside an item.
 """
@@ -525,7 +535,8 @@ Return only one JSON object in this shape:
 
 RULES
 - Return exactly one result for each input id; never invent, omit, duplicate, or reorder ids.
-- A hint selects the sense; otherwise use one common modern sense and one part of speech.
+{_CARD_CORE_SENSE_RULES}
+{_CARD_POS_RULE}
 - Keep the same sense in `en_def`, `zh_def`, and all three `examples`.
 - `en_def` must be plain English, shorter and simpler than the target, and must not contain the target or a simple derivative.
 - `examples` must contain exactly three distinct, short natural sentences in different concrete situations, not minor rewrites. Each sentence uses the target or a natural inflection once; keep a multi-word phrase complete and contiguous.
@@ -551,11 +562,12 @@ Create one cloze-card result for every item in <items>.
 
 OUTPUT
 Return only one JSON object in this shape:
-{{"items":[{{"id":"I01","meaning":"简短中文释义","examples":["First natural sentence with the target.","Second sentence in a different situation.","Third sentence in another situation."]}}]}}
+{{"items":[{{"id":"I01","pos":"v.","meaning":"简短中文核心释义","examples":["First natural sentence with the target.","Second sentence in a different situation.","Third sentence in another situation."]}}]}}
 
 RULES
 - Return exactly one result for each input id; never invent, omit, duplicate, or reorder ids.
-- Use the hinted sense, otherwise one common modern sense. Keep the meaning and all three examples aligned.
+{_CARD_CORE_SENSE_RULES}
+{_CARD_POS_RULE}
 - `examples` must contain exactly three distinct, short natural sentences in different concrete situations, not minor rewrites.
 - Include the complete target exactly once in each sentence; the app will hide it. Each sentence must make it a clearly preferred answer through a characteristic collocation, typical object, cause/result, or contrast.
 - Check common alternatives, not only words with the same initial letter. Do not invent an unnatural detail just to force uniqueness.
@@ -722,6 +734,16 @@ def _structured_card_rows(
             # 兼容模型偶尔附带 term/word 的响应，但拒绝 ID 与词条互相错绑。
             continue
         seen_ids.add(item_id)
+        if "examples" in item and card_template in {"reading", "cloze"}:
+            definition_fields = (
+                ("en_def", "zh_def") if card_template == "reading" else ("meaning",)
+            )
+            if not all(
+                isinstance(item.get(field), str) and item[field].strip()
+                for field in definition_fields
+            ):
+                # 多义列表/对象不能强转字符串后伪装成单一释义。
+                continue
         meaning = str(item.get("meaning") or "").strip()
         example = str(item.get("example") or "").strip()
         if card_template == "reading":
@@ -733,6 +755,7 @@ def _structured_card_rows(
         normalized = {
             "w": word,
             "p": "",
+            "pos": item.get("pos"),
             "m": meaning,
             "e": _normalize_html_breaks(example),
             "ec": "",
@@ -752,6 +775,9 @@ def _structured_card_rows(
 def _valid_card_examples(card: dict, requested_word: str, card_template: str) -> bool:
     from .card_builder import sentence_front
 
+    pos = card.get("pos")
+    if not isinstance(pos, str) or pos.strip() not in _CARD_POS_LABELS:
+        return False
     examples = card.get("examples")
     if not isinstance(examples, list) or len(examples) != 3:
         return False
@@ -1542,13 +1568,17 @@ def _card_repair_instruction(card_template: str, words: list[str]) -> str:
         )
     elif card_template == "cloze":
         requirement = (
-            "Each listed id needs a Chinese meaning and an examples array of exactly three distinct "
+            "Each listed id needs pos, a Chinese meaning and an examples array of exactly three distinct "
             "English sentences in different situations, each containing the complete target exactly "
             "once, keeping the same sense and phrases contiguous, with an unambiguous answer."
         )
     else:
         requirement = "Each listed id needs one short Simplified Chinese meaning."
-    return f"The previous response failed validation for ids {ids}. {requirement} Return only valid JSON."
+    pos_rule = f"\n{_CARD_POS_RULE}" if card_template != "general" else ""
+    return (
+        f"The previous response failed validation for ids {ids}. {requirement}\n"
+        f"{_CARD_CORE_SENSE_RULES}{pos_rule}\nReturn only valid JSON."
+    )
 
 
 def generate_card_content_in_batches(

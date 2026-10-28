@@ -129,3 +129,62 @@ def test_legacy_or_invalid_examples_preserve_original_card(raw):
     result = _card_dict(card)
     assert (result["front"], result["back"], result["context"]) == (card.front, card.back, card.context)
     assert result["example_count"] == 1
+
+
+@pytest.mark.parametrize("template", ["reading", "cloze"])
+@pytest.mark.parametrize("pos", ["n. / v.", "adj.; adv.", ["n.", "v."], "", None, "verb or noun"])
+def test_generation_rejects_missing_or_multiple_parts_of_speech(template, pos):
+    payload = json.loads(card_content(template))
+    payload["items"][0]["pos"] = pos
+    assert ai._parse_ai_card_batch(json.dumps(payload), ["run"], template) == {}
+
+
+@pytest.mark.parametrize("template, field", [
+    ("reading", "en_def"), ("reading", "zh_def"), ("cloze", "meaning"),
+])
+def test_generation_rejects_lists_of_definitions(template, field):
+    payload = json.loads(card_content(template))
+    payload["items"][0][field] = ["move quickly on foot 跑步", "operate a business 经营"]
+    assert ai._parse_ai_card_batch(json.dumps(payload), ["run"], template) == {}
+
+
+@pytest.mark.parametrize("template", ["reading", "cloze"])
+def test_generation_retries_multiple_pos_then_accepts_single_pos(monkeypatch, template):
+    monkeypatch.setattr(config, "AI_DAILY_REQUEST_LIMIT", 0)
+    monkeypatch.setattr(ai, "ai_enabled", lambda: True)
+    monkeypatch.setattr(ai, "_new_ai_client", lambda: object())
+    invalid = json.loads(card_content(template))
+    invalid["items"][0]["pos"] = "n. / v."
+    responses = [json.dumps(invalid), card_content(template)]
+    repairs = []
+
+    def fake_call(*args, **kwargs):
+        repairs.append(kwargs.get("repair_instruction", ""))
+        return responses.pop(0)
+
+    monkeypatch.setattr(ai, "_call_ai_card_batch", fake_call)
+    results, errors, _, _ = ai.generate_card_content_in_batches(None, 1, ["run"], template)
+    assert len(repairs) == 2
+    assert "exactly one part of speech" in repairs[1]
+    assert results["run"]["pos"] == "v."
+    assert results["run"]["examples"] == EXAMPLES
+    assert errors == {}
+
+
+@pytest.mark.parametrize("template", ["general", "reading", "cloze"])
+def test_initial_and_repair_prompts_keep_one_core_sense_and_pos(template):
+    builder = {
+        "general": ai._build_word_front_prompts,
+        "reading": ai._build_reading_front_prompts,
+        "cloze": ai._build_definition_front_prompts,
+    }[template]
+    _, prompt = builder(ai._card_prompt_items(["run (operate a business)"], template))
+    for text in [prompt, ai._card_repair_instruction(template, ["run"])]:
+        assert "single most common core meaning" in text
+        assert "exactly one part of speech" in text
+        assert "Do not let a sense hint override" in text
+        assert "vary the situation, never the meaning or grammatical role" in text
+    assert "hint selects the sense" not in prompt
+    assert "Use the hinted sense" not in prompt
+    if template != "general":
+        assert '"pos"' in prompt
