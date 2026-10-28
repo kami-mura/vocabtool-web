@@ -26,7 +26,8 @@ const card = {
   example_number: 2, example_count: 3, example_valid_until: "2026-10-02T16:00:00+00:00",
 };
 const html = context.realReviewCardHtml(card);
-assert.ok(html.includes("今日例句 2/3"));
+assert.ok(!html.includes("今日例句"));
+assert.ok(!html.includes("学习日轮换"));
 assert.ok(html.includes('data-real-audio="He runs to catch the bus."'));
 assert.ok(!html.includes("She runs by the river"));
 assert.ok(!context.realReviewCardHtml({ ...card, example_count: 1 }).includes("今日例句"));
@@ -39,7 +40,8 @@ const cloze = context.realReviewCardHtml({
   ...card, card_type: "cloze", front: "He ______ to catch the bus.",
   back: "He **runs** to catch the bus.\n\n跑步",
 });
-assert.ok(cloze.includes("今日例句 2/3"));
+assert.ok(!cloze.includes("今日例句"));
+assert.ok(!cloze.includes("学习日轮换"));
 assert.ok(!cloze.split('class="demo-card-face back"')[0].includes("data-real-audio"));
 const hostile = context.realReviewCardHtml({ ...card, context: 'He runs.\" onclick=\"alert(1)' });
 assert.ok(!hostile.includes(' onclick="alert(1)'));

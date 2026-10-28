@@ -1039,10 +1039,6 @@
     const backInner = '<div class="card-answer">' + renderMarkdown(sanitizeCardBack(card.back), target) +
       (card.card_type === "cloze" ? ' <button class="demo-audio reading-word-audio" data-real-audio="' + escapeHtml(target) + '" type="button">▶</button>' : "") +
       "</div>";
-    const exampleLabel = Number(card.example_count) > 1
-      ? '<small class="muted">今日例句 ' + Number(card.example_number) + '/' + Number(card.example_count) + ' · 学习日轮换</small>'
-      : "";
-    frontHtml += exampleLabel;
     const backHtml = backInner +
       '<div class="demo-rating">' +
       '<button class="rating again" data-real-rating="again" data-real-card="' + card.id + '" type="button"><b>重来</b><small>现在</small></button>' +

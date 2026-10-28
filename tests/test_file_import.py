@@ -352,3 +352,46 @@ def test_xml_entity_rejection_catches_utf16_documents():
         '<?xml version="1.0" encoding="UTF-16"?>\n<root><child>ok</child></root>'
     ).encode("utf-16")
     _reject_xml_entity_declarations(clean, "DOCX")  # 不应抛错
+
+
+def _sample_text_pdf() -> bytes:
+    """独立构造固定 PDF，验证实际读取与文字提取路径。"""
+    stream = b"BT /F1 12 Tf 72 720 Td (People run every morning.) Tj ET"
+    objects = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
+        b"/Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>",
+        b"<< /Length " + str(len(stream)).encode() + b" >>\nstream\n" + stream + b"\nendstream",
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    ]
+    output = bytearray(b"%PDF-1.4\n")
+    offsets = [0]
+    for index, obj in enumerate(objects, start=1):
+        offsets.append(len(output))
+        output.extend(f"{index} 0 obj\n".encode() + obj + b"\nendobj\n")
+    xref_offset = len(output)
+    output.extend(f"xref\n0 {len(offsets)}\n0000000000 65535 f \n".encode())
+    for offset in offsets[1:]:
+        output.extend(f"{offset:010d} 00000 n \n".encode())
+    output.extend(
+        f"trailer\n<< /Size {len(offsets)} /Root 1 0 R >>\nstartxref\n{xref_offset}\n%%EOF\n".encode()
+    )
+    return bytes(output)
+
+
+def test_pdf_import_extracts_text_after_security_update():
+    text, source_type, chapters = extract_file_content("book.pdf", _sample_text_pdf(), 10_000)
+    assert source_type == "pdf"
+    assert text == "People run every morning."
+    assert chapters[0]["text"] == text
+
+
+def test_pdf_import_enforces_text_budget():
+    with pytest.raises(ImportFileError):
+        extract_file_content("book.pdf", _sample_text_pdf(), 5)
+
+
+def test_pdf_import_rejects_corrupt_file():
+    with pytest.raises(ImportFileError, match="PDF 文件损坏"):
+        extract_file_content("book.pdf", b"%PDF-1.4\ntruncated", 10_000)
