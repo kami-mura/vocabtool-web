@@ -1405,7 +1405,7 @@
   }
 
   let reviewActionChain = Promise.resolve();
-  const reviewRetryDelays = [250, 750];
+  const reviewRetryDelays = [500, 1500];
   // 评分链看门狗：当确有评分请求在途且已远超预期时长仍未完成时，
   // 说明链被挂起的请求卡死（如网络黑洞、服务器无响应），此时不再
   // 把新点击追加到队列尾部等待——直接丢弃旧链并重拉队列对齐，
@@ -1449,10 +1449,21 @@
           body: JSON.stringify(payload),
           signal: controller.signal,
         });
-        const data = await res.json().catch(() => ({}));
+        let data;
+        try {
+          data = await res.json();
+        } catch (error) {
+          // 成功响应的正文也可能在传输途中断开；重试同一动作确认结果。
+          if (res.ok) throw error;
+          data = {};
+        }
         if (res.ok) {
-          const status = document.getElementById("real-undo-status");
-          if (status && status.textContent.startsWith("正在保存")) status.textContent = "";
+          if (!data || (!data.errors?.length && (
+            !Array.isArray(data.cards) || data.cards.length !== payload.ratings.length ||
+            data.cards.some((item) => !item || !item.card)
+          ))) {
+            throw new Error("评分结果未能完整接收，当前卡片已保留");
+          }
           return data;
         }
         const error = new Error(reviewErrorMessage(data, "保存失败"));
@@ -1461,6 +1472,8 @@
         lastError = error;
         if (![502, 503, 504].includes(res.status)) throw error;
       } catch (error) {
+        error.reviewNetworkError = !error.status &&
+          ["TypeError", "AbortError"].includes(error.name);
         lastError = error;
         // 超时（AbortError）没有 status，与 502/503/504 一样走自动重试；
         // 服务端有 action_id 幂等，重试不会把同一次评分应用两遍。
@@ -1533,6 +1546,25 @@
       await loadRealReview(true, id);
       return;
     }
+    // 请求失败时服务端可能已经保存。手动重试也必须沿用原 action_id，
+    // 直到确认结果或卡片版本/评分发生变化，避免把一次点击应用两遍。
+    const pending = card._pendingReview;
+    const previous = pending && pending.ratings[0];
+    if (!previous || previous.rating !== rating ||
+        previous.expected_revision !== (Number(card.revision) || 0) ||
+        previous.expected_example_day !== (card.example_learning_day || "")) {
+      card._pendingReview = {
+        ratings: [{
+          card_id: id,
+          rating,
+          session_repeat: Boolean(card.session_repeat),
+          action_id: newActionId(),
+          expected_revision: Number(card.revision) || 0,
+          expected_example_day: card.example_learning_day || "",
+        }],
+      };
+    }
+    const payload = card._pendingReview;
     // “重来”在任何状态下都会立即回队；学习/新卡点“困难”也会回队
     // （FSRS 学习步骤为 0 秒，与 docs/调度算法说明.md 一致）。
     // 如果这是最后一张，不能乐观移除后又被服务器“顶回来”造成闪动，
@@ -1573,17 +1605,6 @@
         }
         renderRealReview();
       }
-      // 同一次点击的自动重试必须复用 action_id 与 revision，确保服务端幂等。
-      const payload = {
-        ratings: [{
-          card_id: id,
-          rating,
-          session_repeat: Boolean(card.session_repeat),
-          action_id: newActionId(),
-          expected_revision: Number(card.revision) || 0,
-          expected_example_day: card.example_learning_day || "",
-        }],
-      };
       const data = await submitReviewWithRetry(payload);
       if (data.errors && data.errors.length) {
         const error = new Error((data.errors[0] && data.errors[0].detail) || "保存失败");
@@ -1594,6 +1615,12 @@
       // 此时按失败处理，重拉队列与服务器对齐。
       if (!data.cards || !data.cards[0] || !data.cards[0].card) {
         throw new Error("服务器没有返回评分结果");
+      }
+      delete card._pendingReview;
+      const status = document.getElementById("real-undo-status");
+      if (status && /^(正在保存|评分失败)/.test(status.textContent)) {
+        clearTimeout(realUndoStatusTimer);
+        status.textContent = "";
       }
       // 保存成功后才记入撤回历史，避免失败时本地记录与服务器不一致。
       realReviewHistory.push({ card, index });
@@ -1635,9 +1662,15 @@
       loadTodayOverview();
       updateTodayOverview();
     } catch (err) {
+      if (err.status >= 400 && err.status < 500 && err.status !== 429) {
+        delete card._pendingReview;
+      }
       const status = document.getElementById("real-undo-status");
       if (status) {
-        status.textContent = "评分失败：" + err.message + "，请重试";
+        const message = err.reviewNetworkError
+          ? (err.name === "AbortError" ? "保存超时，当前卡片已保留" : "网络连接中断，当前卡片已保留")
+          : err.message;
+        status.textContent = "评分失败：" + message + "，请重试";
         clearTimeout(realUndoStatusTimer);
         realUndoStatusTimer = setTimeout(() => {
           status.textContent = "";
