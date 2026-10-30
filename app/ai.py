@@ -696,7 +696,8 @@ def _decode_json_object(raw_text: str):
 
 
 def _structured_card_rows(
-    raw_text: str, requested_words: list[str], card_template: str
+    raw_text: str, requested_words: list[str], card_template: str,
+    validation_errors: dict[str, str] | None = None,
 ) -> dict[str, dict] | None:
     """Parse the preferred id-based JSON card response.
 
@@ -732,6 +733,8 @@ def _structured_card_rows(
             word
         ):
             # 兼容模型偶尔附带 term/word 的响应，但拒绝 ID 与词条互相错绑。
+            if validation_errors is not None:
+                validation_errors[word] = "词条与返回的 ID 不一致"
             continue
         seen_ids.add(item_id)
         if "examples" in item and card_template in {"reading", "cloze"}:
@@ -743,6 +746,8 @@ def _structured_card_rows(
                 for field in definition_fields
             ):
                 # 多义列表/对象不能强转字符串后伪装成单一释义。
+                if validation_errors is not None:
+                    validation_errors[word] = "释义字段缺失或不是单条文本"
                 continue
         meaning = str(item.get("meaning") or "").strip()
         example = str(item.get("example") or "").strip()
@@ -763,60 +768,78 @@ def _structured_card_rows(
         }
         if "examples" in item and card_template != "general":
             normalized["examples"] = item["examples"]
-            if not _valid_card_examples(normalized, word, card_template):
+            error = _card_examples_error(normalized, word, card_template)
+            if error:
+                if validation_errors is not None:
+                    validation_errors[word] = error
                 continue
             normalized["examples"] = [" ".join(s.split()) for s in item["examples"]]
             normalized["e"] = normalized["examples"][0]
-        if _validate_card_result(normalized, word, card_template):
+        error = _card_result_error(normalized, word, card_template)
+        if not error:
             parsed[word] = normalized
+        elif validation_errors is not None:
+            validation_errors[word] = error
     return parsed
 
 
 def _valid_card_examples(card: dict, requested_word: str, card_template: str) -> bool:
+    return not _card_examples_error(card, requested_word, card_template)
+
+
+def _card_examples_error(card: dict, requested_word: str, card_template: str) -> str:
     from .card_builder import sentence_front
 
     pos = card.get("pos")
     if not isinstance(pos, str) or pos.strip() not in _CARD_POS_LABELS:
-        return False
+        return "词性必须是一个有效的单一词性标签"
     examples = card.get("examples")
     if not isinstance(examples, list) or len(examples) != 3:
-        return False
+        return "必须返回 3 个例句"
     if not all(isinstance(s, str) and 0 < len(s.strip()) <= 1000 for s in examples):
-        return False
+        return "例句为空、不是文本或超过 1000 字符"
     keys = {" ".join(s.split()).casefold().rstrip(".!?") for s in examples}
-    return len(keys) == 3 and all(
-        _validate_card_result({**card, "e": sentence}, requested_word, card_template)
-        and (card_template != "cloze" or sentence_front(sentence, requested_word, cloze=True).count("______") == 1)
-        for sentence in examples
-    )
+    if len(keys) != 3:
+        return "3 个例句不能重复"
+    for index, sentence in enumerate(examples, start=1):
+        error = _card_result_error({**card, "e": sentence}, requested_word, card_template)
+        if error:
+            return f"例句 {index}：{error}"
+        if card_template == "cloze" and sentence_front(sentence, requested_word, cloze=True).count("______") != 1:
+            return f"例句 {index}：无法完整挖空一次目标词"
+    return ""
 
 
 def _validate_card_result(card: dict, requested_word: str, card_template: str) -> bool:
     """Validate machine-checkable card constraints before persistence."""
+    return not _card_result_error(card, requested_word, card_template)
+
+
+def _card_result_error(card: dict, requested_word: str, card_template: str) -> str:
     meaning = str(card.get("m") or "").strip()
     example = str(card.get("e") or "").strip()
     if not meaning:
-        return False
+        return "缺少释义"
     if card_template == "general":
-        return bool(re.search(r"[\u4e00-\u9fff]", meaning))
+        return "" if re.search(r"[\u4e00-\u9fff]", meaning) else "缺少中文释义"
 
     pattern = target_surface_pattern(_split_card_entry(requested_word)[0])
     if card_template == "cloze":
         if not re.search(r"[\u4e00-\u9fff]", meaning):
-            return False
+            return "缺少中文释义"
         if not example or not re.search(r"[A-Za-z]", example):
-            return False
+            return "缺少英文例句"
         if pattern is None or not pattern.search(example):
-            return False
-        return len(list(pattern.finditer(example))) == 1
+            return "未包含目标词或已支持的词形"
+        return "" if len(list(pattern.finditer(example))) == 1 else "目标词必须完整出现一次"
     meaning_parts = _reading_meaning_parts(meaning)
     if not meaning_parts:
-        return False
+        return "缺少词性、英文释义或中文释义"
     if pattern is not None and pattern.search(meaning_parts[1]):
-        return False
+        return "英文释义包含目标词，需改为简单的同义解释"
     if not example or not re.search(r"[A-Za-z]", example):
-        return False
-    return pattern is not None and bool(pattern.search(example))
+        return "缺少英文例句"
+    return "" if pattern is not None and pattern.search(example) else "未包含目标词或已支持的词形"
 
 
 def _call_ai_card_batch(
@@ -854,11 +877,17 @@ def _call_ai_card_batch(
 
 
 def _parse_ai_card_batch(
-    content: str, requested_words: list[str], card_template: str
+    content: str, requested_words: list[str], card_template: str,
+    validation_errors: dict[str, str] | None = None,
 ) -> dict[str, dict]:
     """Parse preferred id-based JSON, then fall back to legacy text rows."""
-    structured = _structured_card_rows(content, requested_words, card_template)
+    if validation_errors is not None:
+        validation_errors.update({word: "未返回该词条的有效卡片内容" for word in requested_words})
+    structured = _structured_card_rows(content, requested_words, card_template, validation_errors)
     if structured is not None:
+        if validation_errors is not None:
+            for word in structured:
+                validation_errors.pop(word, None)
         return structured
 
     requested_by_key = {_card_word_key(word): word for word in requested_words}
@@ -871,9 +900,14 @@ def _parse_ai_card_batch(
             continue
         normalized = dict(card)
         normalized["w"] = requested_word
-        if not _validate_card_result(normalized, requested_word, card_template):
+        error = _card_result_error(normalized, requested_word, card_template)
+        if error:
+            if validation_errors is not None:
+                validation_errors[requested_word] = error
             continue
         parsed[requested_word] = normalized
+        if validation_errors is not None:
+            validation_errors.pop(requested_word, None)
     return parsed
 
 
@@ -1374,9 +1408,12 @@ def _generate_card_content_locked(
         content = ""
         request_error = ""
         attempts = 0
-        batch_repair = "\n".join(
-            repair_notes.get(_card_word_key(word), "") for word in batch
-        ).strip()
+        failures = {
+            word: repair_notes[_card_word_key(word)]
+            for word in batch if _card_word_key(word) in repair_notes
+        }
+        # 重组批次后 ID 会重新编号，不能复用原单词各自的 I01 修复提示。
+        batch_repair = _card_repair_instruction(card_template, batch, failures) if failures else ""
 
         def call_batch() -> str:
             try:
@@ -1459,8 +1496,15 @@ def _generate_card_content_locked(
                 for word in pending:
                     errors.setdefault(word, "制卡超时，请重试剩余单词")
                 break
-            batch = pending[:batch_size]
-            pending = pending[batch_size:]
+            # 首轮保持批量生成；格式失败的词单独修复一次，避免再次在大批
+            # JSON 中漏项。单词尝试次数和任务总时长上限保持原有约束。
+            current_batch_size = 1 if _card_word_key(pending[0]) in repair_notes else batch_size
+            for index, word in enumerate(pending[:current_batch_size]):
+                if index and _card_word_key(word) in repair_notes:
+                    current_batch_size = index
+                    break
+            batch = pending[:current_batch_size]
+            pending = pending[current_batch_size:]
             for word in batch:
                 key = _card_word_key(word)
                 attempts_by_key[key] = attempts_by_key.get(key, 0) + 1
@@ -1509,13 +1553,15 @@ def _generate_card_content_locked(
                 _report_round()
                 continue
 
-            parsed = _parse_ai_card_batch(content, batch, card_template)
+            validation_errors: dict[str, str] = {}
+            parsed = _parse_ai_card_batch(content, batch, card_template, validation_errors)
             if card_template != "general":
                 # 旧文本解析仍供历史格式使用；新制卡必须完成三个语境才能入库。
-                parsed = {
-                    word: card for word, card in parsed.items()
-                    if _valid_card_examples(card, word, card_template)
-                }
+                for word in list(parsed):
+                    error = _card_examples_error(parsed[word], word, card_template)
+                    if error:
+                        validation_errors[word] = error
+                        parsed.pop(word)
             results.update(parsed)
             for word in batch:
                 key = _card_word_key(word)
@@ -1524,10 +1570,11 @@ def _generate_card_content_locked(
                     repair_notes.pop(key, None)
                     continue
                 # 格式不合格（句子不完整/不含目标词）：放回队尾继续尝试。
+                reason = validation_errors.get(word, "未返回该词条的有效卡片内容")
                 if attempts_by_key[key] >= max_attempts:
-                    errors[word] = "AI 多次返回不完整卡片，已跳过"
+                    errors[word] = f"AI 重试后仍未通过校验：{reason}"
                 else:
-                    repair_notes[key] = _card_repair_instruction(card_template, [word])
+                    repair_notes[key] = reason
                     timings["format_retry_count"] += 1
                     pending.append(word)
             _report_round()
@@ -1556,7 +1603,9 @@ def _empty_timings() -> dict[str, float | int]:
     }
 
 
-def _card_repair_instruction(card_template: str, words: list[str]) -> str:
+def _card_repair_instruction(
+    card_template: str, words: list[str], failures: dict[str, str] | None = None,
+) -> str:
     """给一次格式修复提供具体、短小的失败约束。"""
     ids = ", ".join(
         f"I{index:02d}" for index, _word in enumerate(words, start=1)
@@ -1576,9 +1625,15 @@ def _card_repair_instruction(card_template: str, words: list[str]) -> str:
     else:
         requirement = "Each listed id needs one short Simplified Chinese meaning."
     pos_rule = f"\n{_CARD_POS_RULE}" if card_template != "general" else ""
+    failure_details = ""
+    if failures:
+        failure_details = "\nVALIDATION_FAILURES\n" + json.dumps([
+            {"id": f"I{index:02d}", "reason": failures[word]}
+            for index, word in enumerate(words, start=1) if word in failures
+        ], ensure_ascii=False) + "\n"
     return (
         f"The previous response failed validation for ids {ids}. {requirement}\n"
-        f"{_CARD_CORE_SENSE_RULES}{pos_rule}\nReturn only valid JSON."
+        f"{_CARD_CORE_SENSE_RULES}{pos_rule}{failure_details}\nReturn only valid JSON."
     )
 
 

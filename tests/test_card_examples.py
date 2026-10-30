@@ -188,3 +188,91 @@ def test_initial_and_repair_prompts_keep_one_core_sense_and_pos(template):
     assert "Use the hinted sense" not in prompt
     if template != "general":
         assert '"pos"' in prompt
+
+
+@pytest.mark.parametrize("target, sentence, surface", [
+    ("wrote", "She has written a letter to her friend.", "written"),
+    ("deteriorated", "The bridge will deteriorate without regular repairs.", "deteriorate"),
+])
+def test_matching_and_rendering_use_same_inflection_family(target, sentence, surface):
+    assert card_builder.is_complete_sentence(sentence, target)
+    assert f"**{surface}**" in card_builder.sentence_front(sentence, target)
+    assert card_builder.sentence_front(sentence, target, cloze=True).count("______") == 1
+
+
+def test_format_repairs_isolate_failed_words(monkeypatch):
+    monkeypatch.setattr(config, "AI_DAILY_REQUEST_LIMIT", 0)
+    monkeypatch.setattr(ai, "ai_enabled", lambda: True)
+    monkeypatch.setattr(ai, "_new_ai_client", lambda: object())
+    calls = []
+    batches = []
+
+    def fake_call(_client, words, _template, repair_instruction=""):
+        calls.append(repair_instruction)
+        batches.append(words)
+        if len(calls) == 1:
+            return '{"items":[]}'
+        return json.dumps({"items": [
+            {"id": f"I{index:02d}", "pos": "n.", "en_def": "a test target", "zh_def": "测试目标", "examples": [
+                f"Readers discuss {word} during class.",
+                f"She writes {word} on the board.",
+                f"They found {word} in a book.",
+            ]}
+            for index, word in enumerate(words, start=1)
+        ]})
+
+    monkeypatch.setattr(ai, "_call_ai_card_batch", fake_call)
+    results, errors, _, _ = ai.generate_card_content_in_batches(None, 1, ["alpha", "beta"])
+    assert set(results) == {"alpha", "beta"}
+    assert errors == {}
+    assert batches == [["alpha", "beta"], ["alpha"], ["beta"]]
+    assert "ids I01" in calls[1]
+    assert calls[1].count("The previous response") == 1
+    assert "I02" not in calls[1]
+    assert "I02" not in calls[2]
+
+
+def test_repair_rebinds_reasons_to_current_batch_ids():
+    instruction = ai._card_repair_instruction("reading", ["fresh", "beta", "alpha"], {
+        "beta": "必须返回 3 个例句", "alpha": "缺少中文释义",
+    })
+    details = json.loads(instruction.split("\nVALIDATION_FAILURES\n")[1].split("\n")[0])
+    assert details == [
+        {"id": "I02", "reason": "必须返回 3 个例句"},
+        {"id": "I03", "reason": "缺少中文释义"},
+    ]
+
+
+@pytest.mark.parametrize("field, value, reason", [
+    ("examples", EXAMPLES[:2], "必须返回 3 个例句"),
+    ("examples", [EXAMPLES[0]] * 3, "例句不能重复"),
+    ("examples", [EXAMPLES[0], "He walks to school every day.", EXAMPLES[2]], "例句 2：未包含目标词"),
+    ("pos", "n. / v.", "单一词性标签"),
+    ("en_def", "to run very fast", "英文释义包含目标词"),
+    ("en_def", ["move quickly"], "释义字段缺失"),
+])
+def test_rejected_cards_report_the_actual_constraint(field, value, reason):
+    payload = json.loads(card_content())
+    payload["items"][0][field] = value
+    errors = {}
+    assert ai._parse_ai_card_batch(json.dumps(payload), ["run"], "reading", errors) == {}
+    assert reason in errors["run"]
+
+
+def test_exhausted_repairs_show_specific_reason(monkeypatch):
+    monkeypatch.setattr(config, "AI_DAILY_REQUEST_LIMIT", 0)
+    monkeypatch.setattr(ai, "ai_enabled", lambda: True)
+    monkeypatch.setattr(ai, "_new_ai_client", lambda: object())
+    repairs = []
+
+    def fake_call(*args, **kwargs):
+        repairs.append(kwargs.get("repair_instruction", ""))
+        return card_content(examples=EXAMPLES[:2])
+
+    monkeypatch.setattr(ai, "_call_ai_card_batch", fake_call)
+    results, errors, requests, _ = ai.generate_card_content_in_batches(None, 1, ["run"])
+    assert results == {}
+    assert requests == 2
+    assert "必须返回 3 个例句" in repairs[1]
+    assert "必须返回 3 个例句" in errors["run"]
+    assert "不完整卡片" not in errors["run"]

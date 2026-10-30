@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from . import builtin_lookup, config, vocab
 from .models import Card, Corpus, LookupCache, LookupHistory, WordEntry
+from .word_forms import target_surface_pattern
 
 _WORD_RE = re.compile(r"[A-Za-z]+(?:['’][A-Za-z]+)?", re.IGNORECASE)
 # 旧卡补句子时扫描语料的预算：最多扫最近 2MB 正文，且每本书截取前 500KB，
@@ -38,24 +39,14 @@ def _replace_word(text: str, word: str, replacement: str, preserve_surface: bool
     # 否则带注解的词永远匹配不上句子里的单词，正面不会挖空/高亮。
     target = re.sub(
         r"\s+", " ", re.sub(r"[\(\（].*?[\)\）]", "", word, flags=re.IGNORECASE)
-    ).strip().lower()
-
-    def _sub(m: re.Match) -> str:
-        if vocab.normalize_word(m.group(0)) != target:
-            return m.group(0)
-        return replacement.format(surface=m.group(0)) if preserve_surface else replacement
-
-    if re.search(r"\s", target):
-        # 多词短语：按完整短语匹配（忽略大小写），整段高亮/挖空；
-        # 单词语正则无法匹配短语，会导致短语目标在正面不凸显。
-        def _phrase_sub(m: re.Match) -> str:
-            surface = m.group(0)
-            return replacement.format(surface=surface) if preserve_surface else replacement
-
-        pattern = r"(?<![A-Za-z])" + re.escape(target) + r"(?![A-Za-z])"
-        return re.sub(pattern, _phrase_sub, text, flags=re.IGNORECASE)
-
-    return _WORD_RE.sub(_sub, text)
+    ).strip()
+    pattern = target_surface_pattern(target)
+    if pattern is None:
+        return text
+    return pattern.sub(
+        lambda match: replacement.format(surface=match.group(0)) if preserve_surface else replacement,
+        text,
+    )
 
 
 def _complete_sentence(sentence: str) -> str:
@@ -103,16 +94,8 @@ def is_complete_sentence(sentence: str, word: str) -> bool:
         return False
     # 去掉括号注解（如 span(v) 只看 span），避免把注解字母当成目标词。
     base_word = re.sub(r"[\(\（].*?[\)\）]", "", word, flags=re.IGNORECASE).strip()
-    target_tokens = _WORD_RE.findall(base_word.lower())
-    if not target_tokens:
-        return False
-    target_norms = [vocab.normalize_word(token) for token in target_tokens]
-    sentence_norms = [vocab.normalize_word(token) for token in tokens]
-    width = len(target_norms)
-    return any(
-        sentence_norms[index : index + width] == target_norms
-        for index in range(len(sentence_norms) - width + 1)
-    )
+    pattern = target_surface_pattern(base_word)
+    return pattern is not None and bool(pattern.search(sentence))
 
 
 def sentence_front(sentence: str, word: str, cloze: bool = False) -> str:
