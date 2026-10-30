@@ -3149,11 +3149,12 @@
       setCardProgress(
         doneCount,
         result.processed || doneCount || totalWords || 0,
-        "完成"
+        result.error && !result.created && !result.existing ? "失败" : "完成"
       );
       const status = document.getElementById("real-card-status");
       if (status) {
-        status.textContent = result.limit_notice || (result.error ? "部分失败：" + result.error : "");
+        status.textContent = result.limit_notice || (result.error
+          ? (result.created ? "部分失败：" : "生成失败：") + result.error : "");
       }
       await loadRealWords();
       loadRealCardQuota();
@@ -3181,7 +3182,7 @@
       progressTimer = setInterval(pollCardProgress, 1500);
       let res;
       try {
-        res = await fetch("/api/card-studio/cards", {
+        res = await fetch("/api/card-studio/cards?background=true", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ words, card_type: realCardType }),
@@ -3193,6 +3194,19 @@
         return;
       }
       const data = await res.json().catch(() => ({}));
+      if (res.status === 202 || (res.status === 409 && data.state === "generating")) {
+        if (status) status.textContent = "正在后台生成，可继续查看进度…";
+        startProgressWatchdog();
+        pollCardProgress();
+        return;
+      }
+      if ([502, 503, 504, 524].includes(res.status)) {
+        // 网关错误不能证明任务失败；先通过独立进度请求确认原任务结果。
+        if (status) status.textContent = "连接中断，正在确认后台生成进度…";
+        startProgressWatchdog();
+        pollCardProgress();
+        return;
+      }
       if (!res.ok) {
         // 服务端明确拒绝（额度用完/超出上限/校验失败）：显示真实原因并停止轮询。
         stopCardProgressPoll();

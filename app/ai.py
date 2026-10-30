@@ -935,6 +935,7 @@ def _report_card_progress(
             entry.pop("finished_wall", None)
             entry.pop("result", None)
             entry["total"] = max(0, total)
+            entry["completed"] = 0
         if completed is not None:
             entry["completed"] = max(int(entry["completed"] or 0), max(0, completed))
         if detail:

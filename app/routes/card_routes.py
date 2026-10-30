@@ -80,6 +80,10 @@ logger = logging.getLogger(__name__)
 # progress 轮询的专用执行器容量：与制卡占用的默认线程池彻底分开。
 _PROGRESS_ROUTE_LIMITER = anyio.CapacityLimiter(4)
 
+# 覆盖完整的“生成 + 入库”过程；重复提交不能覆盖原任务的进度或最终结果。
+_CARD_STUDIO_ACTIVE: set[int] = set()
+_CARD_STUDIO_GUARD = threading.Lock()
+
 _ARTICLE_GENERATION: dict[int, dict[str, object]] = {}
 _ARTICLE_GENERATION_GUARD = threading.Lock()
 
@@ -536,10 +540,62 @@ def get_card_studio_quota(request: Request, db: Session = Depends(get_db)):
 
 @router.post("/card-studio/cards")
 def create_cards_from_studio(
-    body: CardStudioCreateIn, request: Request, db: Session = Depends(get_db)
+    body: CardStudioCreateIn,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    background: bool = False,
 ):
     """唯一的站内制卡入口；查词和阅读页只能把词送到这里。"""
     user = _require_user(db, request)
+    if body.card_type not in GENERATABLE_CARD_TYPES:
+        raise HTTPException(status_code=400, detail="无效卡片类型")
+    words = _parse_card_target_list("\n".join(body.words))[:config.MAX_CARDS_PER_RUN]
+    if not words:
+        raise HTTPException(status_code=400, detail="没有可用于制卡的词条")
+    with _CARD_STUDIO_GUARD:
+        if user.id in _CARD_STUDIO_ACTIVE:
+            return JSONResponse(
+                status_code=409,
+                content={"detail": "已有制卡任务正在进行，请查看进度", "state": "generating"},
+            )
+        _CARD_STUDIO_ACTIVE.add(user.id)
+    ai_mod._report_card_progress(user.id, total=len(words), completed=0, detail="排队中")
+    if background:
+        # 返回 202 后才执行长任务，不让浏览器连接承担几十分钟的 AI 等待。
+        background_tasks.add_task(_create_cards_in_background, body, user.id)
+        return JSONResponse(status_code=202, content={"ok": True, "state": "generating"})
+    try:
+        return _create_cards_from_studio(body, user, db)
+    finally:
+        with _CARD_STUDIO_GUARD:
+            _CARD_STUDIO_ACTIVE.discard(user.id)
+
+
+def _create_cards_in_background(body: CardStudioCreateIn, user_id: int) -> None:
+    # 请求会话在响应结束后关闭；后台必须自己创建并释放数据库会话。
+    db = SessionLocal()
+    try:
+        user = db.get(User, user_id)
+        if user is None:
+            raise HTTPException(status_code=404, detail="账户不存在")
+        _create_cards_from_studio(body, user, db)
+    except Exception as exc:
+        db.rollback()
+        message = exc.detail if isinstance(exc, HTTPException) else "制卡失败，请稍后重试"
+        ai_mod.mark_card_generation_done(user_id, {"error": message})
+        logger.warning(
+            "card studio background job failed: user_id=%s error_type=%s",
+            user_id, type(exc).__name__,
+        )
+    finally:
+        db.close()
+        with _CARD_STUDIO_GUARD:
+            _CARD_STUDIO_ACTIVE.discard(user_id)
+
+
+def _create_cards_from_studio(body: CardStudioCreateIn, user: User, db: Session):
+    """同步和后台任务共用制卡、配额、去重与入库逻辑。"""
     user_credential = _user_ai_credential(db, user)
     submitted_count = len(body.words)
     input_words = list(body.words)
