@@ -241,6 +241,7 @@ def test_repair_rebinds_reasons_to_current_batch_ids():
         {"id": "I02", "reason": "必须返回 3 个例句"},
         {"id": "I03", "reason": "缺少中文释义"},
     ]
+    assert "use the exact input term once in each example" in instruction
 
 
 @pytest.mark.parametrize("field, value, reason", [

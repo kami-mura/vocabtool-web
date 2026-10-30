@@ -1624,6 +1624,11 @@ def _card_repair_instruction(
         )
     else:
         requirement = "Each listed id needs one short Simplified Chinese meaning."
+    if card_template != "general":
+        requirement += (
+            " For this repair, use the exact input term once in each example instead of an "
+            "inflection or synonym; choose natural contexts that preserve its core sense and POS."
+        )
     pos_rule = f"\n{_CARD_POS_RULE}" if card_template != "general" else ""
     failure_details = ""
     if failures:
